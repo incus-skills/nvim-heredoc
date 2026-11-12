@@ -214,7 +214,7 @@ local function process_pending_ranges(buf, close_incomplete)
   end
 end
 
-local function schedule_changed_range(buf, firstline, new_lastline)
+local function schedule_changed_range(buf, firstline, lastline, new_lastline)
   if processing[buf] then
     return
   end
@@ -257,8 +257,8 @@ local function attach(buf)
 
   attached[buf] = true
   vim.api.nvim_buf_attach(buf, false, {
-    on_lines = function(_, changed_buf, _, firstline, _, new_lastline)
-      schedule_changed_range(changed_buf, firstline, new_lastline)
+    on_lines = function(_, changed_buf, _, firstline, lastline, new_lastline)
+      schedule_changed_range(changed_buf, firstline, lastline, new_lastline)
     end,
     on_detach = function(_, detached_buf)
       attached[detached_buf] = nil
