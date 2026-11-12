@@ -11,6 +11,7 @@ local function set_buffer(source, filetype)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(source, "\n", { plain = true }))
   vim.bo[buf].filetype = filetype
   vim.api.nvim_set_current_buf(buf)
+  dofile("tests/fixtures/provisioned/after/ftplugin/" .. filetype .. ".lua")
   return buf
 end
 
@@ -65,8 +66,7 @@ local zsh = set_buffer("print -r -- ok", "zsh")
 assert(#conform.list_formatters_for_buffer(zsh) == 0, "Zsh must not resolve to shfmt")
 vim.api.nvim_set_current_buf(bash)
 
-dofile("plugin/nvim-heredoc.lua")
-assert(vim.g.loaded_nvim_heredoc == true, "plugin entrypoint did not load")
+assert(plugin.setup_buffer(bash), "provisioned Bash ftplugin did not attach the buffer")
 
 -- Trigger Blink's real buffer-source completion menu while the cursor is
 -- inside a managed heredoc body. Enabled-state alone is not sufficient evidence.
