@@ -52,9 +52,9 @@ done
 glow - <<REPORT
 ## nvim-heredoc provisioned
 
-- Configuration: `$NVIM_CONFIG_DIR`
-- Lua modules: `lua/nvim-heredoc/`
-- Filetype entrypoints: `after/ftplugin/{bash,sh,zsh}.lua`
+- Configuration: $NVIM_CONFIG_DIR
+- Lua modules: lua/nvim-heredoc/
+- Filetype entrypoints: after/ftplugin/{bash,sh,zsh}.lua
 - Write behaviour: replace the three owned ftplugins and implementation modules
 - Runtime plugin-manager entrypoint: not required
 REPORT
