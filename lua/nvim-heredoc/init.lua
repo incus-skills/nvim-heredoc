@@ -92,7 +92,12 @@ function M.process_buffer(buf, changed_range, close_incomplete)
         end
         local pending
         for _, region in ipairs(result.regions) do
-          if not region.terminator_line and region.opener_safe then
+          local body_row = region.body_start_line - 1
+          local body_line_exists = region.body_start_line <= #lines
+          local change_reached_body = not changed_range
+            or (changed_range.start_row <= body_row and changed_range.end_row >= region.body_start_line)
+          if not region.terminator_line and region.opener_safe
+            and body_line_exists and change_reached_body then
             pending = region
             break
           end
