@@ -270,11 +270,13 @@ local ok, err = xpcall(function()
 
   test_batched_heredoc_input("<CR>x", "x", 6, function()
     test_batched_heredoc_input("<CR>abc", "abc", 8, function()
+    test_minipairs_expression_fallback(function()
       test_controlled_string_fallback(function()
         print("LazyVim synchronous Enter prototype: PASS")
         vim.cmd("qa!")
       end)
     end)
+  end)
   end)
 end, debug.traceback)
 
