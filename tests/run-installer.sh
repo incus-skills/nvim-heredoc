@@ -8,9 +8,10 @@ config="$tmp/nvim"
 fake_bin="$tmp/bin"
 
 mkdir -p -- "$fake_bin"
+export GLOW_REPORT_PATH="$tmp/glow-report.md"
 cat > "$fake_bin/glow" <<'GLOW'
 #!/usr/bin/env bash
-cat >/dev/null
+cat > "$GLOW_REPORT_PATH"
 GLOW
 chmod +x "$fake_bin/glow"
 
@@ -19,6 +20,11 @@ export NVIM_CONFIG_DIR="$config"
 
 bash -n "$repo_root/scripts/install.sh"
 bash "$repo_root/scripts/install.sh"
+
+grep -F -- "- Configuration: $config" "$GLOW_REPORT_PATH"
+grep -F -- "- Lua modules: lua/nvim-heredoc/" "$GLOW_REPORT_PATH"
+grep -F -- "- Filetype entrypoints: after/ftplugin/{bash,sh,zsh}.lua" "$GLOW_REPORT_PATH"
+grep -F -- "- Runtime plugin-manager entrypoint: not required" "$GLOW_REPORT_PATH"
 
 for module in init.lua scanner.lua editing.lua; do
   cmp "$repo_root/lua/nvim-heredoc/$module" "$config/lua/nvim-heredoc/$module"
