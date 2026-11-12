@@ -217,7 +217,7 @@ local function start()
                   assert_lines(actual[2] == "\ttyped" and actual[3] == "\tsecond"
                     and actual[4] == "\t  pasted one"
                     and actual[5] == "\t    pasted two"
-                    and actual[6] == "\tLIVE",
+                    and actual[6] == "LIVE",
                     "InsertLeave must not be required to repair indentation")
 
                   cleanup(true, "PASS (first Return, typing, pre-keystroke TAB, and multi-line paste); "
