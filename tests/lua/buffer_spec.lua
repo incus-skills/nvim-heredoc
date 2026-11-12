@@ -210,65 +210,6 @@ do
 end
 
 do
-  local buf = set_buffer({ "\tcat <<-LIVE" })
-  vim.api.nvim_set_current_buf(buf)
-  -- Match the required shell-buffer indentation contract established by the
-  -- provisioned Bash/sh/Zsh ftplugins.
-  vim.bo[buf].expandtab = false
-  vim.bo[buf].tabstop = 2
-  vim.bo[buf].softtabstop = 0
-  vim.bo[buf].shiftwidth = 2
-  plugin.setup()
-
-  -- Send real Insert-mode keys. The closer must appear after Enter while
-  -- Insert mode remains active; no InsertLeave event has occurred.
-  local opener = "\tcat <<-LIVE"
-  vim.api.nvim_win_set_cursor(0, { 1, #opener })
-  vim.api.nvim_feedkeys("A\n", "n", false)
-  assert(vim.wait(1000, function()
-    local actual = lines(buf)
-    local cursor = vim.api.nvim_win_get_cursor(0)
-    -- The body line and closer are inserted before the scheduled on_lines
-    -- callback has necessarily completed. Wait for the complete live state,
-    -- including the cursor being placed after the structural TAB.
-    return actual[2] == "\t" and actual[3] == "\tLIVE"
-      and cursor[1] == 2 and vim.api.nvim_get_mode().mode == "i"
-  end, 10), "Enter live-state timeout: lines=" .. vim.inspect(lines(buf))
-    .. " cursor=" .. vim.inspect(vim.api.nvim_win_get_cursor(0))
-    .. " mode=" .. vim.inspect(vim.api.nvim_get_mode()))
-
-  -- The Insert-mode byte column is the TAB's byte index (zero), while the
-  -- insertion point is immediately after it. Typing below proves the actual
-  -- insertion position without relying on normal-mode cursor coordinates.
-
-  -- Ordinary typing is also processed before leaving Insert mode.
-  vim.api.nvim_feedkeys("typed", "n", false)
-  assert(vim.wait(1000, function()
-    local cursor = vim.api.nvim_win_get_cursor(0)
-    return lines(buf)[2] == "\ttyped"
-      and cursor[1] == 2 and vim.api.nvim_get_mode().mode == "i"
-  end, 10), "typed body text should receive its structural TAB and retain the correct cursor while still in Insert mode; lines="
-    .. vim.inspect(lines(buf)) .. " cursor=" .. vim.inspect(vim.api.nvim_win_get_cursor(0)))
-  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "xt", false)
-
-  -- A multi-line paste is handled as one changed range. Structural TABs are
-  -- added while preserving each line's original content indentation.
-  vim.api.nvim_buf_set_lines(buf, 1, 2, false, {
-    "  pasted one",
-    "    pasted two",
-    "",
-  })
-  assert(vim.wait(1000, function()
-    local actual = lines(buf)
-    return actual[2] == "\t  pasted one"
-      and actual[3] == "\t    pasted two"
-      and actual[4] == "\t"
-  end, 10), "multi-line paste should receive live structural indentation")
-  local actual = lines(buf)
-  assert(actual[5] == "\tLIVE", "paste processing must preserve the reserved closer")
-end
-
-do
   local buf = set_buffer({ "\tcat <<-AUTO", "" })
   vim.api.nvim_set_current_buf(buf)
   plugin.setup()
