@@ -76,7 +76,7 @@ local function active_cursor_row(buf)
   return vim.api.nvim_win_get_cursor(win)[1] - 1
 end
 
-local function ensure_body_prefix_and_cursor(buf, region, body_row)
+local function ensure_body_prefix(buf, region, body_row)
   local prefix = region.structural_prefix or ""
   if prefix == "" then
     return
@@ -143,7 +143,7 @@ function M.process_buffer(buf, changed_range, close_incomplete)
             -- auto-indented the new line already, but can leave the cursor
             -- before that TAB. Ensure both the prefix and insertion point
             -- are correct before the user types the first payload byte.
-            ensure_body_prefix_and_cursor(buf, pending, body_row)
+            ensure_body_prefix(buf, pending, body_row)
           end
         elseif close_incomplete then
           -- Retain the fallback for buffers opened with an incomplete region.
