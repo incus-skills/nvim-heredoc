@@ -48,6 +48,10 @@ An unterminated managed heredoc is returned with `confidence = "incomplete"`, no
 - A bounded subset of `$(...)` command substitutions and nested substitutions, sufficient to skip ordinary substitutions that contain no heredoc redirection.
 - Arithmetic expansions inside supported command-substitution contexts.
 
+## Independent parser oracle
+
+The CI core job uses the mvdan/sh parser through the `shfmt --to-json` interface to establish that selected unsupported-grammar fixtures are valid Bash programs. The Lua scanner is then required to report uncertainty for those same fixtures and must not mark any returned region editable. This deliberately separates *syntactic validity* from *safe editability*: mvdan/sh is a test oracle, not a runtime dependency or an authority that can override the Lua scanner's conservative gate. The fixtures currently cover backtick substitution and a heredoc nested inside command substitution.
+
 ## Explicit limits
 
 This is not a full parser for Bash, POSIX sh, or Zsh. Backtick substitutions, heredoc redirections inside command substitutions, multiline quoted commands, and other unsupported lexical contexts produce an uncertainty diagnostic. The scan stops at that point and no returned region is editable. The scanner's subset has not yet been demonstrated equivalent across every shell grammar edge case; new syntax should be added only with regression coverage for all intended dialects.
@@ -68,4 +72,4 @@ The current integration:
 
 The integration is headlessly tested, but this does not establish compatibility with LazyVim, `mini.pairs`, `blink.cmp`, or `conform.nvim`. Plugin-specific controls remain deliberately untouched pending inspection of the actual installed revisions and configuration.
 
-These behaviours remain prototype-level. The `editable` field is a conservative gate for the current editing operations, not proof that every possible shell construct has been parsed. Headless regressions cover disjoint edits and pending-range rebasing when a later edit inserts or deletes lines before an earlier pending range; untouched intervening lines are asserted byte-for-byte. More complex overlapping replacement sequences, partial notifications, cursor behaviour, and all buffer mutation paths still require broader regression and real-workstation validation.
+These behaviours remain prototype-level. The `editable` field is a conservative gate for the current editing operations, not proof that every possible shell construct has been parsed. Headless regressions cover disjoint edits; insertion/deletion before earlier pending edits; an overlapping replacement with a line-count change; a replacement spanning multiple disjoint pending ranges; and insertion at a pending-range boundary. They assert that changed content is prefixed while untouched neighboring lines remain byte-for-byte unchanged. Partial notifications, arbitrary concurrent buffer mutation paths, and broader real-workstation validation remain open.
