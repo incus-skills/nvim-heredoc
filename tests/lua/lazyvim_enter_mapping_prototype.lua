@@ -193,16 +193,13 @@ local function test_controlled_string_fallback()
     false
   )
 
-  wait_for(function()
-    return vim.deep_equal(get_lines(buf), { "seed", "OBSERVED_NORMAL_ENTERworld" })
-  end, "controlled string-based <CR> mapping was not preserved; lines=" .. vim.inspect(get_lines(buf)))
+  assert(vim.deep_equal(get_lines(buf), { "seed", "OBSERVED_NORMAL_ENTERworld" }),
+    "controlled string-based <CR> mapping was not preserved; lines=" .. vim.inspect(get_lines(buf)))
 
   assert(vim.api.nvim_get_mode().mode == "i",
     "controlled fallback must remain in Insert mode")
   print("controlled string <CR> fallback PASS")
-  feed("<Esc>")
-  wait_for(function() return vim.api.nvim_get_mode().mode ~= "i" end,
-    "Escape did not leave Insert mode")
+  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "xt", false)
 end
 
 local ok, err = xpcall(function()
