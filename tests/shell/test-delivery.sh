@@ -23,6 +23,18 @@ if [ -f "$tmp/zsh.out" ]; then
   cmp "$tmp/expected" "$tmp/zsh.out"
 fi
 
+# An empty quoted delimiter is a valid delimiter word.
+printf 'cat <<-""\\n\\tempty-delimiter-body\\n\\t\\n' > "$tmp/empty.sh"
+bash "$tmp/empty.sh" > "$tmp/empty-bash.out"
+dash "$tmp/empty.sh" > "$tmp/empty-dash.out"
+printf 'empty-delimiter-body\\n' > "$tmp/empty.expected"
+cmp "$tmp/empty.expected" "$tmp/empty-bash.out"
+cmp "$tmp/empty.expected" "$tmp/empty-dash.out"
+if command -v zsh >/dev/null 2>&1; then
+  zsh "$tmp/empty.sh" > "$tmp/empty-zsh.out"
+  cmp "$tmp/empty.expected" "$tmp/empty-zsh.out"
+fi
+
 # Leading spaces do not make a <<- delimiter match.
 {
   printf 'cat <<-EOF\npayload\n  EOF\n'
