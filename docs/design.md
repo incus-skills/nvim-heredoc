@@ -126,7 +126,7 @@ The scanner should expose region information to editing integrations. It must ex
 
 Treesitter may be used as an optional cross-check or structural aid when a parser is available and successfully parses the relevant buffer. The lexical scanner remains authoritative for shared behaviour and must work when Treesitter is absent, unavailable for a filetype, or unable to parse an incomplete editing buffer.
 
-The first implementation in `lua/nvim-heredoc/scanner.lua` is a deliberately bounded lexical prototype. It handles simple command lines, line continuations, comments, quotes, escaped operators, ordinary heredoc body skipping, and declaration-order queues. It does not yet claim complete shell grammar coverage. Command substitutions, backtick substitutions, multiline quoted commands, and other unsupported contexts must be treated as uncertain rather than edited. The supported subset and diagnostics must expand only alongside regression tests.
+The first implementation in `lua/nvim-heredoc/scanner.lua` is a deliberately bounded lexical prototype. It handles simple command lines, line continuations, comments, quotes, escaped operators, ordinary heredoc body skipping, declaration-order queues, arithmetic expansions, and ordinary command substitutions without nested heredocs. A heredoc redirection inside command substitution, backtick substitution, multiline quoted commands, and other unsupported contexts remain uncertain and must not be edited. It does not claim complete shell grammar coverage. The supported subset and diagnostics must expand only alongside regression tests.
 
 ## 8. Validation contract
 
