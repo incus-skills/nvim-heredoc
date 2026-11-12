@@ -106,6 +106,28 @@ do
 end
 
 do
+  local buf = set_buffer({
+    "\tcat <<-EOF",
+    "\tfirst",
+    "untouched middle",
+    "\tthird",
+    "\tEOF",
+  })
+  vim.api.nvim_set_current_buf(buf)
+  plugin.setup()
+  -- Delete a line before a pending edit. Its old row must shift upward.
+  vim.api.nvim_buf_set_lines(buf, 3, 4, false, { "  third changed" })
+  vim.api.nvim_buf_set_lines(buf, 1, 2, false, {})
+  assert(vim.wait(1000, function()
+    local actual = lines(buf)
+    return actual[3] == "\t  third changed"
+  end, 10), "pending changed ranges should be rebased after a line deletion")
+  local actual = lines(buf)
+  assert(actual[2] == "untouched middle",
+    "line deletion before a pending range must not redirect it onto an untouched line")
+end
+
+do
   local buf = set_buffer({ "\tcat <<-AUTO", "" })
   vim.api.nvim_set_current_buf(buf)
   plugin.setup()
