@@ -69,55 +69,49 @@ defer(function()
         .. vim.inspect(actual))
     assert_insert_mode("typing the first payload must remain in Insert mode")
 
-    -- A second Enter creates a genuinely new, unindented body line. The test
-    -- deliberately disables autoindent, so only the plugin's changed-range
-    -- handler can add its structural TAB before the next payload is typed.
-    vim.api.nvim_input("\n")
+    -- A second Enter creates a genuinely new, unindented body line. Queue
+    -- the next payload immediately: TextChangedI must apply the structural
+    -- TAB before Neovim consumes the following characters, without relying
+    -- on a timer or InsertLeave.
+    vim.api.nvim_input("\nsecond")
     defer(function()
-      wait_for(function()
-        return lines(buf)[3] == "\t"
-      end, "a subsequent Enter must receive a structural TAB before InsertLeave")
-      assert_insert_mode("live indentation after Enter must remain in Insert mode")
+      actual = lines(buf)
+      assert(actual[3] == "\tsecond",
+        "a subsequent Enter must receive its structural TAB before the next typed payload; lines="
+          .. vim.inspect(actual))
+      assert_insert_mode("typing on the newly indented line must remain in Insert mode")
 
-      vim.api.nvim_input("second")
+      vim.api.nvim_input("\n")
       defer(function()
-        actual = lines(buf)
-        assert(actual[3] == "\tsecond",
-          "second body payload must follow the live-inserted TAB; lines=" .. vim.inspect(actual))
-        assert_insert_mode("typing on the newly indented line must remain in Insert mode")
+        wait_for(function()
+          return lines(buf)[4] == "\t"
+        end, "the next body line must be structurally indented before paste")
 
-        vim.api.nvim_input("\n")
+        -- Exercise Neovim's paste API while still in Insert mode. The
+        -- inserted lines begin with spaces; the plugin must prepend only
+        -- the structural TAB to each changed line and retain those spaces.
+        local pasted = vim.api.nvim_paste("  pasted one\n    pasted two", false, -1)
+        assert(pasted, "Neovim rejected the multi-line paste")
         defer(function()
           wait_for(function()
-            return lines(buf)[4] == "\t"
-          end, "the next body line must be structurally indented before paste")
+            actual = lines(buf)
+            return actual[4] == "\t  pasted one"
+              and actual[5] == "\t    pasted two"
+              and actual[6] == "\tLIVE"
+          end, "multi-line paste must be indented before InsertLeave/save without changing payload bytes")
+          assert_insert_mode("live paste processing must remain in Insert mode")
 
-          -- Exercise Neovim's paste API while still in Insert mode. The
-          -- inserted lines begin with spaces; the plugin must prepend only
-          -- the structural TAB to each changed line and retain those spaces.
-          local pasted = vim.api.nvim_paste("  pasted one\n    pasted two", false, -1)
-          assert(pasted, "Neovim rejected the multi-line paste")
+          vim.api.nvim_input(vim.api.nvim_replace_termcodes("<Esc>", true, false, true))
           defer(function()
-            wait_for(function()
-              actual = lines(buf)
-              return actual[4] == "\t  pasted one"
-                and actual[5] == "\t    pasted two"
-                and actual[6] == "\tLIVE"
-            end, "multi-line paste must be indented before InsertLeave/save without changing payload bytes")
-            assert_insert_mode("live paste processing must remain in Insert mode")
-
-            vim.api.nvim_input(vim.api.nvim_replace_termcodes("<Esc>", true, false, true))
-            defer(function()
-              assert(vim.api.nvim_get_mode().mode ~= "i", "Escape should leave Insert mode")
-              actual = lines(buf)
-              assert(actual[2] == "\ttyped" and actual[3] == "\tsecond"
-                and actual[4] == "\t  pasted one" and actual[5] == "\t    pasted two"
-                and actual[6] == "\tLIVE",
-                "InsertLeave must not be required to repair live body indentation; lines="
-                  .. vim.inspect(actual))
-              print("live Insert-mode buffer tests: PASS")
-              vim.cmd("qa!")
-            end)
+            assert(vim.api.nvim_get_mode().mode ~= "i", "Escape should leave Insert mode")
+            actual = lines(buf)
+            assert(actual[2] == "\ttyped" and actual[3] == "\tsecond"
+              and actual[4] == "\t  pasted one" and actual[5] == "\t    pasted two"
+              and actual[6] == "\tLIVE",
+              "InsertLeave must not be required to repair live body indentation; lines="
+                .. vim.inspect(actual))
+            print("live Insert-mode buffer tests: PASS")
+            vim.cmd("qa!")
           end)
         end)
       end)
