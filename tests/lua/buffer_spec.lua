@@ -120,7 +120,7 @@ do
   vim.api.nvim_buf_set_lines(buf, 1, 2, false, {})
   assert(vim.wait(1000, function()
     local actual = lines(buf)
-    return actual[3] == "\t  third changed"
+    return actual[3] == "\t\t  third changed"
   end, 10), "pending changed ranges should be rebased after a line deletion")
   local actual = lines(buf)
   assert(actual[2] == "untouched middle",
