@@ -11,9 +11,17 @@ trap 'rm -rf "$tmp"' EXIT
 
 bash "$tmp/input.sh" > "$tmp/bash.out"
 dash "$tmp/input.sh" > "$tmp/dash.out"
+if command -v zsh >/dev/null 2>&1; then
+  zsh "$tmp/input.sh" > "$tmp/zsh.out"
+else
+  echo "SKIP: zsh is not installed"
+fi
 printf 'leading-tab\n  leading-spaces\n' > "$tmp/expected"
 cmp "$tmp/expected" "$tmp/bash.out"
 cmp "$tmp/expected" "$tmp/dash.out"
+if [ -f "$tmp/zsh.out" ]; then
+  cmp "$tmp/expected" "$tmp/zsh.out"
+fi
 
 # Leading spaces do not make a <<- delimiter match.
 {
@@ -25,4 +33,4 @@ if ! grep -qi "here-document" "$tmp/invalid.err"; then
   exit 1
 fi
 
-echo "shell delivery tests: PASS (bash, dash)"
+echo "shell delivery tests: PASS (bash, dash; zsh when installed)"
