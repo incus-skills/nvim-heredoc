@@ -74,8 +74,11 @@ end
 do
   local _, r = one("\tcat <<-END\nbody\n\tEND\n")
   local pasted = { "  alpha", "", "   ", "\tbeta", "\t\tgamma" }
-  local once, changed = editing.prefix_lines(r, pasted)
+  local once, changed, insertions = editing.prefix_lines(r, pasted)
   assert(changed)
+  assert(insertions[1].column == 0 and insertions[1].text == "\t\t")
+  assert(insertions[4].column == 1 and insertions[4].text == "\t",
+    "existing opener indentation should receive one additional body TAB")
   assert(once[1] == "\t\t  alpha" and once[2] == "\t\t" and once[3] == "\t\t   ")
   assert(once[4] == "\t\tbeta" and once[5] == "\t\tgamma")
   local twice, changed_again = editing.prefix_lines(r, once)
