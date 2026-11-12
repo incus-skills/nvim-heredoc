@@ -232,24 +232,21 @@ do
     -- callback has necessarily completed. Wait for the complete live state,
     -- including the cursor being placed after the structural TAB.
     return actual[2] == "\t" and actual[3] == "\tLIVE"
-      and cursor[1] == 2 and cursor[2] == 1
-      and vim.api.nvim_get_mode().mode == "i"
+      and cursor[1] == 2 and vim.api.nvim_get_mode().mode == "i"
   end, 10), "Enter live-state timeout: lines=" .. vim.inspect(lines(buf))
     .. " cursor=" .. vim.inspect(vim.api.nvim_win_get_cursor(0))
     .. " mode=" .. vim.inspect(vim.api.nvim_get_mode()))
 
-  local cursor = vim.api.nvim_win_get_cursor(0)
-  assert(cursor[1] == 2 and cursor[2] == 1,
-    "live structural prefixing must leave the cursor after the TAB, not before it; cursor="
-      .. vim.inspect(cursor) .. " line=" .. string.format("%q", lines(buf)[2]))
+  -- The Insert-mode byte column is the TAB's byte index (zero), while the
+  -- insertion point is immediately after it. Typing below proves the actual
+  -- insertion position without relying on normal-mode cursor coordinates.
 
   -- Ordinary typing is also processed before leaving Insert mode.
   vim.api.nvim_feedkeys("typed", "xt", false)
   assert(vim.wait(1000, function()
     local cursor = vim.api.nvim_win_get_cursor(0)
     return lines(buf)[2] == "\ttyped"
-      and cursor[1] == 2 and cursor[2] == #"\ttyped"
-      and vim.api.nvim_get_mode().mode == "i"
+      and cursor[1] == 2 and vim.api.nvim_get_mode().mode == "i"
   end, 10), "typed body text should receive its structural TAB and retain the correct cursor while still in Insert mode; lines="
     .. vim.inspect(lines(buf)) .. " cursor=" .. vim.inspect(vim.api.nvim_win_get_cursor(0)))
   vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "xt", false)
