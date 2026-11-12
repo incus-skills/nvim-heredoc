@@ -33,11 +33,15 @@ end
 
 do
   local buf = set_buffer({ "\tcat <<-EOF", "\tfirst", "  changed", "\tEOF" })
+  vim.api.nvim_set_current_buf(buf)
+  vim.api.nvim_win_set_cursor(0, { 3, 2 })
   local changed = plugin.process_buffer(buf, { start_row = 2, end_row = 3 }, false)
   assert(changed)
   local actual = lines(buf)
   assert(actual[2] == "\tfirst", "unmodified body lines must remain untouched by a changed-range operation")
   assert(actual[3] == "\t  changed", "only the supplied changed range should receive the structural prefix")
+  local cursor = vim.api.nvim_win_get_cursor(0)
+  assert(cursor[1] == 3 and cursor[2] == 3, "cursor should remain on the same payload byte after prefix insertion")
   assert(not plugin.process_buffer(buf, { start_row = 2, end_row = 3 }, false), "repeated changed-range processing must be idempotent")
 end
 
