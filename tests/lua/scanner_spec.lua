@@ -108,10 +108,25 @@ end
 
 do
   local _, r = one("    cat <<-EOF\nbody\nEOF\n")
-  assert(not r.structural_tabs_only and not r.editable and not r.opener_safe)
-  assert(r.confidence == "unsupported-indent")
-  local closer = editing.closer_line(r)
-  assert(closer == nil, "space-indented opener must not authorise closer placement")
+  assert(r.space_indented and r.opener_safe and r.editable)
+  assert(r.structural_prefix == "\t    " and r.closer_prefix == "\t")
+  assert(editing.closer_line(r) == "\tEOF")
+  local prefixed, changed = editing.prefix_lines(r, { "payload", "    autoindented", "  pasted" })
+  assert(changed)
+  assert(prefixed[1] == "\t    payload")
+  assert(prefixed[2] == "\t    autoindented",
+    "TAB must precede Neovim's existing opener spaces")
+  assert(prefixed[3] == "\t      pasted",
+    "opener indentation and pasted leading spaces must both be retained")
+  local twice, changed_again = editing.prefix_lines(r, prefixed)
+  assert(not changed_again)
+  for i, line in ipairs(prefixed) do assert(twice[i] == line) end
+end
+
+do
+  local _, r = one("  \tcat <<-EOF\nbody\nEOF\n")
+  assert(not r.opener_safe and not r.editable,
+    "mixed TAB/space opener indentation must remain unsupported")
 end
 
 -- mvdan/sh (through shfmt --to-json in CI) validates these as legal Bash
