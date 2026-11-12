@@ -1,6 +1,6 @@
 # Task 002 — Provisioning installation and live replacement
 
-**Status:** active — provisioning path implemented; live workstation verification pending  
+**Status:** active — repository provisioning and CI validation complete; live workstation verification pending  
 **Priority:** immediate  
 **Scope:** package the tested Lua implementation through the established heredoc-based provisioning method and verify replacement in the actual Neovim 0.12.4/LazyVim environment. Do not introduce a plugin-manager installation route or broaden scanner grammar.
 
@@ -22,13 +22,13 @@ Replace the previous function-wrapped heredoc ftplugin implementation with the r
 
 ## Remaining work
 
-1. Validate scripts/install.sh in CI, including syntax, isolated installation, expected file contents, and repeat execution.
-2. Confirm the updated LazyVim fixture and all other CI jobs pass after replacing the plugin entrypoint with provisioned ftplugin loading.
-3. Run the provisioner against the user's actual Neovim configuration.
-4. Verify Bash, POSIX sh, and Zsh ftplugin attachment; automatic closer insertion; changed-range indentation; ordinary-heredoc non-interference; and shell-delivered payload bytes.
-5. Record actual Neovim 0.12.4, LazyVim, and relevant plugin revisions and any differences from the pinned fixture.
-6. Correct defects exposed by live testing. Do not suppress unrelated completion, pair, or formatting behaviour without evidence.
-7. Keep this task active until the user confirms the replacement operates as intended.
+1. Run the provisioner against the user's actual Neovim configuration.
+2. Verify Bash, POSIX sh, and Zsh ftplugin attachment; automatic closer insertion; changed-range indentation; ordinary-heredoc non-interference; and shell-delivered payload bytes.
+3. Record actual Neovim 0.12.4, LazyVim, and relevant plugin revisions and any differences from the pinned fixture.
+4. Correct defects exposed by live testing. Do not suppress unrelated completion, pair, or formatting behaviour without evidence.
+5. Keep this task active until the user confirms the replacement operates as intended.
+
+The installer syntax, isolated installation, module-copy checks, generated entrypoint checks, repeat-execution check, pinned LazyVim fixture, and five-job hosted workflow are complete. See [run 43205842260](https://github.com/incus-skills/nvim-heredoc/actions/runs/43205842260). These results do not satisfy the live-workstation acceptance criteria.
 
 ## Acceptance criteria
 
