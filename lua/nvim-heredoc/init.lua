@@ -40,11 +40,32 @@ local function prefix_region_range(buf, region, changed_range)
     return false
   end
 
+  -- Inserting at column zero while the Insert-mode cursor is also at column
+  -- zero can leave the cursor before the newly inserted structural TAB.
+  -- Neovim then places subsequently typed payload text before that TAB. Keep
+  -- the cursor at the same payload byte, after the inserted prefix.
+  local win = vim.api.nvim_get_current_win()
+  local cursor
+  if vim.api.nvim_win_get_buf(win) == buf then
+    cursor = vim.api.nvim_win_get_cursor(win)
+  end
+  local cursor_line_prefixed = false
+
   for index = #lines, 1, -1 do
     if prefixed[index] ~= lines[index] then
       local row = first_row + index - 1
+      if cursor and cursor[1] - 1 == row then
+        cursor_line_prefixed = true
+      end
       vim.api.nvim_buf_set_text(buf, row, 0, row, 0, { region.structural_prefix })
     end
+  end
+
+  if cursor and cursor_line_prefixed then
+    vim.api.nvim_win_set_cursor(win, {
+      cursor[1],
+      cursor[2] + #region.structural_prefix,
+    })
   end
   return true
 end

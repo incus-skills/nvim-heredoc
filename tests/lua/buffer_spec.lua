@@ -212,6 +212,12 @@ end
 do
   local buf = set_buffer({ "\tcat <<-LIVE" })
   vim.api.nvim_set_current_buf(buf)
+  -- Match the required shell-buffer indentation contract established by the
+  -- provisioned Bash/sh/Zsh ftplugins.
+  vim.bo[buf].expandtab = false
+  vim.bo[buf].tabstop = 2
+  vim.bo[buf].softtabstop = 0
+  vim.bo[buf].shiftwidth = 2
   plugin.setup()
 
   -- Send real Insert-mode keys. The closer must appear after Enter while
@@ -225,13 +231,15 @@ do
   end, 10), "Enter after a safe opener should create and indent the closer live")
 
   local cursor = vim.api.nvim_win_get_cursor(0)
-  assert(cursor[1] == 2, "live closer insertion must leave the cursor in the body")
+  assert(cursor[1] == 2 and cursor[2] == 1,
+    "live structural prefixing must leave the cursor after the TAB, not before it")
 
   -- Ordinary typing is also processed before leaving Insert mode.
   vim.api.nvim_feedkeys("typed", "xt", false)
   assert(vim.wait(1000, function()
     return lines(buf)[2] == "\ttyped"
-  end, 10), "typed body text should receive its structural TAB while still in Insert mode")
+  end, 10), "typed body text should receive its structural TAB while still in Insert mode; lines="
+    .. vim.inspect(lines(buf)) .. " cursor=" .. vim.inspect(vim.api.nvim_win_get_cursor(0)))
   vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "xt", false)
 
   -- A multi-line paste is handled as one changed range. Structural TABs are
