@@ -79,14 +79,10 @@ local completion_buf = set_buffer(table.concat({
   "fi",
 }, "\n"), "bash")
 vim.api.nvim_win_set_cursor(0, { 4, 3 })
-vim.keymap.set("i", "<F5>", function()
-  blink.show({ providers = { "buffer" } })
-end, { buffer = completion_buf })
-vim.api.nvim_feedkeys(
-  "A" .. vim.api.nvim_replace_termcodes("<F5>", true, false, true),
-  "xt",
-  false
-)
+vim.api.nvim_feedkeys("A", "xt", false)
+assert(vim.api.nvim_get_mode().mode:sub(1, 1) == "i",
+  "could not enter insert mode for Blink completion test")
+blink.show({ providers = { "buffer" } })
 assert(vim.wait(5000, function()
   return blink.is_menu_visible() and #blink.get_items() > 0
 end, 20), "Blink did not display buffer completion inside the managed heredoc body")
