@@ -127,8 +127,8 @@ local function setup_plugins_and_inventory()
 end
 
 local function test_batched_heredoc_input(keys, payload, expected_col)
-  local buf = vim.api.nvim_get_current_buf()
-  vim.api.nvim_buf_clear_namespace(buf, -1, 0, -1)
+  local buf = vim.api.nvim_create_buf(true, false)
+  vim.api.nvim_set_current_buf(buf)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "    cat <<-PROTO" })
   vim.bo[buf].filetype = "bash"
 
