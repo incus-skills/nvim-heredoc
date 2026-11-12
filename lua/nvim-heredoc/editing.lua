@@ -6,7 +6,8 @@ function M.closer_line(region)
   if not region or not region.opener_safe then
     return nil, "heredoc opener is not safe to edit"
   end
-  if type(region.delimiter) ~= "string" or region.delimiter == "" then
+  if type(region.delimiter) ~= "string" or type(region.delimiter_original) ~= "string"
+    or region.delimiter_original == "" then
     return nil, "heredoc delimiter is unavailable"
   end
   return (region.structural_prefix or "") .. region.delimiter
