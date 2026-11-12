@@ -69,9 +69,10 @@ The scanner is the common authority for later editing mechanisms. Automatic clos
 - `lua/nvim-heredoc/scanner.lua` provides an initial buffer-independent lexical scan and a shared region record for completed or incomplete managed heredocs.
 - Ordinary `<<` heredocs are queued and consumed so their body text is not scanned as shell code; they are not returned as managed regions.
 - Initial cases cover quoted delimiters, declaration-order queues, comments, quoted/escaped operators, here-strings, line continuations, tab-stripping terminators, and incomplete heredocs.
-- Shell-delivery fixture and runner are present. The equivalent fixture was executed locally with Bash and Dash and produced matching expected payload bytes. Zsh was not available in that environment.
-- Formatter payload-comparison fixture is present but has not yet been run because `shfmt` is unavailable in the development environment.
-- Initial GitHub Actions workflow runs core, shell-delivery, and formatter jobs. It has not yet been observed running on GitHub Actions.
+- Shell-delivery fixture and runner are present. GitHub Actions run 43150720234 passed the payload comparison with Bash 5.2.21, Dash, and Zsh 5.9.
+- Formatter payload-comparison fixture passed in run 43150720234 with shfmt 3.8.0 for the Bash and POSIX-shell-subset fixtures. This is fixture-specific evidence, not a general guarantee. The test uses the configured `shfmt -i 0 -p` invocation in default language mode because shfmt rejects combining `-p` with `-ln`.
+- Core scanner tests passed under Lua 5.1.5 in run 43150720234.
+- The initial three-job GitHub Actions workflow has completed successfully: https://github.com/incus-skills/nvim-heredoc/actions/runs/43150720234.
 
 ### Known prototype limits
 
