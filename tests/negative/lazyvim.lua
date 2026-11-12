@@ -13,8 +13,7 @@ require("blink.cmp").setup({
 assert(vim.wait(10000, function()
   return package.loaded["blink.cmp.fuzzy"] ~= nil
 end, 20), "blink.cmp did not finish initialising for negative control")
-dofile("plugin/nvim-heredoc.lua")
-assert(vim.g.loaded_nvim_heredoc == true, "plugin entrypoint did not load")
+dofile("tests/fixtures/provisioned/after/ftplugin/bash.lua")
 
 local buf = vim.api.nvim_create_buf(true, false)
 vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
