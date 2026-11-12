@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-repo_root="$(cd -- "$(dirname -- "\${BASH_SOURCE[0]}")/.." && pwd -P)"
+repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 tmp="$(mktemp -d)"
 trap 'rm -rf -- "$tmp"' EXIT
 config="$tmp/nvim"

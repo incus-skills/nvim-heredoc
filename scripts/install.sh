@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-SCRIPT_DIR="$(cd -- "$(dirname -- "\${BASH_SOURCE[0]}")/.." && pwd -P)"
-NVIM_CONFIG_DIR="\${NVIM_CONFIG_DIR:-\${XDG_CONFIG_HOME:-$HOME/.config}/nvim}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+NVIM_CONFIG_DIR="${NVIM_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/nvim}"
 MODULE_SOURCE="$SCRIPT_DIR/lua/nvim-heredoc"
 MODULE_DEST="$NVIM_CONFIG_DIR/lua/nvim-heredoc"
 FTPLUGIN_DEST="$NVIM_CONFIG_DIR/after/ftplugin"
