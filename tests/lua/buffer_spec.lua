@@ -25,7 +25,7 @@ do
   local buf = set_buffer({ "\tcat <<-EOF", "\t  already", "  pasted", "" })
   assert(plugin.process_buffer(buf))
   local actual = lines(buf)
-  assert(actual[2] == "\t\t  already", "existing structural prefix must not duplicate")
+  assert(actual[2] == "\t\t  already", "existing body content must receive the additional structural TAB")
   assert(actual[3] == "\t\t  pasted", "body spaces must remain after structural TAB")
   assert(actual[4] == "\t\t")
   assert(actual[5] == "\tEOF")
@@ -215,7 +215,7 @@ do
   plugin.setup()
   vim.api.nvim_exec_autocmds("InsertLeave", { buffer = buf })
   local actual = lines(buf)
-  assert(actual[3] == "\tAUTO", "InsertLeave should invoke automatic closer placement")
+  assert(actual[3] == "\tAUTO", "InsertLeave should place the closer at opener indentation")
 end
 
 do
