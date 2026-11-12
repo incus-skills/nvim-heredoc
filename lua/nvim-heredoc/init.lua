@@ -3,6 +3,13 @@ local editing = require("nvim-heredoc.editing")
 
 local M = {}
 local group_name = "NvimHeredoc"
+local processing = {}
+local attached = {}
+local pending_ranges = {}
+
+local function supported(ft)
+  return ft == "bash" or ft == "sh" or ft == "zsh"
+end
 
 local function get_lines(buf)
   return vim.api.nvim_buf_get_lines(buf, 0, -1, false)
@@ -12,24 +19,30 @@ local function get_source(lines)
   return table.concat(lines, "\n")
 end
 
-local function insert_prefixes(buf, region)
-  local first = region.body_start_line
-  local last = region.body_end_line
-  if not last or last < first then
+local function prefix_region_range(buf, region, changed_range)
+  local first_row = region.body_start_line - 1
+  local last_row = region.body_end_line
+  if last_row <= first_row then
     return false
   end
 
-  local lines = vim.api.nvim_buf_get_lines(buf, first - 1, last, false)
+  if changed_range then
+    first_row = math.max(first_row, changed_range.start_row)
+    last_row = math.min(last_row, changed_range.end_row)
+  end
+  if last_row <= first_row then
+    return false
+  end
+
+  local lines = vim.api.nvim_buf_get_lines(buf, first_row, last_row, false)
   local prefixed, changed = editing.prefix_lines(region, lines)
   if not prefixed or not changed then
     return false
   end
 
-  -- Prefix from the bottom so row positions remain stable for future
-  -- range-tracking integrations and extmarks.
   for index = #lines, 1, -1 do
     if prefixed[index] ~= lines[index] then
-      local row = first + index - 2
+      local row = first_row + index - 1
       vim.api.nvim_buf_set_text(buf, row, 0, row, 0, { region.structural_prefix })
     end
   end
@@ -46,18 +59,19 @@ local function append_closer(buf, region)
   return true
 end
 
-function M.process_buffer(buf)
+function M.process_buffer(buf, changed_range, close_incomplete)
   buf = buf or vim.api.nvim_get_current_buf()
   if not vim.api.nvim_buf_is_valid(buf) or not vim.api.nvim_buf_is_loaded(buf) then
     return false
   end
-
-  local ok, busy = pcall(vim.api.nvim_buf_get_var, buf, "_nvim_heredoc_processing")
-  if ok and busy then
+  if processing[buf] then
     return false
   end
-  vim.api.nvim_buf_set_var(buf, "_nvim_heredoc_processing", true)
+  if close_incomplete == nil then
+    close_incomplete = true
+  end
 
+  processing[buf] = true
   local changed = false
   local success, err = pcall(function()
     -- Each pass can close one pending heredoc. Re-scan so multiple queued
@@ -66,6 +80,9 @@ function M.process_buffer(buf)
       local lines = get_lines(buf)
       local result = scanner.scan(get_source(lines))
       if not result.complete then
+        if not close_incomplete then
+          break
+        end
         local pending
         for _, region in ipairs(result.regions) do
           if not region.terminator_line and region.opener_safe then
@@ -85,7 +102,7 @@ function M.process_buffer(buf)
         local pass_changed = false
         for _, region in ipairs(result.regions) do
           if region.editable and region.structural_prefix ~= "" then
-            if insert_prefixes(buf, region) then
+            if prefix_region_range(buf, region, changed_range) then
               pass_changed = true
             end
           end
@@ -96,7 +113,7 @@ function M.process_buffer(buf)
     end
   end)
 
-  pcall(vim.api.nvim_buf_del_var, buf, "_nvim_heredoc_processing")
+  processing[buf] = nil
   if not success then
     vim.notify("nvim-heredoc: " .. tostring(err), vim.log.levels.WARN)
     return false
@@ -104,15 +121,51 @@ function M.process_buffer(buf)
   return changed
 end
 
-local function supported(ft)
-  return ft == "bash" or ft == "sh" or ft == "zsh"
+local function schedule_changed_range(buf, firstline, new_lastline)
+  if processing[buf] then
+    return
+  end
+  local pending = pending_ranges[buf]
+  if pending then
+    pending.start_row = math.min(pending.start_row, firstline)
+    pending.end_row = math.max(pending.end_row, new_lastline)
+    return
+  end
+
+  pending = {
+    start_row = firstline,
+    end_row = new_lastline,
+  }
+  pending_ranges[buf] = pending
+  vim.schedule(function()
+    local range = pending_ranges[buf]
+    pending_ranges[buf] = nil
+    if range and vim.api.nvim_buf_is_valid(buf) and vim.api.nvim_buf_is_loaded(buf)
+      and supported(vim.bo[buf].filetype) then
+      M.process_buffer(buf, range, false)
+    end
+  end)
 end
 
 local function attach(buf)
-  local ft = vim.bo[buf].filetype
-  if not supported(ft) then
+  if attached[buf] then
     return
   end
+  if not supported(vim.bo[buf].filetype) then
+    return
+  end
+
+  attached[buf] = true
+  vim.api.nvim_buf_attach(buf, false, {
+    on_lines = function(_, changed_buf, _, firstline, _, new_lastline)
+      schedule_changed_range(changed_buf, firstline, new_lastline)
+    end,
+    on_detach = function(_, detached_buf)
+      attached[detached_buf] = nil
+      pending_ranges[detached_buf] = nil
+    end,
+  })
+
   vim.api.nvim_create_autocmd({ "InsertLeave", "TextChanged" }, {
     group = vim.api.nvim_create_augroup(group_name .. "Buffer" .. buf, { clear = true }),
     buffer = buf,
