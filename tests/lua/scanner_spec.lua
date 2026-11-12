@@ -71,7 +71,7 @@ do
 end
 
 do
-  local _, r = one('value=$(printf "x")\necho "$((1 + 2))"\ncat <<-EOF\npayload\nEOF\n')
+  local _, r = one('value=$(printf "x" "$(printf x)")\necho "$((8 << 1))"\ncat <<-EOF\npayload\nEOF\n')
   assert(r.delimiter == "EOF", "ordinary command and arithmetic substitutions should not hide later heredocs")
 end
 
