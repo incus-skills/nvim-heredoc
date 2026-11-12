@@ -13,9 +13,9 @@ The initial CI design separates four validation layers:
 
 ## Workflow shape
 
-The intended workflow is `.github/workflows/test.yml`. The core, shell-delivery, and formatter jobs should run on every push and pull request. LazyVim integration should be a separate job so failures identify distribution/plugin integration rather than being conflated with scanner or shell-semantic failures. It should run on pull requests and pushes to the primary branch; a manual trigger may also be useful for diagnosing dependency changes.
+The initial workflow is `.github/workflows/test.yml`. It currently runs three independent jobs on pushes to `main`, pull requests, and manual dispatch: `core`, `shell-delivery`, and `formatter`. The `lazyvim-integration` job is intentionally deferred until the plugin integration and its test command exist. It must be added as a separate job so failures identify distribution/plugin integration rather than being conflated with scanner or shell-semantic failures.
 
-The first three jobs should use a lightweight hosted runner. They must not require bootstrapping a full LazyVim installation.
+The first three jobs use a lightweight `ubuntu-24.04` hosted runner. They do not require bootstrapping a full LazyVim installation. The current workflow installs Lua 5.1, Zsh, and shfmt from the runner's Ubuntu package repositories and prints their runtime versions. This is an initial repeatable baseline, not yet a fully locked toolchain: package versions should be pinned once the supported version floor is selected.
 
 The LazyVim job should build and run a repository-owned container image from `ci/Dockerfile` (or use an equivalently reproducible pinned image once one exists). The container should provide a headless Neovim runtime and a controlled LazyVim/plugin configuration. The plugin under test should be mounted or copied into that environment from the checked-out commit, not fetched from an unrelated moving branch.
 
@@ -37,7 +37,7 @@ The implementation should define stable commands before the workflow is authored
 - A formatter test command that runs the supported formatter and compares payloads before and after formatting.
 - A headless LazyVim integration command that loads the checked-out plugin and exercises only verified integration APIs.
 
-These commands should also be runnable locally where dependencies are available. CI should invoke the same commands rather than contain a second implementation of test logic.
+These commands should also be runnable locally where dependencies are available. CI invokes the same commands rather than containing a second implementation of test logic. The current commands are `bash tests/run-core.sh`, `bash tests/run-shell-delivery.sh`, and `bash tests/formatter/test-shfmt.sh`.
 
 ## Container boundary
 
@@ -49,4 +49,4 @@ Do not add a large prebuilt container dependency before the test commands and pl
 
 Keep job names aligned with the validation layers: `core`, `shell-delivery`, `formatter`, and `lazyvim-integration`. Preserve separate reports so a failure identifies which contract was violated.
 
-The workflow is not complete merely because it parses or runs. It must be exercised against at least one known passing fixture and a deliberately failing fixture for each test command, demonstrating that regressions produce a failing job.
+The workflow is not complete merely because it parses or runs. It must be exercised against at least one known passing fixture and a deliberately failing fixture for each test command, demonstrating that regressions produce a failing job. The initial workflow has been committed but has not yet been observed running on GitHub Actions. The scanner's Lua tests have not yet been executed in this development environment; the shell-delivery fixture has been checked locally with Bash and Dash.
