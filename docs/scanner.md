@@ -42,7 +42,7 @@ Ordinary \`<<\` heredocs are not returned, but their delimiter/body are consumed
 
 - Operators outside single/double quotes, escaped text, and comments.
 - Distinguishing \`<<-\`, ordinary \`<<\`, and \`<<<\`.
-- Quoted and escaped delimiter words, preserving both source spelling and quote-removed match value.
+- Quoted and escaped delimiter words, preserving both source spelling and quote-removed match value, including valid empty quoted delimiters.
 - Multiple heredocs on one logical command, consumed in declaration order.
 - Backslash-newline command continuations.
 - \`<<-\` terminator matching after stripping leading TAB bytes.
