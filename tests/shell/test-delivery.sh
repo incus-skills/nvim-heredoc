@@ -19,8 +19,9 @@ cmp "$tmp/expected" "$tmp/dash.out"
 {
   printf 'cat <<-EOF\npayload\n  EOF\n'
 } > "$tmp/invalid.sh"
-if bash "$tmp/invalid.sh" >"$tmp/invalid.out" 2>"$tmp/invalid.err"; then
-  echo "expected Bash to reject a space-prefixed terminator" >&2
+bash "$tmp/invalid.sh" >"$tmp/invalid.out" 2>"$tmp/invalid.err" || true
+if ! grep -qi "here-document" "$tmp/invalid.err"; then
+  echo "expected Bash to report the unmatched space-prefixed terminator" >&2
   exit 1
 fi
 
