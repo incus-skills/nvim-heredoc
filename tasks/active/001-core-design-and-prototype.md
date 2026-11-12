@@ -66,7 +66,8 @@ The scanner is the common authority for later editing mechanisms. Automatic clos
 
 ### Present
 
-- `lua/nvim-heredoc/scanner.lua` provides an initial buffer-independent lexical scan and a shared region record for completed or incomplete managed heredocs.
+- `lua/nvim-heredoc/scanner.lua` provides an initial buffer-independent lexical scan and a shared region record for completed or incomplete managed heredocs. The record distinguishes `opener_safe` from full-region `editable` so a lexically certain incomplete opener can support closer construction without authorising body edits.
+- `lua/nvim-heredoc/editing.lua` provides pure helpers for constructing the structural closer line and idempotently prefixing a caller-supplied complete changed-line range. It is not yet wired to Neovim events.
 - Ordinary `<<` heredocs are queued and consumed so their body text is not scanned as shell code; they are not returned as managed regions.
 - Initial cases cover quoted delimiters, declaration-order queues, comments, quoted/escaped operators, here-strings, line continuations, tab-stripping terminators, and incomplete heredocs.
 - Shell-delivery fixture and runner are present. GitHub Actions run 43150720234 passed the payload comparison with Bash 5.2.21, Dash, and Zsh 5.9.
