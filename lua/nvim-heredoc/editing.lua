@@ -22,7 +22,7 @@ function M.prefix_lines(region, lines)
   end
 
   local prefix = region.structural_prefix or ""
-  local opener_prefix = region.closer_prefix or ""
+  local opener_prefix = region.opener_prefix or region.closer_prefix or ""
   local output, insertions, changed = {}, {}, false
   for index, line in ipairs(lines) do
     if type(line) ~= "string" then
@@ -32,10 +32,15 @@ function M.prefix_lines(region, lines)
       output[index] = line
     else
       local column, insertion
-      if region.space_indented then
+      if region.space_indented and opener_prefix ~= ""
+        and line:sub(1, #opener_prefix) == opener_prefix then
+        -- Neovim may already have copied the opener's spaces. Put the
+        -- removable TAB before them, rather than after them.
+        column, insertion = 0, "\\t"
+      elseif region.space_indented then
         -- Keep the removable TAB at byte zero so <<- strips it. The opener's
         -- spaces follow it and survive shell delivery as the payload's base
-        -- indentation, including when Neovim auto-indents the new line.
+        -- indentation.
         column, insertion = 0, prefix
       elseif opener_prefix ~= "" and line:sub(1, #opener_prefix) == opener_prefix then
         -- Neovim may already have copied the opener indentation onto the
