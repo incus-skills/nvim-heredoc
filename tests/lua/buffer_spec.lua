@@ -240,4 +240,31 @@ do
   assert(actual[6] == "\tB")
 end
 
+do
+  local buf = set_buffer({ "\\tcat <<-TRACE", "\\tbefore", "  changed", "\\tTRACE" })
+  vim.api.nvim_set_current_buf(buf)
+  plugin.setup()
+  vim.g.nvim_heredoc_trace = true
+  plugin.clear_trace()
+  vim.api.nvim_buf_set_lines(buf, 2, 3, false, { "  changed by trace test" })
+  assert(vim.wait(1000, function()
+    local trace = plugin.get_trace()
+    for _, event in ipairs(trace) do
+      if event.event == "range.scheduled-callback" then
+        return true
+      end
+    end
+    return false
+  end, 10), "opt-in trace should record scheduled callback execution")
+  local seen = {}
+  for _, event in ipairs(plugin.get_trace()) do
+    seen[event.event] = true
+  end
+  assert(seen.on_lines and seen["range.schedule-request"]
+    and seen["range.schedule-queued"] and seen["range.scheduled-callback"],
+    "trace should expose the on_lines-to-scheduled-processing path")
+  vim.g.nvim_heredoc_trace = false
+  plugin.clear_trace()
+end
+
 print("buffer integration tests: PASS")
