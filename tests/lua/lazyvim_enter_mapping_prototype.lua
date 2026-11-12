@@ -144,8 +144,8 @@ local function test_batched_heredoc_input(keys, payload, expected_col)
   install_wrapper(buf, original)
 
   vim.api.nvim_win_set_cursor(0, { 1, #"    cat <<-PROTO" })
-  feed("A")
-  wait_for(function() return vim.api.nvim_get_mode().mode == "i" end,
+  vim.api.nvim_feedkeys("A", "xt", false)
+  assert(vim.api.nvim_get_mode().mode == "i",
     "could not enter Insert mode before batched input")
   feed(keys)
 
@@ -188,8 +188,8 @@ local function test_controlled_string_fallback()
 
   install_wrapper(buf, original)
   vim.api.nvim_win_set_cursor(0, { 1, 4 })
-  feed("A")
-  wait_for(function() return vim.api.nvim_get_mode().mode == "i" end,
+  vim.api.nvim_feedkeys("A", "xt", false)
+  assert(vim.api.nvim_get_mode().mode == "i",
     "could not enter Insert mode before controlled fallback")
   feed("<CR>world")
 
