@@ -90,7 +90,7 @@ defer(function()
         vim.api.nvim_input("\n")
         defer(function()
           wait_for(function()
-            return lines(buf)[4] == "\t"
+            return lines(buf)[4] == "\t    "
           end, "the next body line must be structurally indented before paste")
 
         -- Exercise Neovim's paste API while still in Insert mode. The
