@@ -41,7 +41,7 @@ The scanner is the common authority for later editing mechanisms. Automatic clos
 - The scanner does not depend on Treesitter being installed or able to parse an incomplete buffer.
 - Test output is reproducible with documented commands.
 - A layered CI workflow runs core, shell-delivery, and formatter tests independently of LazyVim, with LazyVim integration isolated in a pinned container environment.
-- Each test command has a known passing fixture and a deliberately failing fixture that proves regressions fail the relevant job.
+- Each test command has a known passing fixture and a deliberately failing fixture that proves regressions fail the relevant job. The deliberate-failure checks remain outstanding.
 
 ## Boundaries
 
@@ -82,9 +82,11 @@ The scanner is the common authority for later editing mechanisms. Automatic clos
 
 - This is not a complete shell parser. Command substitutions, backtick substitutions, multiline quoted commands, and other unsupported contexts are not yet recognised safely.
 - The initial changed-range implementation uses line ranges from `on_lines`, coalesced until scheduled processing. It does not yet use extmarks; behaviour under overlapping/disjoint rapid changes, other plugins mutating the same buffer, and complex edit sequences needs more testing.
-- The Lua scanner tests have been authored but not executed in the current development environment because neither Lua nor Neovim is installed here.
-- A local diagnostic script at `tests/diagnostics/inspect-lazyvim.sh` now inventories exact installed plugin revisions, lockfile entries, and candidate buffer-local controls. It has not yet been run against the user's workstation.
-- The LazyVim container job is deferred until the inventory has been reviewed, plugin coexistence behaviour has been implemented/tested, and the container can pin the relevant revisions.
+- The Lua scanner tests are run in GitHub Actions; neither Lua nor Neovim is installed in the current development container.
+- The local diagnostic script at `tests/diagnostics/inspect-lazyvim.sh` was run against the target workstation. Its output is recorded in [the plugin compatibility inventory](../../docs/plugin-compatibility.md), including exact LazyVim, mini.pairs, blink.cmp, conform.nvim, lazy.nvim, Treesitter, and Neovim revisions.
+- Exact source inspection confirmed mini.pairs' global and buffer-local disable variables, blink.cmp's `vim.b.completion` control and `enabled` callback, and Conform's per-buffer `format_on_save` callback. The mini.pairs and Blink controls are buffer-wide; no region-scoped disable API was established. No suppression has been added.
+- Added `ci/lazyvim/Dockerfile`, `ci/lazyvim/versions.env`, and `ci/lazyvim/init.lua`, plus `tests/run-lazyvim.sh` and `tests/lua/lazyvim_spec.lua`. The fixture loads the checked-out plugin alongside the pinned LazyVim core and selected plugin revisions, without the legacy `after/ftplugin` implementation. It checks that mini.pairs mappings and Blink completion remain enabled in managed heredoc buffers, ordinary `<<` remains unchanged, and Conform's actual shfmt path preserves delivered payload bytes. Zsh is not assigned to shfmt.
+- The first five-job CI run, including the new container build and headless plugin coexistence test, passed in [run 43175124220](https://github.com/incus-skills/nvim-heredoc/actions/runs/43175124220). This is a controlled LazyVim-core/selected-plugin fixture, not a full LazyVim starter installation or the user's complete private configuration.
 
 Do not describe the scanner as production-ready or authorise source mutation from uncertain results.
 
