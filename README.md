@@ -15,6 +15,10 @@ Provide predictable editing support for shell `<<-` (tab-stripping) heredocs:
 - Work in Bash, POSIX `sh`, and Zsh buffers.
 - Coexist with the user's existing completion, pair, indentation, and formatting configuration.
 
+## Installation
+
+See [installation and replacement](docs/installation.md) for the LazyVim setup, reversible backup of the previous ftplugins, live verification, and rollback procedure.
+
 ## Semantics that constrain the implementation
 
 A shell `<<-` heredoc removes leading **TAB bytes** from body lines and from the terminating delimiter. It does not remove leading spaces.
@@ -43,5 +47,5 @@ Formatting is separate from interactive editing. `shfmt` is for Bash and POSIX `
 - A conservative Lua scanner, pure structural closer/paste helpers, and Neovim buffer integration with changed-range tracking are present under `lua/` and `tests/`; interfaces and current limits are documented in [scanner.md](docs/scanner.md).
 - [The CI workflow](.github/workflows/test.yml) runs core, headless buffer integration, shell-delivery, formatter, and pinned LazyVim/plugin coexistence jobs. The first five-job run passed in [run 43175124220](https://github.com/incus-skills/nvim-heredoc/actions/runs/43175124220). The LazyVim fixture uses the observed Neovim 0.12.4 and pinned LazyVim, mini.pairs, blink.cmp, conform.nvim, and lazy.nvim revisions; see [the CI design](docs/ci.md) and [plugin compatibility inventory](docs/plugin-compatibility.md).
 - [Task 001](tasks/active/001-core-design-and-prototype.md) remains active: expand and validate shell grammar coverage, stress-test editing/paste behaviour, extend plugin interaction coverage, and complete deliberate-failure regression checks.
-- The initial LazyVim fixture validates the selected plugin revisions in a controlled headless environment; it is not the user's full LazyVim configuration. A user-facing installer remains unvalidated. Do not treat an installer as ready until buffer, shell-delivery, formatter, and distribution-integration tests pass.
+- The pinned LazyVim fixture validates the selected plugin revisions in a controlled headless environment; it is not the user's full LazyVim configuration. The repository now has a Neovim runtime entrypoint and a documented, reversible LazyVim installation path. Live operation in the user's configuration remains to be verified.
 
