@@ -58,9 +58,13 @@ local function parse_delimiter(s, pos)
     elseif c == "'" or c == '"' then
       quote, quoted = c, true
     elseif c == "\\" then
-      if pos == #s then return nil, pos, "delimiter ends with an escape" end
-      value[#value + 1] = s:sub(pos + 1, pos + 1)
-      pos, quoted, escaped = pos + 1, true, true
+      if s:sub(pos + 1, pos + 1) == "\n" then
+        pos = pos + 1
+      else
+        if pos == #s then return nil, pos, "delimiter ends with an escape" end
+        value[#value + 1] = s:sub(pos + 1, pos + 1)
+        pos, quoted, escaped = pos + 1, true, true
+      end
     elseif c:match("[ \t\r\n]") or c:match("[;|&()<>]") then
       break
     else
@@ -96,7 +100,13 @@ local function scan_command(chunk, first_line)
         return queue, diagnostics
       else i = i + 1 end
     elseif c == "\\" then
-      i = i + 2
+      if n == "\n" then
+        i = i + 2
+      elseif chunk:sub(i + 1, i + 3) == "<<<" then
+        i = i + 4
+      else
+        i = i + 2
+      end
       word_boundary = false
     elseif c == "'" or c == '"' then
       quote = c
