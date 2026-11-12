@@ -241,7 +241,7 @@ do
 end
 
 do
-  local buf = set_buffer({ "\\tcat <<-TRACE", "\\tbefore", "  changed", "\\tTRACE" })
+  local buf = set_buffer({ "\tcat <<-TRACE", "\tbefore", "  changed", "\tTRACE" })
   vim.api.nvim_set_current_buf(buf)
   plugin.setup()
   vim.g.nvim_heredoc_trace = true
