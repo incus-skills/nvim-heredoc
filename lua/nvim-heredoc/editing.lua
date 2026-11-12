@@ -36,7 +36,7 @@ function M.prefix_lines(region, lines)
         and line:sub(1, #opener_prefix) == opener_prefix then
         -- Neovim may already have copied the opener's spaces. Put the
         -- removable TAB before them, rather than after them.
-        column, insertion = 0, "\\t"
+        column, insertion = 0, "\t"
       elseif region.space_indented then
         -- Keep the removable TAB at byte zero so <<- strips it. The opener's
         -- spaces follow it and survive shell delivery as the payload's base
