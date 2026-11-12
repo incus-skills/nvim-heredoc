@@ -158,16 +158,16 @@ local function start()
 
   defer(function()
     assert(vim.wait(1000, function()
-      return lines()[2] == "\t" and lines()[3] == "LIVE"
+      return lines()[2] == "\t    " and lines()[3] == "\tLIVE"
     end, 10), "scheduled first-Return processing did not create the body TAB and closer")
-    assert_lines(lines()[2] == "\t" and lines()[3] == "LIVE",
+    assert_lines(lines()[2] == "\t    " and lines()[3] == "\tLIVE",
       "first Return must create the body TAB and reserve the closer")
     assert_insert_mode("first Return must remain in Insert mode")
 
     stage = "first payload typing"
     vim.api.nvim_input("typed")
     defer(function()
-      assert_lines(lines()[2] == "\ttyped",
+      assert_lines(lines()[2] == "\t    typed",
         "first payload must follow the structural TAB")
       assert_insert_mode("first payload typing must remain in Insert mode")
 
@@ -179,21 +179,21 @@ local function start()
         defer(function()
           assert(prefix_before_next_payload == true,
             "the new body line must have its TAB before InsertCharPre")
-          assert_lines(lines()[3] == "\ts",
+          assert_lines(lines()[3] == "\t    s",
             "the first character after Return must follow the structural TAB")
           assert_insert_mode("subsequent Return and typing must remain in Insert mode")
 
           stage = "remaining second payload typing"
           vim.api.nvim_input("econd")
           defer(function()
-            assert_lines(lines()[3] == "\tsecond",
+            assert_lines(lines()[3] == "\t    second",
               "the rest of the second payload must follow the structural TAB")
 
             stage = "next body line before paste"
             vim.api.nvim_input("\n")
             defer(function()
               assert(vim.wait(1000, function()
-                return lines()[4] == "\t"
+                return lines()[4] == "\t    "
               end, 10), "the next body line was not prefixed before paste")
 
               stage = "multi-line paste"
@@ -202,9 +202,9 @@ local function start()
               defer(function()
                 assert(vim.wait(1000, function()
                   local actual = lines()
-                  return actual[4] == "\t  pasted one"
+                  return actual[4] == "\t      pasted one"
                     and actual[5] == "\t    pasted two"
-                    and actual[6] == "\\tLIVE"
+                    and actual[6] == "\tLIVE"
                 end, 10), "multi-line paste was not prefixed before InsertLeave")
                 assert_insert_mode("paste processing must remain in Insert mode")
 
@@ -214,10 +214,10 @@ local function start()
                   local actual = lines()
                   assert(vim.api.nvim_get_mode().mode ~= "i",
                     "Escape should leave Insert mode")
-                  assert_lines(actual[2] == "\ttyped" and actual[3] == "\tsecond"
-                    and actual[4] == "\t  pasted one"
+                  assert_lines(actual[2] == "\t    typed" and actual[3] == "\t    second"
+                    and actual[4] == "\t      pasted one"
                     and actual[5] == "\t    pasted two"
-                    and actual[6] == "\\tLIVE",
+                    and actual[6] == "\tLIVE",
                     "InsertLeave must not be required to repair indentation")
 
                   cleanup(true, "PASS (first Return, typing, pre-keystroke TAB, and multi-line paste); "
