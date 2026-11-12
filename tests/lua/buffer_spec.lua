@@ -128,6 +128,88 @@ do
 end
 
 do
+  local buf = set_buffer({
+    "\tcat <<-EOF",
+    "\tbefore",
+    "untouched one",
+    "untouched two",
+    "\tlast",
+    "\tEOF",
+  })
+  vim.api.nvim_set_current_buf(buf)
+  plugin.setup()
+  -- A later replacement overlaps the first pending range and changes line
+  -- count. The resulting replacement interval must be treated as one edit.
+  vim.api.nvim_buf_set_lines(buf, 4, 5, false, { "  last changed" })
+  vim.api.nvim_buf_set_lines(buf, 2, 5, false, {
+    "  replacement one",
+    "  replacement two",
+    "  replacement three",
+  })
+  assert(vim.wait(1000, function()
+    local actual = lines(buf)
+    return actual[3] == "\t  replacement one"
+      and actual[4] == "\t  replacement two"
+      and actual[5] == "\t  replacement three"
+  end, 10), "overlapping replacement should rebase and merge the pending interval")
+  local actual = lines(buf)
+  assert(actual[2] == "\tbefore", "overlapping replacement must not expand into the preceding line")
+  assert(actual[6] == "\tEOF", "overlapping replacement must not consume the terminator")
+end
+
+do
+  local buf = set_buffer({
+    "\tcat <<-EOF",
+    "\tfirst",
+    "untouched middle",
+    "\tthird",
+    "\tfourth",
+    "\tEOF",
+  })
+  vim.api.nvim_set_current_buf(buf)
+  plugin.setup()
+  -- Two previously disjoint pending edits are both swallowed by a single
+  -- replacement. Their intervals must collapse onto the replacement range.
+  vim.api.nvim_buf_set_lines(buf, 1, 2, false, { "  first changed" })
+  vim.api.nvim_buf_set_lines(buf, 3, 4, false, { "  third changed" })
+  vim.api.nvim_buf_set_lines(buf, 1, 4, false, {
+    "  merged one",
+    "  merged two",
+  })
+  assert(vim.wait(1000, function()
+    local actual = lines(buf)
+    return actual[2] == "\t  merged one" and actual[3] == "\t  merged two"
+  end, 10), "replacement spanning multiple pending ranges should merge onto new content")
+  local actual = lines(buf)
+  assert(actual[4] == "\tfourth", "replacement merge must not prefix the untouched line after it")
+  assert(actual[5] == "\tEOF", "replacement merge must preserve the terminator")
+end
+
+do
+  local buf = set_buffer({
+    "\tcat <<-EOF",
+    "\tbefore",
+    "  changed",
+    "\tafter",
+    "\tEOF",
+  })
+  vim.api.nvim_set_current_buf(buf)
+  plugin.setup()
+  -- Inserting at the beginning of a pending interval creates a second
+  -- adjacent changed interval; both should be prefixed, but not its neighbor.
+  vim.api.nvim_buf_set_lines(buf, 2, 3, false, { "  changed" })
+  vim.api.nvim_buf_set_lines(buf, 2, 2, false, { "  inserted at range start" })
+  assert(vim.wait(1000, function()
+    local actual = lines(buf)
+    return actual[3] == "\t  inserted at range start"
+      and actual[4] == "\t  changed"
+  end, 10), "insertion at a pending range boundary should retain both changed lines")
+  local actual = lines(buf)
+  assert(actual[2] == "\tbefore" and actual[5] == "\tafter",
+    "boundary insertion must not widen into adjacent unchanged lines")
+end
+
+do
   local buf = set_buffer({ "\tcat <<-AUTO", "" })
   vim.api.nvim_set_current_buf(buf)
   plugin.setup()
