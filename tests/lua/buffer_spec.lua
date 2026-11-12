@@ -234,7 +234,9 @@ do
     return actual[2] == "\t" and actual[3] == "\tLIVE"
       and cursor[1] == 2 and cursor[2] == 1
       and vim.api.nvim_get_mode().mode == "i"
-  end, 10), "Enter should create the closer, indent the body, and place the Insert-mode cursor after the TAB")
+  end, 10), "Enter live-state timeout: lines=" .. vim.inspect(lines(buf))
+    .. " cursor=" .. vim.inspect(vim.api.nvim_win_get_cursor(0))
+    .. " mode=" .. vim.inspect(vim.api.nvim_get_mode()))
 
   local cursor = vim.api.nvim_win_get_cursor(0)
   assert(cursor[1] == 2 and cursor[2] == 1,
