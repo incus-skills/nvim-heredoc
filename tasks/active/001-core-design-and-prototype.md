@@ -68,8 +68,8 @@ The scanner is the common authority for later editing mechanisms. Automatic clos
 
 - `lua/nvim-heredoc/scanner.lua` provides an initial buffer-independent lexical scan and a shared region record for completed or incomplete managed heredocs. The record distinguishes `opener_safe` from full-region `editable` so a lexically certain incomplete opener can support closer construction without authorising body edits.
 - `lua/nvim-heredoc/editing.lua` provides pure helpers for constructing the structural closer line and idempotently prefixing a caller-supplied line range.
-- `lua/nvim-heredoc/init.lua` provides the first Neovim buffer integration on `InsertLeave` and `TextChanged`. It closes safe incomplete managed heredocs, re-scans pending heredocs in declaration order, and prefixes the body of completed regions.
-- Headless buffer tests cover automatic closer insertion, body-space preservation, already-prefixed lines, ordinary heredoc non-interference, space-indented opener refusal, and multiple queued managed heredocs. All four CI jobs passed with Neovim 0.9.5 in run 43151626549.
+- `lua/nvim-heredoc/init.lua` provides the first Neovim buffer integration. It tracks changed line ranges with `nvim_buf_attach(on_lines)`, closes safe incomplete managed heredocs on `InsertLeave`/normal-mode change, re-scans pending heredocs in declaration order, and prefixes only the changed/body-range intersection for incremental edits.
+- Headless buffer tests cover automatic closer insertion, body-space preservation, already-prefixed lines, ordinary heredoc non-interference, space-indented opener refusal, multiple queued managed heredocs, changed-range isolation, repeated notifications, and cursor preservation. All four CI jobs passed with Neovim 0.9.5 in run 43152169536.
 - Ordinary `<<` heredocs are queued and consumed so their body text is not scanned as shell code; they are not returned as managed regions.
 - Initial cases cover quoted delimiters, declaration-order queues, comments, quoted/escaped operators, here-strings, line continuations, tab-stripping terminators, and incomplete heredocs.
 - Shell-delivery fixture and runner are present. GitHub Actions run 43150720234 passed the payload comparison with Bash 5.2.21, Dash, and Zsh 5.9.
@@ -81,7 +81,7 @@ The scanner is the common authority for later editing mechanisms. Automatic clos
 ### Known prototype limits
 
 - This is not a complete shell parser. Command substitutions, backtick substitutions, multiline quoted commands, and other unsupported contexts are not yet recognised safely.
-- The first Neovim integration exists, but it currently prefixes the full recognised body range rather than tracking the precise changed/pasted range. Extmark-based range tracking and cursor-preservation tests remain outstanding.
+- The initial changed-range implementation uses line ranges from `on_lines`, coalesced until scheduled processing. It does not yet use extmarks; behaviour under overlapping/disjoint rapid changes, other plugins mutating the same buffer, and complex edit sequences needs more testing.
 - The Lua scanner tests have been authored but not executed in the current development environment because neither Lua nor Neovim is installed here.
 - The LazyVim container job is deferred until plugin coexistence tests and a pinned LazyVim environment are ready.
 
