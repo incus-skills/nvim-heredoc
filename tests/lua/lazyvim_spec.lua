@@ -74,13 +74,13 @@ assert(plugin.setup_buffer(bash), "provisioned Bash ftplugin did not attach the 
 local blink = require("blink.cmp")
 local completion_buf = set_buffer(table.concat({
   "if true; then",
-  "\tcat <<-EOF",
-  "\tpayloadcandidate",
-  "\tpay",
+  "    cat <<-EOF",
+  "\t    payloadcandidate",
+  "\t    pay",
   "\tEOF",
   "fi",
 }, "\n"), "bash")
-vim.api.nvim_win_set_cursor(0, { 4, 3 })
+vim.api.nvim_win_set_cursor(0, { 4, 7 })
 vim.api.nvim_feedkeys("A", "xt", false)
 blink.show({ providers = { "buffer" } })
 assert(vim.wait(5000, function()
@@ -94,8 +94,8 @@ assert(vim.b.completion == nil, "Blink completion must remain buffer-enabled in 
 -- are active in the same buffer.
 local managed_source = table.concat({
   "if true; then",
-  "\tcat <<-EOF",
-  "\t  payload with two leading spaces",
+  "    cat <<-EOF",
+  "\t      payload with two leading spaces",
   "\tEOF",
   "fi",
 }, "\n")
@@ -126,13 +126,13 @@ assert(type_quote(code_pair, 0) == 'printf ok""',
 
 local body_pair = set_buffer(table.concat({
   "if true; then",
-  "\tcat <<-EOF",
-  "\tpayload",
+  "    cat <<-EOF",
+  "\t    payload",
   "\tEOF",
   "fi",
 }, "\n"), "bash")
 local body_line = type_quote(body_pair, 2)
-assert(body_line == '\tpayload""',
+assert(body_line == '\t    payload""',
   "mini.pairs changed the heredoc body's structural prefix or payload")
 vim.wait(100, function() return false end, 10)
 assert(vim.api.nvim_buf_get_lines(body_pair, 2, 3, false)[1] == '\tpayload""',
@@ -151,8 +151,8 @@ assert(table.concat(lines(ordinary), "\n") == ordinary_source, "ordinary heredoc
 -- Exercise Conform's actual formatter path in the same Neovim process.
 local format_source = table.concat({
   "if true; then",
-  "\tcat <<-EOF",
-  "\t  payload with two leading spaces",
+  "    cat <<-EOF",
+  "\t      payload with two leading spaces",
   "\t\tleading tab is stripped by the shell",
   "\tEOF",
   "fi",
