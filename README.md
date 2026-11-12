@@ -28,7 +28,7 @@ The implementation distinguishes:
 - **Structural indentation:** leading TAB bytes used to nest the opener and delimiter in shell code and removed by `<<-`.
 - **Content indentation:** payload whitespace, especially leading spaces, which must remain unchanged.
 
-Leading TAB bytes in the body are also stripped by the shell. The editor therefore cannot promise to preserve them as payload indentation. Neovim's tab display width may provide visual nesting without converting structural tabs to spaces.
+Leading TAB bytes in the body are also stripped by the shell. The editor therefore cannot promise to preserve them as payload indentation. The provisioned filetype entrypoints set `expandtab = false`, `tabstop = 2`, `softtabstop = 0`, and `shiftwidth = 2` for Bash, POSIX `sh`, and Zsh. This is required for the intended literal-TAB editing model; the two-column tab display is only cosmetic.
 
 Ordinary `<<` heredocs and `<<<` here-strings are outside the managed scope and must remain untouched.
 
