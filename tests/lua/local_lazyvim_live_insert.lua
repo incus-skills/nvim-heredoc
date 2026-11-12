@@ -10,6 +10,9 @@ end
 local win = vim.api.nvim_get_current_win()
 local original_buf = vim.api.nvim_win_get_buf(win)
 local original_cursor = vim.api.nvim_win_get_cursor(win)
+local original_bufhidden = vim.bo[original_buf].bufhidden
+-- Keep even a bufhidden=wipe buffer alive while the test temporarily switches away.
+vim.bo[original_buf].bufhidden = "hide"
 local buf = vim.api.nvim_create_buf(false, true)
 local finished = false
 
@@ -27,6 +30,7 @@ local function cleanup(ok, message)
     if vim.api.nvim_win_is_valid(win) then
       if vim.api.nvim_buf_is_valid(original_buf) then
         vim.api.nvim_win_set_buf(win, original_buf)
+        vim.bo[original_buf].bufhidden = original_bufhidden
         pcall(vim.api.nvim_win_set_cursor, win, original_cursor)
       end
     end
@@ -83,11 +87,6 @@ local function start()
     and vim.bo[buf].shiftwidth == 2,
     "the installed Bash ftplugin did not establish the expected TAB settings")
 
-  -- Report whether the common LazyVim input plugins were already loaded.
-  local integrations = {
-    mini_pairs = package.loaded["mini.pairs"] ~= nil,
-    blink = package.loaded["blink.cmp"] ~= nil,
-  }
   vim.api.nvim_win_set_cursor(win, { 1, #("\tcat <<-LIVE") })
   vim.api.nvim_input("A\n")
 
@@ -152,8 +151,8 @@ local function start()
                     "InsertLeave must not be required to repair indentation")
 
                   cleanup(true, "PASS (typing, pre-keystroke TAB, and multi-line paste); "
-                    .. "mini.pairs loaded=" .. tostring(integrations.mini_pairs)
-                    .. ", Blink loaded=" .. tostring(integrations.blink))
+                    .. "mini.pairs loaded=" .. tostring(package.loaded["mini.pairs"] ~= nil)
+                    .. ", Blink loaded=" .. tostring(package.loaded["blink.cmp"] ~= nil))
                 end)
               end)
             end)
