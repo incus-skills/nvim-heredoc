@@ -146,8 +146,8 @@ local function start()
 
   assert(vim.b[buf].nvim_heredoc_attached == true,
     "the installed Bash ftplugin did not attach nvim-heredoc")
-  assert(vim.bo[buf].expandtab == false,
-    "the installed Bash ftplugin must set expandtab=false")
+  assert(vim.bo[buf].expandtab == true,
+    "the installed Bash ftplugin must set expandtab=true")
   assert(vim.bo[buf].tabstop == 2 and vim.bo[buf].softtabstop == 0
     and vim.bo[buf].shiftwidth == 2,
     "the installed Bash ftplugin did not establish the expected TAB settings")
