@@ -83,6 +83,39 @@ assert(plugin.process_buffer(managed) == false, "already structured managed here
 local managed_after = shell_output(table.concat(lines(managed), "\n"))
 assert(managed_before == managed_after, "plugin processing changed the managed heredoc payload")
 
+-- Exercise mini.pairs' real insert-mode mapping, not just its presence.
+local function type_quote(buf, row)
+  vim.api.nvim_set_current_buf(buf)
+  local current = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1]
+  vim.api.nvim_win_set_cursor(0, { row + 1, #current })
+  vim.api.nvim_feedkeys('A"\\27', "xt", false)
+  vim.wait(100, function()
+    local updated = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1]
+    return updated:sub(-2) == '""'
+  end, 10)
+  local updated = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1]
+  assert(updated:sub(-2) == '""', "mini.pairs did not insert a quote pair")
+  return updated
+end
+
+local code_pair = set_buffer("printf ok", "bash")
+assert(type_quote(code_pair, 0) == 'printf ok""',
+  "mini.pairs quote insertion failed in ordinary shell code")
+
+local body_pair = set_buffer(table.concat({
+  "if true; then",
+  "\\tcat <<-EOF",
+  "\\tpayload",
+  "\\tEOF",
+  "fi",
+}, "\\n"), "bash")
+local body_line = type_quote(body_pair, 2)
+assert(body_line == '\\tpayload""',
+  "mini.pairs changed the heredoc body's structural prefix or payload")
+vim.wait(100, function() return false end, 10)
+assert(vim.api.nvim_buf_get_lines(body_pair, 2, 3, false)[1] == '\\tpayload""',
+  "heredoc changed-range processing corrupted mini.pairs' inserted pair")
+
 -- Ordinary heredoc is a non-managed control and must remain byte-for-byte intact.
 local ordinary_source = table.concat({
   "cat <<EOF",
