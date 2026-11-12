@@ -40,6 +40,7 @@ Formatting is separate from interactive editing. `shfmt` is for Bash and POSIX `
 
 - Repository initialisation complete.
 - Architecture and indentation invariants recorded in [the design contract](docs/design.md).
+- Layered CI and a containerised LazyVim integration environment are specified in [the CI design](docs/ci.md); test commands and the workflow are not implemented yet.
 - [Task 001](tasks/active/001-core-design-and-prototype.md) is active: implement the shared region model, buffer-independent Lua core, editing/paste prototype, and byte-level regression tests.
 - No implementation or installer has yet been validated. Do not treat an installer as ready until buffer, shell-delivery, and formatter tests pass.
 
