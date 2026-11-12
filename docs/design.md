@@ -170,3 +170,10 @@ A visually correct buffer is not sufficient evidence that the shell receives the
 The first deliverable is a tested, buffer-independent core and a minimal Neovim/LazyVim integration. A versioned installation script is a delivery mechanism, not the sole source of implementation. It must install the same tested Lua module and regression suite rather than contain a separate implementation.
 
 Do not produce or validate an installer until the core, interactive behaviour, shell-delivery tests, and formatter checks pass. Installation must back up replaced files and be repeatable. Tests should run independently of a user's full LazyVim configuration wherever possible.
+
+
+## 10. Continuous integration
+
+CI validates the same independent layers as the test contract: core scanner/buffer behaviour, shell-delivered payload bytes, formatter effects, and LazyVim integration. The first three must remain independent of a full LazyVim installation. LazyVim integration belongs in a separate, reproducible container environment so plugin/distribution failures remain distinguishable from core and shell-semantic failures.
+
+See [the CI design](ci.md) for the proposed job boundaries, dependency-pinning policy, container role, and test-command prerequisites. Define and prove the local test commands before making the container or workflow a dependency of implementation. CI must invoke those same commands and must demonstrate that deliberately failing fixtures fail the relevant job.
