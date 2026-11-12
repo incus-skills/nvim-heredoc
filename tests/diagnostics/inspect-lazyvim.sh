@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -uo pipefail
+set -eo pipefail
 
 config_home="$XDG_CONFIG_HOME"
 [ -n "$config_home" ] || config_home="$HOME/.config"
