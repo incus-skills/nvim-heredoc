@@ -95,17 +95,17 @@ local function install_wrapper(buf, original)
   vim.keymap.set("i", "<CR>", function()
     prototype_events[#prototype_events + 1] = { event = "wrapper-enter", mode = vim.api.nvim_get_mode().mode }
     if canonical_transition(buf) then
-      return ""
+      return
     end
     if can_delegate then
-      return original.rhs
+      local keys = vim.api.nvim_replace_termcodes(original.rhs, true, false, true)
+      local flags = "i" .. (original.noremap == 1 and "n" or "")
+      vim.api.nvim_feedkeys(keys, flags, false)
+      return
     end
     error("prototype refuses ambiguous <CR> fallback: " .. vim.inspect(mapping_inventory(original or {})))
   end, {
     buffer = buf,
-    expr = true,
-    replace_keycodes = true,
-    remap = can_delegate and original.noremap == 0 or false,
     desc = "Test-only synchronous heredoc Enter prototype",
   })
 end
@@ -147,10 +147,15 @@ local function test_batched_heredoc_input(keys, payload, expected_col)
   vim.cmd("startinsert")
   feed(keys)
 
-  wait_for(function()
+  local completed = vim.wait(1500, function()
     local actual = get_lines(buf)
     return actual[2] == "\t    " .. payload and actual[3] == "\tPROTO"
-  end, "batched input did not produce canonical heredoc lines for " .. vim.inspect(keys))
+  end, 10)
+  assert(completed, "batched input failed for " .. vim.inspect(keys)
+    .. "; lines=" .. vim.inspect(get_lines(buf))
+    .. "; cursor=" .. vim.inspect(vim.api.nvim_win_get_cursor(0))
+    .. "; mode=" .. vim.inspect(vim.api.nvim_get_mode())
+    .. "; prototype_events=" .. vim.inspect(prototype_events))
 
   local actual = get_lines(buf)
   assert(vim.deep_equal(actual, {
