@@ -227,8 +227,14 @@ do
   vim.api.nvim_feedkeys("A\n", "xt", false)
   assert(vim.wait(1000, function()
     local actual = lines(buf)
+    local cursor = vim.api.nvim_win_get_cursor(0)
+    -- The body line and closer are inserted before the scheduled on_lines
+    -- callback has necessarily completed. Wait for the complete live state,
+    -- including the cursor being placed after the structural TAB.
     return actual[2] == "\t" and actual[3] == "\tLIVE"
-  end, 10), "Enter after a safe opener should create and indent the closer live")
+      and cursor[1] == 2 and cursor[2] == 1
+      and vim.api.nvim_get_mode().mode == "i"
+  end, 10), "Enter should create the closer, indent the body, and place the Insert-mode cursor after the TAB")
 
   local cursor = vim.api.nvim_win_get_cursor(0)
   assert(cursor[1] == 2 and cursor[2] == 1,
@@ -238,8 +244,11 @@ do
   -- Ordinary typing is also processed before leaving Insert mode.
   vim.api.nvim_feedkeys("typed", "xt", false)
   assert(vim.wait(1000, function()
+    local cursor = vim.api.nvim_win_get_cursor(0)
     return lines(buf)[2] == "\ttyped"
-  end, 10), "typed body text should receive its structural TAB while still in Insert mode; lines="
+      and cursor[1] == 2 and cursor[2] == #"\ttyped"
+      and vim.api.nvim_get_mode().mode == "i"
+  end, 10), "typed body text should receive its structural TAB and retain the correct cursor while still in Insert mode; lines="
     .. vim.inspect(lines(buf)) .. " cursor=" .. vim.inspect(vim.api.nvim_win_get_cursor(0)))
   vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "xt", false)
 
