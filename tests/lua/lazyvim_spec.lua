@@ -103,6 +103,7 @@ local format_source = table.concat({
   "fi",
 }, "\n")
 local format_buf = set_buffer(format_source, "bash")
+vim.api.nvim_buf_set_name(format_buf, "/tmp/nvim-heredoc-conform-fixture.sh")
 local payload_before = shell_output(table.concat(lines(format_buf), "\n"))
 assert(conform.format({ buf = format_buf, async = false, lsp_format = "never" }),
   "Conform did not invoke a formatter")
