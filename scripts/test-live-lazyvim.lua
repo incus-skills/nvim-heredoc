@@ -157,6 +157,9 @@ local function start()
   vim.api.nvim_input("A\n")
 
   defer(function()
+    assert(vim.wait(1000, function()
+      return lines()[2] == "\t" and lines()[3] == "LIVE"
+    end, 10), "scheduled first-Return processing did not create the body TAB and closer")
     assert_lines(lines()[2] == "\t" and lines()[3] == "LIVE",
       "first Return must create the body TAB and reserve the closer")
     assert_insert_mode("first Return must remain in Insert mode")
