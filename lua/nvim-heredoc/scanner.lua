@@ -82,6 +82,127 @@ local function parse_delimiter(s, pos)
   }, pos
 end
 
+
+local function skip_arithmetic_expansion(s, start)
+  local depth, quote, i = 2, nil, start + 3
+  while i <= #s do
+    local c = s:sub(i, i)
+    if quote then
+      if c == "\\" then
+        i = i + 2
+      elseif c == quote then
+        quote = nil
+        i = i + 1
+      else
+        i = i + 1
+      end
+    elseif c == "'" or c == '"' then
+      quote = c
+      i = i + 1
+    elseif c == "\\" then
+      i = i + 2
+    elseif c == "(" then
+      depth = depth + 1
+      i = i + 1
+    elseif c == ")" then
+      depth = depth - 1
+      if depth == 0 then return i + 1 end
+      i = i + 1
+    else
+      i = i + 1
+    end
+  end
+  return nil, "unterminated arithmetic expansion"
+end
+
+local function skip_command_substitution(s, start)
+  local depth, quote, word_boundary = 1, nil, true
+  local arithmetic_depth, test_depth = 0, 0
+  local i = start + 2
+
+  while i <= #s do
+    local c, n = s:sub(i, i), s:sub(i + 1, i + 1)
+    if quote == "'" then
+      if c == "'" then quote = nil end
+      i = i + 1
+    elseif quote == '"' then
+      if c == "\\" then
+        i = i + 2
+      elseif c == '"' then
+        quote = nil
+        i = i + 1
+      elseif c == "$" and s:sub(i, i + 2) == "$((" then
+        local next_pos, err = skip_arithmetic_expansion(s, i)
+        if not next_pos then return nil, err end
+        i = next_pos
+      elseif c == "$" and n == "(" then
+        depth = depth + 1
+        i = i + 2
+      elseif c == "\`" then
+        return nil, "backtick substitution inside command substitution is unsupported"
+      else
+        i = i + 1
+      end
+    elseif c == "\\" then
+      i = i + 2
+      word_boundary = false
+    elseif c == "'" or c == '"' then
+      quote = c
+      word_boundary = false
+      i = i + 1
+    elseif c == "\`" then
+      return nil, "backtick substitution inside command substitution is unsupported"
+    elseif c == "$" and s:sub(i, i + 2) == "$((" then
+      local next_pos, err = skip_arithmetic_expansion(s, i)
+      if not next_pos then return nil, err end
+      i = next_pos
+      word_boundary = false
+    elseif c == "$" and n == "(" then
+      depth = depth + 1
+      i = i + 2
+      word_boundary = false
+    elseif c == "#" and word_boundary then
+      local newline = s:find("\n", i, true)
+      if not newline then return nil, "unterminated command substitution comment" end
+      i = newline + 1
+      word_boundary = true
+    elseif c == "(" and n == "(" then
+      arithmetic_depth = arithmetic_depth + 1
+      i = i + 2
+    elseif c == ")" and n == ")" and arithmetic_depth > 0 then
+      arithmetic_depth = arithmetic_depth - 1
+      i = i + 2
+    elseif c == "[" and n == "[" then
+      test_depth = test_depth + 1
+      i = i + 2
+    elseif c == "]" and n == "]" and test_depth > 0 then
+      test_depth = test_depth - 1
+      i = i + 2
+    elseif arithmetic_depth == 0 and test_depth == 0 and c == "<" and n == "<" then
+      if s:sub(i, i + 2) == "<<<" then
+        i = i + 3
+      else
+        return nil, "heredoc redirection inside command substitution is unsupported"
+      end
+    elseif c == "(" then
+      depth = depth + 1
+      i = i + 1
+    elseif c == ")" then
+      depth = depth - 1
+      if depth == 0 then return i + 1 end
+      i = i + 1
+    else
+      if c:match("[ \t\r\n]") or c:match("[;|&]") then
+        word_boundary = true
+      else
+        word_boundary = false
+      end
+      i = i + 1
+    end
+  end
+  return nil, "unterminated command substitution"
+end
+
 local function scan_command(chunk, first_line)
   local queue, diagnostics = {}, {}
   local i, quote, word_boundary = 1, nil, true
@@ -96,8 +217,12 @@ local function scan_command(chunk, first_line)
       if c == "\\" then i = i + 2
       elseif c == '"' then quote = nil; i = i + 1
       elseif c == "$" and n == "(" then
-        diagnostics[#diagnostics + 1] = "command substitution inside double quotes is outside the lexical prototype"
-        return queue, diagnostics
+        local next_pos, err = skip_command_substitution(chunk, i)
+        if not next_pos then
+          diagnostics[#diagnostics + 1] = err
+          return queue, diagnostics
+        end
+        i = next_pos
       else i = i + 1 end
     elseif c == "\\" then
       if n == "\n" then
@@ -112,8 +237,24 @@ local function scan_command(chunk, first_line)
       quote = c
       word_boundary = false
       i = i + 1
-    elseif c == "`" or (c == "$" and n == "(") then
-      diagnostics[#diagnostics + 1] = "command substitution is outside the lexical prototype"
+    elseif c == "$" and chunk:sub(i, i + 2) == "$((" then
+      local next_pos, err = skip_arithmetic_expansion(chunk, i)
+      if not next_pos then
+        diagnostics[#diagnostics + 1] = err
+        return queue, diagnostics
+      end
+      i = next_pos
+      word_boundary = false
+    elseif c == "$" and n == "(" then
+      local next_pos, err = skip_command_substitution(chunk, i)
+      if not next_pos then
+        diagnostics[#diagnostics + 1] = err
+        return queue, diagnostics
+      end
+      i = next_pos
+      word_boundary = false
+    elseif c == "`" then
+      diagnostics[#diagnostics + 1] = "backtick substitution is outside the lexical prototype"
       return queue, diagnostics
     elseif c == "#" and word_boundary then
       break
