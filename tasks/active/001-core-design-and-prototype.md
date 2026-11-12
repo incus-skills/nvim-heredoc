@@ -24,6 +24,7 @@ The scanner is the common authority for later editing mechanisms. Automatic clos
 10. Add shell-delivery fixtures that demonstrate actual `<<-` tab stripping and payload bytes.
 11. Add formatter fixtures for `shfmt -i 0 -p` on Bash and POSIX `sh`, comparing payload bytes before and after formatting. Zsh must not be assigned to `shfmt`.
 12. Record unresolved grammar and editing limits explicitly rather than claiming complete shell parsing.
+13. Define stable local commands for core, shell-delivery, formatter, and headless LazyVim integration tests; CI must call these commands rather than duplicate test logic.
 
 ## Acceptance criteria
 
@@ -39,6 +40,8 @@ The scanner is the common authority for later editing mechanisms. Automatic clos
 - Formatter tests establish the effect of `shfmt -i 0 -p` on heredoc payloads; no assumption of preservation is accepted without evidence.
 - The scanner does not depend on Treesitter being installed or able to parse an incomplete buffer.
 - Test output is reproducible with documented commands.
+- A layered CI workflow runs core, shell-delivery, and formatter tests independently of LazyVim, with LazyVim integration isolated in a pinned container environment.
+- Each test command has a known passing fixture and a deliberately failing fixture that proves regressions fail the relevant job.
 
 ## Boundaries
 
@@ -57,6 +60,7 @@ The scanner is the common authority for later editing mechanisms. Automatic clos
 - Paste handling must identify the full changed range and preserve bytes. If range identification is uncertain, do nothing.
 - `shfmt` is assigned only to Bash and POSIX `sh`; Zsh is excluded.
 - Formatting is independently validated against actual heredoc payload bytes.
+- CI is layered; the core and shell-semantic test paths do not require the LazyVim container. The container is an integration environment, not a runtime dependency.
 
 ## Handoff
 
@@ -67,6 +71,7 @@ When complete, report:
 4. Tests run and exact results.
 5. Shells and formatters available and tested.
 6. Unresolved cases.
-7. Recommended next task.
+7. CI commands/workflow status, including whether the container integration job has been exercised.
+8. Recommended next task.
 
 Keep task in `active/` until implementation, tests, and handoff are complete.
