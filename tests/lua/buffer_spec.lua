@@ -215,6 +215,13 @@ do
   local buf = set_buffer({ "my_function() {", "\tcat <<-EOF", "}" })
   vim.api.nvim_set_current_buf(buf)
   plugin.setup()
+  -- Edits to the opener itself must not create the closer prematurely.
+  vim.api.nvim_buf_set_lines(buf, 1, 2, false, { "\tcat <<-EOF" })
+  vim.wait(100, function() return false end, 10)
+  assert(#lines(buf) == 3 and lines(buf)[3] == "}",
+    "typing the opener must not treat the existing function terminator as a body line")
+  -- This insertion represents Enter after the opener: the new body line is
+  -- now part of the changed range and authorises immediate closer creation.
   vim.api.nvim_buf_set_lines(buf, 2, 2, false, { "" })
   assert(vim.wait(1000, function()
     local actual = lines(buf)
