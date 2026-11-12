@@ -91,7 +91,7 @@ Interactive editing is region-based rather than a sequence of isolated current-l
 - If the changed range cannot be reliably identified, or the region is ambiguous, leave the inserted text unchanged rather than guessing.
 - Neovim's normal indentation, pair insertion, and completion behaviour should be allowed to coexist unless a verified, region-scoped integration is necessary.
 
-A future implementation may use extmarks or another stable range-tracking mechanism, but the design contract does not prescribe a specific Neovim API until the prototype demonstrates the required behaviour.
+The initial pure helper module exposes structural closer-line construction and idempotent prefixing for a caller-supplied changed-line range. It is not yet a Neovim buffer integration and does not establish how that range is tracked. A future implementation may use extmarks or another stable range-tracking mechanism, but the design contract does not prescribe a specific Neovim API until the prototype demonstrates the required behaviour.
 
 ## 6. Plugin coexistence and formatting
 
