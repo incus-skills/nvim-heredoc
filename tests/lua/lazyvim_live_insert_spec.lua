@@ -46,7 +46,7 @@ end, 20), "blink.cmp did not finish initialising")
 assert(blink_config.enabled(), "Blink should remain enabled during live input")
 
 local buf = vim.api.nvim_create_buf(true, false)
-vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "\tcat <<-LIVE" })
+vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "cat <<-LIVE" })
 vim.bo[buf].filetype = "bash"
 vim.bo[buf].expandtab = false
 vim.bo[buf].tabstop = 2
@@ -77,12 +77,12 @@ vim.api.nvim_create_autocmd("InsertCharPre", {
   end,
 })
 
-vim.api.nvim_win_set_cursor(0, { 1, #("\tcat <<-LIVE") })
+vim.api.nvim_win_set_cursor(0, { 1, #("cat <<-LIVE") })
 vim.api.nvim_input("A\n")
 
 defer(function()
   local actual = lines(buf)
-  assert(actual[2] == "\t" and actual[3] == "\tLIVE",
+  assert(actual[2] == "\t" and actual[3] == "LIVE",
     "LazyVim: Enter should create the first body prefix and reserve the closer; lines="
       .. vim.inspect(actual))
   assert_insert_mode("LazyVim: first Enter must remain in Insert mode")
@@ -126,7 +126,7 @@ defer(function()
                 actual = lines(buf)
                 return actual[4] == "\t  pasted one"
                   and actual[5] == "\t    pasted two"
-                  and actual[6] == "\tLIVE"
+                  and actual[6] == "LIVE"
               end, "LazyVim: multi-line paste must be prefixed before InsertLeave")
               assert_insert_mode("LazyVim: paste processing must remain in Insert mode")
 
@@ -136,7 +136,7 @@ defer(function()
                 assert(vim.api.nvim_get_mode().mode ~= "i", "LazyVim: Escape should leave Insert mode")
                 assert(actual[2] == "\ttyped" and actual[3] == "\tsecond"
                   and actual[4] == "\t  pasted one" and actual[5] == "\t    pasted two"
-                  and actual[6] == "\tLIVE",
+                  and actual[6] == "LIVE",
                   "LazyVim: InsertLeave must not be required to repair indentation; lines="
                     .. vim.inspect(actual))
                 print("LazyVim live Insert-mode tests: PASS")
