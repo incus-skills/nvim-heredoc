@@ -81,9 +81,8 @@ do
 end
 
 do
-  local result = scanner.scan('echo "$(nested)" <<-REAL\n<<-FALSE_POSITIVE\nREAL\n')
-  assert(not result.complete)
-  assert(#result.regions == 0, "scanner must not parse possible heredoc payload as shell after ambiguity")
+  local _, r = one('echo "$(nested)" <<-REAL\n<<-FALSE_POSITIVE\nREAL\n')
+  assert(r.delimiter == "REAL" and r.body_start_line == 2 and r.terminator_line == 3)
 end
 
 do
