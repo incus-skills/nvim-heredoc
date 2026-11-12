@@ -49,4 +49,21 @@ do
   assert(#result.regions == 1 and not result.regions[1].editable)
 end
 
+do
+  local result = scanner.scan('echo "$(nested)" <<-REAL\n<<-FALSE_POSITIVE\nREAL\n')
+  assert(not result.complete)
+  assert(#result.regions == 0, "scanner must not parse possible heredoc payload as shell after ambiguity")
+end
+
+do
+  local result = scanner.scan("(( value << 2 ))\n")
+  assert(#result.regions == 0, "shift operator in arithmetic context is not a heredoc")
+end
+
+do
+  local _, r = one("    cat <<-EOF\nbody\nEOF\n")
+  assert(not r.structural_tabs_only and not r.editable)
+  assert(r.confidence == "unsupported-indent")
+end
+
 print("scanner tests: PASS")
