@@ -19,7 +19,7 @@ local function shell_output(source)
   return output
 end
 
--- These options mirror the mini.pairs defaults supplied by the observed
+-- These options mirror the relevant mini.pairs defaults supplied by the observed
 -- LazyVim coding.lua revision. The legacy after/ftplugin files are not loaded.
 require("mini.pairs").setup({
   modes = { insert = true, command = true, terminal = false },
@@ -58,9 +58,11 @@ conform.setup({
     },
   },
 })
-assert(conform.list_formatters_for_buffer(0)[1] == "shfmt", "Bash should resolve to shfmt")
+local bash = set_buffer("echo ok", "bash")
+assert(conform.list_formatters_for_buffer(bash)[1] == "shfmt", "Bash should resolve to shfmt")
 local zsh = set_buffer("print -r -- ok", "zsh")
 assert(#conform.list_formatters_for_buffer(zsh) == 0, "Zsh must not resolve to shfmt")
+vim.api.nvim_set_current_buf(bash)
 
 plugin.setup()
 
