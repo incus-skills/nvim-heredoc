@@ -13,11 +13,13 @@ The initial CI design separates four validation layers:
 
 ## Workflow shape
 
-The initial workflow is `.github/workflows/test.yml`. It currently runs four independent jobs on pushes to `main`, pull requests, and manual dispatch: `core`, `buffer-integration`, `shell-delivery`, and `formatter`. The `lazyvim-integration` job is intentionally deferred until the relevant plugin coexistence tests and pinned LazyVim environment exist. It must be added as a separate job so failures identify distribution/plugin integration rather than being conflated with scanner or shell-semantic failures.
+The workflow is `.github/workflows/test.yml`. It runs five independent jobs on pushes to `main`, pull requests, and manual dispatch: `core`, `buffer-integration`, `shell-delivery`, `formatter`, and `lazyvim-integration`. The LazyVim job is separate so failures identify distribution/plugin integration rather than being conflated with scanner or shell-semantic failures.
 
 The core, shell-delivery, and formatter jobs use a lightweight `ubuntu-24.04` hosted runner. The buffer-integration job also uses that runner but installs the distribution's Neovim package (observed version 0.9.5); it does not bootstrap LazyVim. The current workflow installs Lua 5.1, Zsh, and shfmt from the runner's Ubuntu package repositories and prints their runtime versions. This is an initial repeatable baseline, not yet a fully locked toolchain: package versions should be pinned once the supported version floor is selected.
 
-The LazyVim job should build and run a repository-owned container image from `ci/Dockerfile` (or use an equivalently reproducible pinned image once one exists). The container should provide a headless Neovim runtime and a controlled LazyVim/plugin configuration. The plugin under test should be mounted or copied into that environment from the checked-out commit, not fetched from an unrelated moving branch.
+The LazyVim job builds and runs the repository-owned image in `ci/lazyvim/Dockerfile`. Its revision manifest is `ci/lazyvim/versions.env`; it pins Neovim 0.12.4 and the exact LazyVim, lazy.nvim, mini.pairs, blink.cmp, and conform.nvim commits observed in the supplied workstation inventory. The plugin under test is copied from the checked-out commit into the image, not fetched from a moving branch.
+
+This first fixture is deliberately controlled rather than a clone of the user's entire LazyVim configuration. It loads the pinned LazyVim core and the selected plugin checkouts directly, applies the relevant LazyVim mini.pairs defaults, configures Blink with its normal fuzzy-backend selection and a buffer source, and configures Conform with the observed `shfmt` assignments. It does not import the full LazyVim starter plugin graph, the user's private configuration, or the legacy `after/ftplugin` heredoc implementation. Passing this fixture is evidence for the exercised core/plugin combination only, not a claim of compatibility with every LazyVim plugin or user override.
 
 ## Reproducibility and dependency policy
 
@@ -37,17 +39,17 @@ The implementation should define stable commands before the workflow is authored
 - A formatter test command that runs the supported formatter and compares payloads before and after formatting.
 - A headless LazyVim integration command that loads the checked-out plugin and exercises only verified integration APIs.
 
-These commands should also be runnable locally where dependencies are available. CI invokes the same commands rather than containing a second implementation of test logic. The current commands are `bash tests/run-core.sh`, `bash tests/run-shell-delivery.sh`, and `bash tests/formatter/test-shfmt.sh`.
+These commands should also be runnable locally where dependencies are available. CI invokes the same commands rather than containing a second implementation of test logic. The current commands are `bash tests/run-core.sh`, `bash tests/run-nvim.sh`, `bash tests/run-shell-delivery.sh`, `bash tests/formatter/test-shfmt.sh`, and `bash tests/run-lazyvim.sh` (the last runs inside `ci/lazyvim/Dockerfile`).
 
 ## Container boundary
 
 The container is an integration test environment, not the product runtime and not a requirement for users installing the plugin. It exists to make LazyVim and its selected plugins reproducible. The scanner and shell-delivery tests should remain runnable without it.
 
-Do not add a large prebuilt container dependency before the test commands and plugin versions are known. Start with a repository-owned Dockerfile when the integration test can specify its exact runtime requirements. This avoids allowing a container image or a particular LazyVim release to dictate the scanner architecture.
+The container is an integration test environment, not the product runtime and not a requirement for users installing the plugin. It is intentionally independent of the user's old shell ftplugins. Keep the scanner and shell-delivery tests runnable without it.
 
 ## Reporting
 
-Keep job names aligned with the validation layers: `core`, `shell-delivery`, `formatter`, and `lazyvim-integration`. Preserve separate reports so a failure identifies which contract was violated.
+Keep job names aligned with the validation layers: `core`, `buffer-integration`, `shell-delivery`, `formatter`, and `lazyvim-integration`. Preserve separate reports so a failure identifies which contract was violated.
 
 The workflow is not complete merely because it parses or runs. It must be exercised against at least one known passing fixture and a deliberately failing fixture for each test command, demonstrating that regressions produce a failing job. The initial three-job workflow passed all tests in run [43151269417](https://github.com/incus-skills/nvim-heredoc/actions/runs/43151269417). After adding the first Neovim buffer integration, all four jobs passed in run [43151626549](https://github.com/incus-skills/nvim-heredoc/actions/runs/43151626549). The latest run [43153320144](https://github.com/incus-skills/nvim-heredoc/actions/runs/43153320144) passed all four jobs after adding empty quoted delimiter coverage to the scanner and shell-delivery tests. The buffer job used Neovim 0.9.5. The observed runtime versions were Lua 5.1.5, Bash 5.2.21, Zsh 5.9, and shfmt 3.8.0; Dash was present and passed the payload comparison. The formatter test exercises the configured `shfmt -i 0 -p` invocation against a Bash fixture and a POSIX-shell-subset fixture, then compares actual shell output before and after formatting. It does not establish preservation for every heredoc grammar or payload shape.
 
