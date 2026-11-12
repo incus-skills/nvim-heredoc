@@ -23,6 +23,21 @@ if [ -f "$tmp/zsh.out" ]; then
   cmp "$tmp/expected" "$tmp/zsh.out"
 fi
 
+# A space-indented opener uses a leading structural TAB followed by
+# the opener's spaces. <<- removes only the TAB, preserving the base indent.
+{
+  printf 'cat <<-EOF\n\t    pasted\n\tEOF\n'
+} > "$tmp/space-indented.sh"
+bash "$tmp/space-indented.sh" > "$tmp/space-indented-bash.out"
+dash "$tmp/space-indented.sh" > "$tmp/space-indented-dash.out"
+printf '    pasted\n' > "$tmp/space-indented.expected"
+cmp "$tmp/space-indented.expected" "$tmp/space-indented-bash.out"
+cmp "$tmp/space-indented.expected" "$tmp/space-indented-dash.out"
+if command -v zsh >/dev/null 2>&1; then
+  zsh "$tmp/space-indented.sh" > "$tmp/space-indented-zsh.out"
+  cmp "$tmp/space-indented.expected" "$tmp/space-indented-zsh.out"
+fi
+
 # An empty quoted delimiter is a valid delimiter word.
 printf 'cat <<-""\n\tempty-delimiter-body\n\t\n' > "$tmp/empty.sh"
 bash "$tmp/empty.sh" > "$tmp/empty-bash.out"
