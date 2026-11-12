@@ -187,12 +187,21 @@ function M.scan(source)
 
     local chunk = table.concat(parts, "\n")
     local queue, diagnostics = scan_command(chunk, first)
-    for _, message in ipairs(diagnostics) do
+    if #diagnostics > 0 then
       result.complete = false
-      result.diagnostics[#result.diagnostics + 1] = {
-        line = first,
-        message = message,
-      }
+      for _, message in ipairs(diagnostics) do
+        result.diagnostics[#result.diagnostics + 1] = {
+          line = first,
+          message = message,
+        }
+      end
+      -- Once lexical state is uncertain, later physical lines may still be
+      -- heredoc payload. Do not continue scanning them as shell source.
+      for _, region in ipairs(result.regions) do
+        region.editable = false
+        region.confidence = "uncertain"
+      end
+      return result
     end
 
     for q, item in ipairs(queue) do
@@ -263,6 +272,15 @@ function M.scan(source)
         }
       end
       i = terminator + 1
+    end
+  end
+
+  if not result.complete then
+    for _, region in ipairs(result.regions) do
+      region.editable = false
+      if region.confidence ~= "incomplete" then
+        region.confidence = "uncertain"
+      end
     end
   end
 
