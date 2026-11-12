@@ -9,22 +9,37 @@ The initial integration target is LazyVim, but the editing logic should remain u
 Provide predictable editing support for shell `<<-` (tab-stripping) heredocs:
 
 - Insert a matching closing delimiter automatically.
-- Keep the opener, body, and closing delimiter structurally indented rather than forcing them to column zero.
-- Preserve relative indentation when text is pasted into the body.
-- Avoid changing ordinary `<<` heredocs.
+- Keep the opener and closing delimiter structurally indented within surrounding shell code.
+- Preserve relative indentation and existing bytes when multiline content is pasted.
+- Avoid changing ordinary `<<` heredocs and here-strings (`<<<`).
 - Work in Bash, POSIX `sh`, and Zsh buffers.
 - Coexist with the user's existing completion, pair, indentation, and formatting configuration.
 
 ## Semantics that constrain the implementation
 
-A shell `<<-` heredoc removes leading **tab characters** from body lines and from the terminating delimiter. It does not remove leading spaces. This is shell behaviour, not an editor preference.
+A shell `<<-` heredoc removes leading **TAB bytes** from body lines and from the terminating delimiter. It does not remove leading spaces.
 
-Consequently, the implementation must distinguish structural tabs from body content and must not silently strip or rewrite pasted whitespace. Tabs that are part of the payload are also subject to the shell's `<<-` tab-stripping rule; tests must make this visible.
+The implementation distinguishes:
 
-Ordinary `<<` heredocs are outside the managed scope and must remain untouched.
+- **Structural indentation:** leading TAB bytes used to nest the opener and delimiter in shell code and removed by `<<-`.
+- **Content indentation:** payload whitespace, especially leading spaces, which must remain unchanged.
+
+Leading TAB bytes in the body are also stripped by the shell. The editor therefore cannot promise to preserve them as payload indentation. Neovim's tab display width may provide visual nesting without converting structural tabs to spaces.
+
+Ordinary `<<` heredocs and `<<<` here-strings are outside the managed scope and must remain untouched.
+
+## Architecture
+
+A shared, buffer-independent Lua lexical scanner is the authority for heredoc regions in all three filetypes. Treesitter may provide optional structural assistance, but is not a dependency. Editing, closer insertion, paste handling, and later plugin integrations consume the same region model; they must not independently infer the active heredoc from the nearest preceding opener.
+
+Paste handling must operate on the complete changed range and preserve existing bytes. If the range or region is ambiguous, the safe behaviour is to leave the text unchanged.
+
+Formatting is separate from interactive editing. `shfmt` is for Bash and POSIX `sh` only, not Zsh. Its effect on heredoc payload bytes must be tested rather than assumed.
 
 ## Current status
 
-Repository initialisation and design/validation work are in progress. No installer should be treated as validated until both buffer-level and shell-delivery tests pass.
+- Repository initialisation complete.
+- Architecture and indentation invariants recorded in [the design contract](docs/design.md).
+- [Task 001](tasks/active/001-core-design-and-prototype.md) is active: implement the shared region model, buffer-independent Lua core, editing/paste prototype, and byte-level regression tests.
+- No implementation or installer has yet been validated. Do not treat an installer as ready until buffer, shell-delivery, and formatter tests pass.
 
-See [the design contract](docs/design.md) and [the initial implementation task](tasks/active/001-core-design-and-prototype.md).
