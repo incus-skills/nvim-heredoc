@@ -369,10 +369,19 @@ function M.scan(source)
       if item.operator == "<<-" then
         local opener = lines[item.opener_line] or ""
         local prefix = opener:match("^([ \t]*)") or ""
-        item.closer_prefix = prefix
-        item.structural_prefix = prefix .. "\t"
-        item.structural_tabs_only = not prefix:find(" ", 1, true)
+        local has_spaces = prefix:find(" ", 1, true) ~= nil
+        local has_tabs = prefix:find("\t", 1, true) ~= nil
+        -- A space-indented opener cannot put spaces before the structural
+        -- TAB: <<- would then stop stripping at those spaces. Put the
+        -- removable TAB first, followed by the opener's spaces. The shell
+        -- removes the TAB and preserves the opener indentation in the
+        -- delivered payload. Mixed TAB/space opener prefixes are declined.
+        item.structural_safe = not (has_spaces and has_tabs)
+        item.closer_prefix = has_spaces and "\t" or prefix
+        item.structural_prefix = has_spaces and ("\t" .. prefix) or (prefix .. "\t")
+        item.structural_tabs_only = not has_spaces
       end
+
 
       local body_start, terminator = i, nil
       while i <= #lines do
@@ -406,7 +415,7 @@ function M.scan(source)
             structural_prefix = item.structural_prefix,
             closer_prefix = item.closer_prefix,
             structural_tabs_only = item.structural_tabs_only,
-            opener_safe = item.structural_tabs_only,
+            opener_safe = item.structural_safe,
             confidence = "incomplete",
             editable = false,
           }
@@ -415,7 +424,7 @@ function M.scan(source)
       end
 
       if item.operator == "<<-" then
-        local safe = item.structural_tabs_only
+        local safe = item.structural_safe
         result.regions[#result.regions + 1] = {
           operator = item.operator,
           opener_line = item.opener_line,
@@ -429,7 +438,7 @@ function M.scan(source)
           terminator_line = terminator,
           structural_prefix = item.structural_prefix,
           closer_prefix = item.closer_prefix,
-          structural_tabs_only = safe,
+          structural_tabs_only = item.structural_tabs_only,
           opener_safe = safe,
           confidence = safe and "lexical" or "unsupported-indent",
           editable = safe and #diagnostics == 0,
