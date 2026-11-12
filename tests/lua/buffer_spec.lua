@@ -32,22 +32,22 @@ do
 end
 
 do
-  local buf = set_buffer({ "\\tcat <<-EOF", "\\tfirst", "  changed", "\\tEOF" })
+  local buf = set_buffer({ "\tcat <<-EOF", "\tfirst", "  changed", "\tEOF" })
   local changed = plugin.process_buffer(buf, { start_row = 2, end_row = 3 }, false)
   assert(changed)
   local actual = lines(buf)
-  assert(actual[2] == "\\tfirst", "unmodified body lines must remain untouched by a changed-range operation")
-  assert(actual[3] == "\\t  changed", "only the supplied changed range should receive the structural prefix")
+  assert(actual[2] == "\tfirst", "unmodified body lines must remain untouched by a changed-range operation")
+  assert(actual[3] == "\t  changed", "only the supplied changed range should receive the structural prefix")
   assert(not plugin.process_buffer(buf, { start_row = 2, end_row = 3 }, false), "repeated changed-range processing must be idempotent")
 end
 
 do
-  local buf = set_buffer({ "\\tcat <<-AUTO", "" })
+  local buf = set_buffer({ "\tcat <<-AUTO", "" })
   vim.api.nvim_set_current_buf(buf)
   plugin.setup()
   vim.api.nvim_exec_autocmds("InsertLeave", { buffer = buf })
   local actual = lines(buf)
-  assert(actual[3] == "\\tAUTO", "InsertLeave should invoke automatic closer placement")
+  assert(actual[3] == "\tAUTO", "InsertLeave should invoke automatic closer placement")
 end
 
 do
