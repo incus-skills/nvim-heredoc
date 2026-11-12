@@ -80,6 +80,32 @@ do
 end
 
 do
+  local buf = set_buffer({
+    "\tcat <<-EOF",
+    "\tfirst",
+    "untouched middle",
+    "\tthird",
+    "\tEOF",
+  })
+  vim.api.nvim_set_current_buf(buf)
+  plugin.setup()
+  -- First edit a later line, then insert before it before scheduled processing.
+  -- The earlier pending range must follow the old line to its new row.
+  vim.api.nvim_buf_set_lines(buf, 3, 4, false, { "  third changed" })
+  vim.api.nvim_buf_set_lines(buf, 1, 1, false, { "  inserted before first" })
+  assert(vim.wait(1000, function()
+    local actual = lines(buf)
+    return actual[2] == "\t  inserted before first"
+      and actual[5] == "\t  third changed"
+  end, 10), "pending changed ranges should be rebased after a line insertion")
+  local actual = lines(buf)
+  assert(actual[4] == "untouched middle",
+    "line insertion before a pending range must not redirect it onto an untouched line")
+  assert(actual[3] == "\tfirst",
+    "the insertion must not cause unrelated body lines to be rewritten")
+end
+
+do
   local buf = set_buffer({ "\tcat <<-AUTO", "" })
   vim.api.nvim_set_current_buf(buf)
   plugin.setup()
