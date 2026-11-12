@@ -33,6 +33,7 @@ local function mapping_inventory(mapping)
     lhs = mapping.lhs,
     rhs = mapping.rhs,
     expr = mapping.expr,
+    replace_keycodes = mapping.replace_keycodes,
     callback = mapping.callback,
     buffer = mapping.buffer,
     mode = mapping.mode,
@@ -98,13 +99,13 @@ local function canonical_transition(buf)
 end
 
 local function install_wrapper(buf, original)
-  -- Deliberately support only plain, non-expression string mappings here.
-  -- The actual MiniPairs mapping is inventoried separately and is an expr map.
+  -- String RHS mappings can be fed directly. Expression RHS mappings
+  -- are evaluated at keypress time, then their returned key sequence is fed.
+  -- Lua callback mappings remain deliberately unsupported in this prototype.
   local can_delegate = original
     and type(original.rhs) == "string"
     and original.rhs ~= ""
     and not original.callback
-    and original.expr ~= 1
 
   vim.keymap.set("i", "<CR>", function()
     prototype_events[#prototype_events + 1] = {
@@ -115,7 +116,18 @@ local function install_wrapper(buf, original)
       return
     end
     if can_delegate then
-      local keys = vim.api.nvim_replace_termcodes(original.rhs, true, false, true)
+      local keys
+      if original.expr == 1 then
+        local result = vim.api.nvim_eval(original.rhs)
+        assert(type(result) == "string",
+          "expression mapping did not return a string: " .. vim.inspect(result))
+        keys = result
+        if original.replace_keycodes == 1 or original.replace_keycodes == true then
+          keys = vim.api.nvim_replace_termcodes(keys, true, true, true)
+        end
+      else
+        keys = vim.api.nvim_replace_termcodes(original.rhs, true, false, true)
+      end
       local flags = "i" .. (original.noremap == 1 and "n" or "")
       vim.api.nvim_feedkeys(keys, flags, false)
       return
@@ -185,6 +197,37 @@ local function test_batched_heredoc_input(keys, payload, expected_col, done)
         "cursor must be immediately after payload; cursor=" .. vim.inspect(vim.api.nvim_win_get_cursor(0)))
       print("synchronous heredoc prototype PASS: " .. keys)
 
+      input("<Esc>")
+      defer(done)
+    end)
+  end)
+end
+
+local function test_minipairs_expression_fallback(done)
+  local buf = vim.api.nvim_create_buf(true, false)
+  vim.api.nvim_set_current_buf(buf)
+  vim.bo[buf].filetype = "bash"
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "echo hello" })
+
+  local original = vim.fn.maparg("<CR>", "i", false, true)
+  assert(original.expr == 1 and type(original.rhs) == "string"
+    and original.rhs:find("MiniPairs%.cr%(%") ~= nil and not original.callback,
+    "expected the pinned MiniPairs expression mapping; got " .. vim.inspect(mapping_inventory(original)))
+
+  install_wrapper(buf, original)
+  vim.api.nvim_win_set_cursor(0, { 1, #"echo hello" })
+  input("A")
+  defer(function()
+    assert(vim.api.nvim_get_mode().mode == "i",
+      "could not enter Insert mode before MiniPairs fallback")
+    input("<CR>world")
+
+    defer(function()
+      assert(vim.deep_equal(get_lines(buf), { "echo hello", "world" }),
+        "MiniPairs expression fallback was not preserved; lines=" .. vim.inspect(get_lines(buf)))
+      assert(vim.api.nvim_get_mode().mode == "i",
+        "MiniPairs expression fallback must remain in Insert mode")
+      print("MiniPairs expression <CR> fallback PASS")
       input("<Esc>")
       defer(done)
     end)
