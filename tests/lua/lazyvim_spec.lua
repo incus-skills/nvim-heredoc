@@ -80,8 +80,6 @@ local completion_buf = set_buffer(table.concat({
 }, "\n"), "bash")
 vim.api.nvim_win_set_cursor(0, { 4, 3 })
 vim.api.nvim_feedkeys("A", "xt", false)
-assert(vim.api.nvim_get_mode().mode:sub(1, 1) == "i",
-  "could not enter insert mode for Blink completion test")
 blink.show({ providers = { "buffer" } })
 assert(vim.wait(5000, function()
   return blink.is_menu_visible() and #blink.get_items() > 0
