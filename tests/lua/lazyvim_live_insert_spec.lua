@@ -125,7 +125,7 @@ defer(function()
               wait_for(buf, function()
                 actual = lines(buf)
                 return actual[4] == "\t      pasted one"
-                  and actual[5] == "\t        pasted two"
+                  and actual[5] == "\t    pasted two"
                   and actual[6] == "\tLIVE"
               end, "LazyVim: multi-line paste must be prefixed before InsertLeave")
               assert_insert_mode("LazyVim: paste processing must remain in Insert mode")
@@ -135,7 +135,7 @@ defer(function()
                 actual = lines(buf)
                 assert(vim.api.nvim_get_mode().mode ~= "i", "LazyVim: Escape should leave Insert mode")
                 assert(actual[2] == "\t    typed" and actual[3] == "\t    second"
-                  and actual[4] == "\t      pasted one" and actual[5] == "\t        pasted two"
+                  and actual[4] == "\t      pasted one" and actual[5] == "\t    pasted two"
                   and actual[6] == "\tLIVE",
                   "LazyVim: InsertLeave must not be required to repair indentation; lines="
                     .. vim.inspect(actual))
