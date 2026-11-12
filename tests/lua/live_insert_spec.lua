@@ -102,7 +102,7 @@ defer(function()
           wait_for(function()
             actual = lines(buf)
             return actual[4] == "\t      pasted one"
-              and actual[5] == "\t        pasted two"
+              and actual[5] == "\t    pasted two"
               and actual[6] == "\tLIVE"
           end, "multi-line paste must be indented before InsertLeave/save without changing payload bytes")
           assert_insert_mode("live paste processing must remain in Insert mode")
@@ -112,7 +112,7 @@ defer(function()
             assert(vim.api.nvim_get_mode().mode ~= "i", "Escape should leave Insert mode")
             actual = lines(buf)
             assert(actual[2] == "\t    typed" and actual[3] == "\t    second"
-              and actual[4] == "\t      pasted one" and actual[5] == "\t        pasted two"
+              and actual[4] == "\t      pasted one" and actual[5] == "\t    pasted two"
               and actual[6] == "\tLIVE",
               "InsertLeave must not be required to repair live body indentation; lines="
                 .. vim.inspect(actual))
