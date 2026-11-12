@@ -121,23 +121,85 @@ function M.process_buffer(buf, changed_range, close_incomplete)
   return changed
 end
 
-local function add_changed_range(ranges, firstline, new_lastline)
-  local range = { start_row = firstline, end_row = new_lastline }
-  local index = 1
-  while index <= #ranges do
-    local existing = ranges[index]
-    -- Merge only overlapping or adjacent ranges. A bounding interval across
-    -- disjoint edits would incorrectly authorise changes to untouched lines.
-    if range.start_row <= existing.end_row and range.end_row >= existing.start_row then
-      range.start_row = math.min(range.start_row, existing.start_row)
-      range.end_row = math.max(range.end_row, existing.end_row)
-      table.remove(ranges, index)
-      index = 1
+local function add_changed_range(ranges, firstline, lastline, new_lastline)
+  local delta = new_lastline - lastline
+  local current = {
+    start_row = firstline,
+    end_row = new_lastline,
+  }
+  local transformed = {}
+
+  -- on_lines reports coordinates in the buffer *after* this edit. Rebase
+  -- earlier pending ranges through the line-count delta before coalescing.
+  for _, existing in ipairs(ranges) do
+    local start_row, end_row = existing.start_row, existing.end_row
+    local overlaps = false
+
+    if lastline == firstline then
+      -- Insertion: ranges after the insertion move; a range spanning the
+      -- insertion point expands to include the inserted lines.
+      if start_row >= firstline then
+        start_row = start_row + delta
+        end_row = end_row + delta
+      elseif end_row > firstline then
+        end_row = end_row + delta
+        overlaps = true
+      end
+    elseif end_row <= firstline then
+      -- Existing range is before this edit.
+    elseif start_row >= lastline then
+      start_row = start_row + delta
+      end_row = end_row + delta
     else
-      index = index + 1
+      -- The edit intersects an earlier pending range. Map its surviving
+      -- boundaries into the new buffer and merge the affected intervals.
+      overlaps = true
+      if start_row >= firstline then
+        start_row = firstline
+      end
+      if end_row > lastline then
+        end_row = end_row + delta
+      else
+        end_row = new_lastline
+      end
+    end
+
+    transformed[#transformed + 1] = {
+      start_row = start_row,
+      end_row = end_row,
+      overlaps = overlaps,
+    }
+  end
+
+  if current.end_row > current.start_row then
+    transformed[#transformed + 1] = current
+  end
+  table.sort(transformed, function(a, b)
+    if a.start_row == b.start_row then
+      return a.end_row < b.end_row
+    end
+    return a.start_row < b.start_row
+  end)
+
+  local merged = {}
+  for _, range in ipairs(transformed) do
+    local previous = merged[#merged]
+    if previous and range.start_row <= previous.end_row then
+      previous.end_row = math.max(previous.end_row, range.end_row)
+    else
+      merged[#merged + 1] = {
+        start_row = range.start_row,
+        end_row = range.end_row,
+      }
     end
   end
-  ranges[#ranges + 1] = range
+
+  for index = #ranges, 1, -1 do
+    ranges[index] = nil
+  end
+  for _, range in ipairs(merged) do
+    ranges[#ranges + 1] = range
+  end
 end
 
 local function process_pending_ranges(buf, close_incomplete)
@@ -161,7 +223,7 @@ local function schedule_changed_range(buf, firstline, new_lastline)
     pending = { ranges = {} }
     pending_ranges[buf] = pending
   end
-  add_changed_range(pending.ranges, firstline, new_lastline)
+  add_changed_range(pending.ranges, firstline, lastline, new_lastline)
 
   if pending.scheduled then
     return
