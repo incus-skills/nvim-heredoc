@@ -137,9 +137,12 @@ end
 
 local function start()
   stage = "buffer setup"
-  vim.api.nvim_win_set_buf(win, buf)
+  -- Prepare the opener while the scratch buffer is not current and before
+  -- the plugin attaches. Otherwise TextChanged can observe this setup edit in
+  -- Normal mode and close the incomplete heredoc before the simulated Return.
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "cat <<-LIVE" })
   vim.bo[buf].filetype = "bash"
+  vim.api.nvim_win_set_buf(win, buf)
 
   assert(vim.b[buf].nvim_heredoc_attached == true,
     "the installed Bash ftplugin did not attach nvim-heredoc")
