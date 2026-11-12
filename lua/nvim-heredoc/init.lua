@@ -49,14 +49,22 @@ local function prefix_region_range(buf, region, changed_range)
   return true
 end
 
-local function append_closer(buf, region)
+local function insert_closer(buf, region, row)
   local closer, err = editing.closer_line(region)
   if not closer then
     return false, err
   end
-  local count = vim.api.nvim_buf_line_count(buf)
-  vim.api.nvim_buf_set_lines(buf, count, count, false, { closer })
+  row = math.max(0, math.min(row, vim.api.nvim_buf_line_count(buf)))
+  vim.api.nvim_buf_set_lines(buf, row, row, false, { closer })
   return true
+end
+
+local function active_cursor_row(buf)
+  local win = vim.api.nvim_get_current_win()
+  if vim.api.nvim_win_get_buf(win) ~= buf then
+    return nil
+  end
+  return vim.api.nvim_win_get_cursor(win)[1] - 1
 end
 
 function M.process_buffer(buf, changed_range, close_incomplete)
@@ -80,9 +88,6 @@ function M.process_buffer(buf, changed_range, close_incomplete)
       local lines = get_lines(buf)
       local result = scanner.scan(get_source(lines))
       if not result.complete then
-        if not close_incomplete then
-          break
-        end
         local pending
         for _, region in ipairs(result.regions) do
           if not region.terminator_line and region.opener_safe then
@@ -93,7 +98,22 @@ function M.process_buffer(buf, changed_range, close_incomplete)
         if not pending then
           break
         end
-        local inserted = append_closer(buf, pending)
+
+        local body_row = pending.body_start_line - 1
+        local cursor_row = active_cursor_row(buf)
+        local changed_body_line = not changed_range
+          or (changed_range.start_row <= body_row and changed_range.end_row > body_row)
+        local inserted = false
+
+        -- Enter after the opener creates the first body line. Insert directly
+        -- below it so the closer is reserved before an enclosing brace.
+        if cursor_row == body_row and changed_body_line then
+          inserted = insert_closer(buf, pending, body_row + 1)
+        elseif close_incomplete then
+          -- Retain the fallback for buffers opened with an incomplete region.
+          inserted = insert_closer(buf, pending, vim.api.nvim_buf_line_count(buf))
+        end
+
         if not inserted then
           break
         end
