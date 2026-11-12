@@ -74,7 +74,7 @@ function M.clear_trace()
   trace_events = {}
 end
 
-local function advance_insert_cursor(buf, row)
+local function advance_insert_cursor(buf, row, count)
   if active_cursor_row(buf) ~= row or vim.api.nvim_get_mode().mode ~= "i" then
     return
   end
@@ -84,7 +84,7 @@ local function advance_insert_cursor(buf, row)
   -- insertion point past the newly inserted TAB. Queue a literal Right key
   -- at the front of typeahead so it is consumed before the next user key.
   local right = vim.api.nvim_replace_termcodes("<Right>", true, false, true)
-  vim.api.nvim_feedkeys(right, "ni", false)
+  vim.api.nvim_feedkeys(string.rep(right, math.max(1, count or 1)), "ni", false)
 end
 
 local function prefix_region_range(buf, region, changed_range)
@@ -103,26 +103,28 @@ local function prefix_region_range(buf, region, changed_range)
   end
 
   local lines = vim.api.nvim_buf_get_lines(buf, first_row, last_row, false)
-  local prefixed, changed = editing.prefix_lines(region, lines)
+  local prefixed, changed, insertions = editing.prefix_lines(region, lines)
   if not prefixed then
     return false
   end
 
   if changed then
     local cursor_row = active_cursor_row(buf)
-    local cursor_line_prefixed = false
+    local cursor_col = cursor_row and vim.api.nvim_win_get_cursor(0)[2] or nil
+    local cursor_advance = 0
     for index = #lines, 1, -1 do
       if prefixed[index] ~= lines[index] then
         local row = first_row + index - 1
         trace_event(buf, "edit.prefix-line", { row = row, prefix = region.structural_prefix })
-        vim.api.nvim_buf_set_text(buf, row, 0, row, 0, { region.structural_prefix })
-        if row == cursor_row then
-          cursor_line_prefixed = true
+        local insertion = insertions[index]
+        vim.api.nvim_buf_set_text(buf, row, insertion.column, row, insertion.column, { insertion.text })
+        if row == cursor_row and cursor_col >= insertion.column then
+          cursor_advance = #insertion.text
         end
       end
     end
-    if cursor_line_prefixed then
-      advance_insert_cursor(buf, cursor_row)
+    if cursor_advance > 0 then
+      advance_insert_cursor(buf, cursor_row, cursor_advance)
     end
   end
 
@@ -150,10 +152,20 @@ local function ensure_body_prefix(buf, region, body_row)
   if not line then
     return
   end
-  if line:sub(1, #prefix) ~= prefix then
-    trace_event(buf, "edit.ensure-body-prefix", { row = body_row, prefix = prefix })
-    vim.api.nvim_buf_set_text(buf, body_row, 0, body_row, 0, { prefix })
-    advance_insert_cursor(buf, body_row)
+  local prefixed, changed, insertions = editing.prefix_lines(region, { line })
+  if changed then
+    local insertion = insertions[1]
+    local cursor = active_cursor_row(buf) == body_row and vim.api.nvim_win_get_cursor(0) or nil
+    trace_event(buf, "edit.ensure-body-prefix", {
+      row = body_row,
+      prefix = prefix,
+      insertion_column = insertion.column,
+      insertion_text = insertion.text,
+    })
+    vim.api.nvim_buf_set_text(buf, body_row, insertion.column, body_row, insertion.column, { insertion.text })
+    if cursor and cursor[2] >= insertion.column then
+      advance_insert_cursor(buf, body_row, #insertion.text)
+    end
   end
 end
 
