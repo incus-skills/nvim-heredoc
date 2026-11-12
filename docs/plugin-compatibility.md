@@ -74,3 +74,10 @@ The pinned fixture should use the observed versions above as an initial reproduc
 - Exercise Conform formatting only where the fixture explicitly configures it; assert payload bytes before and after formatting.
 - Record which plugin behaviours were actually exercised. A plugin merely being installed is not evidence of coexistence.
 - Keep the container job separate from the lightweight core and shell-semantic jobs.
+
+
+## Executed integration evidence
+
+The pinned headless fixture exercises the observed mini.pairs and blink.cmp revisions with their normal fixture configuration. It types a quote through mini.pairs in ordinary shell code and a managed heredoc body, and opens Blink's real buffer-source completion menu from inside a managed heredoc body. Both behaviours, Conform payload preservation, the ordinary-heredoc non-interference control, and the negative control passed in [five-job workflow run 43198320233](https://github.com/incus-skills/nvim-heredoc/actions/runs/43198320233).
+
+This remains a controlled fixture rather than a reproduction of the user's full LazyVim plugin graph or private configuration. The test runs its interactive body from a scheduled callback after startup commands have returned, because headless input processing while executing a `:lua` Ex command does not model an interactive insert session.
