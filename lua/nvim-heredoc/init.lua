@@ -40,12 +40,6 @@ local function prefix_region_range(buf, region, changed_range)
     return false
   end
 
-  local win = vim.api.nvim_get_current_win()
-  local cursor
-  if vim.api.nvim_win_get_buf(win) == buf then
-    cursor = vim.api.nvim_win_get_cursor(win)
-  end
-
   if changed then
     for index = #lines, 1, -1 do
       if prefixed[index] ~= lines[index] then
@@ -55,22 +49,12 @@ local function prefix_region_range(buf, region, changed_range)
     end
   end
 
-  -- Neovim may already have supplied the structural TAB through its own
-  -- indentation on Enter. In that case there is no text edit for the plugin
-  -- to make, but the cursor can still be left before that existing TAB.
-  -- Always place a column-zero cursor after the confirmed prefix so payload
-  -- typing starts after structural indentation.
-  if cursor and region.structural_prefix ~= ""
-    and cursor[1] - 1 >= first_row and cursor[1] - 1 < last_row then
-    local current_line = vim.api.nvim_buf_get_lines(buf, cursor[1] - 1, cursor[1], false)[1]
-    if current_line:sub(1, #region.structural_prefix) == region.structural_prefix
-      and cursor[2] < #region.structural_prefix then
-      vim.api.nvim_win_set_cursor(win, {
-        cursor[1],
-        #region.structural_prefix,
-      })
-    end
-  end
+  -- Do not reposition the cursor with nvim_win_set_cursor here. In
+  -- Insert mode Neovim reports the byte column of the character immediately
+  -- before the insertion point; for a one-TAB prefix that is column zero.
+  -- Moving to column one is clamped at end-of-line and can also leave Insert
+  -- mode. The next typed byte is the reliable check that insertion is after
+  -- the structural prefix.
   return changed
 end
 
@@ -106,13 +90,10 @@ local function ensure_body_prefix_and_cursor(buf, region, body_row)
     vim.api.nvim_buf_set_text(buf, body_row, 0, body_row, 0, { prefix })
   end
 
-  local win = vim.api.nvim_get_current_win()
-  if vim.api.nvim_win_get_buf(win) == buf then
-    local cursor = vim.api.nvim_win_get_cursor(win)
-    if cursor[1] - 1 == body_row and cursor[2] < #prefix then
-      vim.api.nvim_win_set_cursor(win, { cursor[1], #prefix })
-    end
-  end
+  -- Leave the Insert-mode cursor alone. Its byte column identifies the
+  -- TAB immediately before the insertion point, so typing naturally follows
+  -- the structural prefix. nvim_win_set_cursor cannot represent a position
+  -- beyond this one-byte line and would force an incorrect normal-mode state.
 end
 
 function M.process_buffer(buf, changed_range, close_incomplete)
