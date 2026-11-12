@@ -232,7 +232,8 @@ do
 
   local cursor = vim.api.nvim_win_get_cursor(0)
   assert(cursor[1] == 2 and cursor[2] == 1,
-    "live structural prefixing must leave the cursor after the TAB, not before it")
+    "live structural prefixing must leave the cursor after the TAB, not before it; cursor="
+      .. vim.inspect(cursor) .. " line=" .. string.format("%q", lines(buf)[2]))
 
   -- Ordinary typing is also processed before leaving Insert mode.
   vim.api.nvim_feedkeys("typed", "xt", false)

@@ -36,38 +36,42 @@ local function prefix_region_range(buf, region, changed_range)
 
   local lines = vim.api.nvim_buf_get_lines(buf, first_row, last_row, false)
   local prefixed, changed = editing.prefix_lines(region, lines)
-  if not prefixed or not changed then
+  if not prefixed then
     return false
   end
 
-  -- Inserting at column zero while the Insert-mode cursor is also at column
-  -- zero can leave the cursor before the newly inserted structural TAB.
-  -- Neovim then places subsequently typed payload text before that TAB. Keep
-  -- the cursor at the same payload byte, after the inserted prefix.
   local win = vim.api.nvim_get_current_win()
   local cursor
   if vim.api.nvim_win_get_buf(win) == buf then
     cursor = vim.api.nvim_win_get_cursor(win)
   end
-  local cursor_line_prefixed = false
 
-  for index = #lines, 1, -1 do
-    if prefixed[index] ~= lines[index] then
-      local row = first_row + index - 1
-      if cursor and cursor[1] - 1 == row then
-        cursor_line_prefixed = true
+  if changed then
+    for index = #lines, 1, -1 do
+      if prefixed[index] ~= lines[index] then
+        local row = first_row + index - 1
+        vim.api.nvim_buf_set_text(buf, row, 0, row, 0, { region.structural_prefix })
       end
-      vim.api.nvim_buf_set_text(buf, row, 0, row, 0, { region.structural_prefix })
     end
   end
 
-  if cursor and cursor_line_prefixed then
-    vim.api.nvim_win_set_cursor(win, {
-      cursor[1],
-      cursor[2] + #region.structural_prefix,
-    })
+  -- Neovim may already have supplied the structural TAB through its own
+  -- indentation on Enter. In that case there is no text edit for the plugin
+  -- to make, but the cursor can still be left before that existing TAB.
+  -- Always place a column-zero cursor after the confirmed prefix so payload
+  -- typing starts after structural indentation.
+  if cursor and region.structural_prefix ~= ""
+    and cursor[1] - 1 >= first_row and cursor[1] - 1 < last_row then
+    local current_line = vim.api.nvim_buf_get_lines(buf, cursor[1] - 1, cursor[1], false)[1]
+    if current_line:sub(1, #region.structural_prefix) == region.structural_prefix
+      and cursor[2] < #region.structural_prefix then
+      vim.api.nvim_win_set_cursor(win, {
+        cursor[1],
+        #region.structural_prefix,
+      })
+    end
   end
-  return true
+  return changed
 end
 
 local function insert_closer(buf, region, row)
