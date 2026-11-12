@@ -341,7 +341,11 @@ local function process_pending_ranges(buf, close_incomplete)
   local pending = pending_ranges[buf]
   pending_ranges[buf] = nil
   if not pending then
-    M.process_buffer(buf, nil, close_incomplete)
+    -- TextChanged can run before the corresponding on_lines notification has
+    -- populated pending_ranges. Do not treat that transient state as an
+    -- explicit request to close an incomplete heredoc: the scheduled
+    -- on_lines callback will process the actual changed range.
+    trace_event(buf, "range.drain-empty", { close_incomplete = close_incomplete })
     return
   end
   for _, range in ipairs(pending.ranges) do
