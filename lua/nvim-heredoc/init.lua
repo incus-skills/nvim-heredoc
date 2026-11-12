@@ -256,6 +256,7 @@ local function attach(buf)
   end
 
   attached[buf] = true
+  vim.b[buf].nvim_heredoc_attached = true
   vim.api.nvim_buf_attach(buf, false, {
     on_lines = function(_, changed_buf, _, firstline, lastline, new_lastline)
       schedule_changed_range(changed_buf, firstline, lastline, new_lastline)
