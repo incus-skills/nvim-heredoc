@@ -62,10 +62,10 @@ The current integration:
 - inserts a closer for a safely recognised incomplete managed heredoc;
 - derives the closer from the opener's structural TAB prefix;
 - tracks changed line ranges with `nvim_buf_attach(on_lines)`;
-- retains disjoint notifications as separate ranges and merges only overlapping or adjacent ranges;
+- retains disjoint notifications as separate ranges, rebases earlier pending ranges when edits insert/delete lines, and merges only overlapping or adjacent ranges;
 - prefixes only changed lines that intersect a scanner-confirmed body range;
 - avoids duplicating an already-present structural prefix.
 
 The integration is headlessly tested, but this does not establish compatibility with LazyVim, `mini.pairs`, `blink.cmp`, or `conform.nvim`. Plugin-specific controls remain deliberately untouched pending inspection of the actual installed revisions and configuration.
 
-These behaviours remain prototype-level. The `editable` field is a conservative gate for the current editing operations, not proof that every possible shell construct has been parsed. The disjoint-range regression is covered by a headless test that performs two edits in one scheduling window and verifies the intervening line is untouched. More complex edit sequences that shift earlier line coordinates, partial notifications, cursor behaviour, and all buffer mutation paths still require broader regression and real-workstation validation.
+These behaviours remain prototype-level. The `editable` field is a conservative gate for the current editing operations, not proof that every possible shell construct has been parsed. Headless regressions cover disjoint edits and pending-range rebasing when a later edit inserts or deletes lines before an earlier pending range; untouched intervening lines are asserted byte-for-byte. More complex overlapping replacement sequences, partial notifications, cursor behaviour, and all buffer mutation paths still require broader regression and real-workstation validation.
