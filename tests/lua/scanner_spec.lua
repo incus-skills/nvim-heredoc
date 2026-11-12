@@ -4,7 +4,13 @@ local editing = require("nvim-heredoc.editing")
 
 local function one(source)
   local result = scanner.scan(source)
-  assert(#result.regions == 1, "expected one managed region, got " .. #result.regions)
+  if #result.regions ~= 1 then
+    local messages = {}
+    for _, diagnostic in ipairs(result.diagnostics) do
+      messages[#messages + 1] = diagnostic.message
+    end
+    error("expected one managed region, got " .. #result.regions .. "; complete=" .. tostring(result.complete) .. "; diagnostics=" .. table.concat(messages, " | "))
+  end
   return result, result.regions[1]
 end
 
