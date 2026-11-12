@@ -83,7 +83,8 @@ The scanner is the common authority for later editing mechanisms. Automatic clos
 - This is not a complete shell parser. Command substitutions, backtick substitutions, multiline quoted commands, and other unsupported contexts are not yet recognised safely.
 - The initial changed-range implementation uses line ranges from `on_lines`, coalesced until scheduled processing. It does not yet use extmarks; behaviour under overlapping/disjoint rapid changes, other plugins mutating the same buffer, and complex edit sequences needs more testing.
 - The Lua scanner tests have been authored but not executed in the current development environment because neither Lua nor Neovim is installed here.
-- The LazyVim container job is deferred until plugin coexistence tests and a pinned LazyVim environment are ready.
+- A local diagnostic script at `tests/diagnostics/inspect-lazyvim.sh` now inventories exact installed plugin revisions, lockfile entries, and candidate buffer-local controls. It has not yet been run against the user's workstation.
+- The LazyVim container job is deferred until the inventory has been reviewed, plugin coexistence behaviour has been implemented/tested, and the container can pin the relevant revisions.
 
 Do not describe the scanner as production-ready or authorise source mutation from uncertain results.
 
