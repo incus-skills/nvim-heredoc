@@ -110,4 +110,21 @@ do
   assert(closer == nil, "space-indented opener must not authorise closer placement")
 end
 
+-- mvdan/sh (through shfmt --to-json in CI) validates these as legal Bash
+-- programs. The Lua scanner intentionally declines them until their lexical
+-- constructs have explicit support; parser validity must not imply edit safety.
+for _, path in ipairs({
+  "tests/fixtures/grammar/backtick-substitution.sh",
+  "tests/fixtures/grammar/nested-heredoc-command-substitution.sh",
+}) do
+  local file = assert(io.open(path, "rb"))
+  local source = file:read("*a")
+  file:close()
+  local result = scanner.scan(source)
+  assert(not result.complete, path .. ": unsupported valid grammar must remain uncertain")
+  for _, region in ipairs(result.regions) do
+    assert(not region.editable, path .. ": uncertain scan must not authorise edits")
+  end
+end
+
 print("scanner tests: PASS")
