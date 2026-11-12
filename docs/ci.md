@@ -66,6 +66,8 @@ All five jobs passed with the contract-specific negative controls enabled in [wo
 
 These controls are contract-specific negative assertions, not arbitrary failing commands. The wrapper also checks the expected marker so dependency/setup failures cannot be mistaken for a successful negative control.
 
+The pending-range coordinate-rebasing regression suite now covers both insertion and deletion before an earlier pending edit. The Neovim test runners also explicitly convert Lua test errors into non-zero process exits; this was necessary because a later `qa!` could otherwise mask an earlier `:lua` error. The pinned LazyVim job now executes its interactive checks from a scheduled callback outside the `:lua` command context, allowing the headless input queue to exercise mini.pairs and Blink. The complete five-job workflow passed with these changes in [run 43198320233](https://github.com/incus-skills/nvim-heredoc/actions/runs/43198320233); its LazyVim log records `LazyVim/plugin coexistence tests: PASS` and the expected negative-control PASS line.
+
 ## Container boundary
 
 The container is an integration test environment, not the product runtime and not a requirement for users installing the plugin. It exists to make LazyVim and its selected plugins reproducible. The scanner and shell-delivery tests should remain runnable without it.
