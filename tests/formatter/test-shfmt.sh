@@ -26,12 +26,12 @@ SCRIPT
   case "$dialect" in
     bash)
       bash "$fixture" > "$before"
-      shfmt -ln bash -i 0 -p -w "$fixture"
+      shfmt -i 0 -p -w "$fixture"
       bash "$fixture" > "$after"
       ;;
     posix)
       dash "$fixture" > "$before"
-      shfmt -ln posix -i 0 -p -w "$fixture"
+      shfmt -i 0 -p -w "$fixture"
       dash "$fixture" > "$after"
       ;;
   esac
