@@ -105,8 +105,13 @@ local function skip_arithmetic_expansion(s, start)
       depth = depth + 1
       i = i + 1
     elseif c == ")" then
+      if depth == 1 then return i + 1 end
+      local context = substitution_contexts[depth]
       depth = depth - 1
-      if depth == 0 then return i + 1 end
+      if context then
+        quote = context.quote
+        substitution_contexts[depth + 1] = nil
+      end
       i = i + 1
     else
       i = i + 1
@@ -118,6 +123,7 @@ end
 local function skip_command_substitution(s, start)
   local depth, quote, word_boundary = 1, nil, true
   local arithmetic_depth, test_depth = 0, 0
+  local substitution_contexts = {}
   local i = start + 2
 
   while i <= #s do
@@ -137,6 +143,8 @@ local function skip_command_substitution(s, start)
         i = next_pos
       elseif c == "$" and n == "(" then
         depth = depth + 1
+        substitution_contexts[depth] = { quote = quote }
+        quote = nil
         i = i + 2
       elseif c == "`" then
         return nil, "backtick substitution inside command substitution is unsupported"
@@ -159,6 +167,8 @@ local function skip_command_substitution(s, start)
       word_boundary = false
     elseif c == "$" and n == "(" then
       depth = depth + 1
+      substitution_contexts[depth] = { quote = quote }
+      quote = nil
       i = i + 2
       word_boundary = false
     elseif c == "#" and word_boundary then
