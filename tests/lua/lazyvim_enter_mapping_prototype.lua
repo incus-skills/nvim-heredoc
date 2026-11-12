@@ -11,16 +11,21 @@ local function fail(err)
   vim.cmd("cquit 1")
 end
 
-local function feed(keys)
+local function defer(fn, delay)
+  vim.defer_fn(function()
+    local ok, err = xpcall(fn, debug.traceback)
+    if not ok then
+      fail(err)
+    end
+  end, delay or 25)
+end
+
+local function input(keys)
   vim.api.nvim_input(vim.api.nvim_replace_termcodes(keys, true, false, true))
 end
 
 local function get_lines(buf)
   return vim.api.nvim_buf_get_lines(buf, 0, -1, false)
-end
-
-local function wait_for(predicate, message)
-  assert(vim.wait(1500, predicate, 10), message)
 end
 
 local function mapping_inventory(mapping)
@@ -48,7 +53,9 @@ local function canonical_transition(buf)
   local lines = get_lines(buf)
   local opener = lines[row + 1]
   if not opener or col ~= #opener then
-    prototype_events[#prototype_events + 1] = { event = "not-at-opener-eol", row = row, col = col, opener = opener }
+    prototype_events[#prototype_events + 1] = {
+      event = "not-at-opener-eol", row = row, col = col, opener = opener,
+    }
     return false
   end
 
@@ -81,11 +88,18 @@ local function canonical_transition(buf)
     closer_line,
   })
   vim.api.nvim_win_set_cursor(win, { body_row + 1, #body_prefix })
-  prototype_events[#prototype_events + 1] = { event = "heredoc-transition", prefix = body_prefix, closer = closer_line }
+  prototype_events[#prototype_events + 1] = {
+    event = "heredoc-transition",
+    prefix = body_prefix,
+    closer = closer_line,
+    mode = vim.api.nvim_get_mode().mode,
+  }
   return true
 end
 
 local function install_wrapper(buf, original)
+  -- Deliberately support only plain, non-expression string mappings here.
+  -- The actual MiniPairs mapping is inventoried separately and is an expr map.
   local can_delegate = original
     and type(original.rhs) == "string"
     and original.rhs ~= ""
@@ -93,7 +107,10 @@ local function install_wrapper(buf, original)
     and not original.expr
 
   vim.keymap.set("i", "<CR>", function()
-    prototype_events[#prototype_events + 1] = { event = "wrapper-enter", mode = vim.api.nvim_get_mode().mode }
+    prototype_events[#prototype_events + 1] = {
+      event = "wrapper-enter",
+      mode = vim.api.nvim_get_mode().mode,
+    }
     if canonical_transition(buf) then
       return
     end
@@ -130,10 +147,9 @@ local function setup_plugins_and_inventory()
   vim.bo[buf].filetype = "bash"
   local mapping = vim.fn.maparg("<CR>", "i", false, true)
   print("LazyVim <CR> mapping inventory: " .. vim.inspect(mapping_inventory(mapping)))
-  return buf
 end
 
-local function test_batched_heredoc_input(keys, payload, expected_col)
+local function test_batched_heredoc_input(keys, payload, expected_col, done)
   local buf = vim.api.nvim_create_buf(true, false)
   vim.api.nvim_set_current_buf(buf)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "    cat <<-PROTO" })
@@ -142,39 +158,40 @@ local function test_batched_heredoc_input(keys, payload, expected_col)
   -- Capture the effective mapping before installing the buffer-local wrapper.
   local original = vim.fn.maparg("<CR>", "i", false, true)
   install_wrapper(buf, original)
-
   vim.api.nvim_win_set_cursor(0, { 1, #"    cat <<-PROTO" })
-  vim.api.nvim_feedkeys(
-    vim.api.nvim_replace_termcodes("A" .. keys, true, false, true),
-    "xt",
-    false
-  )
 
-  local completed = vim.wait(1500, function()
-    local actual = get_lines(buf)
-    return actual[2] == "\t    " .. payload and actual[3] == "\tPROTO"
-  end, 10)
-  assert(completed, "batched input failed for " .. vim.inspect(keys)
-    .. "; lines=" .. vim.inspect(get_lines(buf))
-    .. "; cursor=" .. vim.inspect(vim.api.nvim_win_get_cursor(0))
-    .. "; mode=" .. vim.inspect(vim.api.nvim_get_mode())
-    .. "; prototype_events=" .. vim.inspect(prototype_events))
+  -- Enter Insert mode first. Then submit <CR> and the payload in one input
+  -- batch so the test exercises typeahead ordering rather than a settled edit.
+  input("A")
+  defer(function()
+    assert(vim.api.nvim_get_mode().mode == "i",
+      "could not enter Insert mode before batched input")
+    input(keys)
 
-  local actual = get_lines(buf)
-  assert(vim.deep_equal(actual, {
-    "    cat <<-PROTO",
-    "\t    " .. payload,
-    "\tPROTO",
-  }), "unexpected heredoc result: " .. vim.inspect(actual))
-  assert(vim.api.nvim_get_mode().mode == "i",
-    "the direct heredoc transition must remain in Insert mode")
-  assert(vim.api.nvim_win_get_cursor(0)[2] == expected_col,
-    "cursor must be immediately after payload; cursor=" .. vim.inspect(vim.api.nvim_win_get_cursor(0)))
-  print("synchronous heredoc prototype PASS: " .. keys)
-  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "xt", false)
+    defer(function()
+      local actual = get_lines(buf)
+      assert(vim.deep_equal(actual, {
+        "    cat <<-PROTO",
+        "\t    " .. payload,
+        "\tPROTO",
+      }), "batched input failed for " .. vim.inspect(keys)
+        .. "; lines=" .. vim.inspect(actual)
+        .. "; cursor=" .. vim.inspect(vim.api.nvim_win_get_cursor(0))
+        .. "; mode=" .. vim.inspect(vim.api.nvim_get_mode())
+        .. "; prototype_events=" .. vim.inspect(prototype_events))
+      assert(vim.api.nvim_get_mode().mode == "i",
+        "the direct heredoc transition must remain in Insert mode")
+      assert(vim.api.nvim_win_get_cursor(0)[2] == expected_col,
+        "cursor must be immediately after payload; cursor=" .. vim.inspect(vim.api.nvim_win_get_cursor(0)))
+      print("synchronous heredoc prototype PASS: " .. keys)
+
+      input("<Esc>")
+      defer(done)
+    end)
+  end)
 end
 
-local function test_controlled_string_fallback()
+local function test_controlled_string_fallback(done)
   local buf = vim.api.nvim_create_buf(true, false)
   vim.api.nvim_set_current_buf(buf)
   vim.bo[buf].filetype = "text"
@@ -187,30 +204,35 @@ local function test_controlled_string_fallback()
 
   install_wrapper(buf, original)
   vim.api.nvim_win_set_cursor(0, { 1, 4 })
-  vim.api.nvim_feedkeys(
-    vim.api.nvim_replace_termcodes("A<CR>world", true, false, true),
-    "xt",
-    false
-  )
+  input("A")
+  defer(function()
+    assert(vim.api.nvim_get_mode().mode == "i",
+      "could not enter Insert mode before controlled fallback")
+    input("<CR>world")
 
-  assert(vim.deep_equal(get_lines(buf), { "seed", "OBSERVED_NORMAL_ENTERworld" }),
-    "controlled string-based <CR> mapping was not preserved; lines=" .. vim.inspect(get_lines(buf)))
-
-  assert(vim.api.nvim_get_mode().mode == "i",
-    "controlled fallback must remain in Insert mode")
-  print("controlled string <CR> fallback PASS")
-  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "xt", false)
+    defer(function()
+      assert(vim.deep_equal(get_lines(buf), { "seed", "OBSERVED_NORMAL_ENTERworld" }),
+        "controlled string-based <CR> mapping was not preserved; lines=" .. vim.inspect(get_lines(buf)))
+      assert(vim.api.nvim_get_mode().mode == "i",
+        "controlled fallback must remain in Insert mode")
+      print("controlled string <CR> fallback PASS")
+      input("<Esc>")
+      defer(done)
+    end)
+  end)
 end
 
 local ok, err = xpcall(function()
   setup_plugins_and_inventory()
 
-  test_batched_heredoc_input("<CR>x", "x", 6)
-  test_batched_heredoc_input("<CR>abc", "abc", 8)
-  test_controlled_string_fallback()
-
-  print("LazyVim synchronous Enter prototype: PASS")
-  vim.cmd("qa!")
+  test_batched_heredoc_input("<CR>x", "x", 6, function()
+    test_batched_heredoc_input("<CR>abc", "abc", 8, function()
+      test_controlled_string_fallback(function()
+        print("LazyVim synchronous Enter prototype: PASS")
+        vim.cmd("qa!")
+      end)
+    end)
+  end)
 end, debug.traceback)
 
 if not ok then
