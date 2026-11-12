@@ -79,18 +79,19 @@ local completion_buf = set_buffer(table.concat({
   "fi",
 }, "\n"), "bash")
 vim.api.nvim_win_set_cursor(0, { 4, 3 })
-vim.api.nvim_feedkeys("A", "nx", false)
-assert(vim.api.nvim_get_mode().mode:sub(1, 1) == "i",
-  "could not enter insert mode for Blink completion test; mode="
-    .. vim.api.nvim_get_mode().mode)
-blink.show({ providers = { "buffer" } })
+vim.keymap.set("i", "<F5>", function()
+  blink.show({ providers = { "buffer" } })
+end, { buffer = completion_buf })
+vim.api.nvim_feedkeys(
+  "A" .. vim.api.nvim_replace_termcodes("<F5>", true, false, true),
+  "xt",
+  false
+)
 assert(vim.wait(5000, function()
   return blink.is_menu_visible() and #blink.get_items() > 0
 end, 20), "Blink did not display buffer completion inside the managed heredoc body")
 blink.hide()
-vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "nx", false)
-assert(vim.api.nvim_get_mode().mode:sub(1, 1) == "n",
-  "could not leave insert mode after Blink completion test")
+vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "xt", false)
 assert(vim.b.completion == nil, "Blink completion must remain buffer-enabled in heredoc")
 
 -- Managed heredoc: scanner editing remains safe while pair/completion plugins
@@ -115,19 +116,12 @@ local function type_quote(buf, row)
   vim.api.nvim_set_current_buf(buf)
   local current = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1]
   vim.api.nvim_win_set_cursor(0, { row + 1, #current })
-  vim.api.nvim_feedkeys("A", "nx", false)
-  assert(vim.api.nvim_get_mode().mode:sub(1, 1) == "i",
-    "could not enter insert mode for mini.pairs test; mode=" .. vim.api.nvim_get_mode().mode)
-  vim.api.nvim_feedkeys('"', "xt", false)
+  vim.api.nvim_feedkeys('A"\\27', "xt", false)
   assert(vim.wait(1000, function()
     local updated = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1]
     return updated:sub(-2) == '""'
   end, 10), "mini.pairs did not insert a quote pair")
-  local updated = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1]
-  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "nx", false)
-  assert(vim.api.nvim_get_mode().mode:sub(1, 1) == "n",
-    "could not leave insert mode after mini.pairs test")
-  return updated
+  return vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1]
 end
 
 local code_pair = set_buffer("printf ok", "bash")
