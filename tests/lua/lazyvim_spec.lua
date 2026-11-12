@@ -1,5 +1,6 @@
 package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
 
+local function run_tests()
 local plugin = require("nvim-heredoc")
 local function lines(buf)
   return vim.api.nvim_buf_get_lines(buf, 0, -1, false)
@@ -179,3 +180,15 @@ local payload_after = shell_output(table.concat(lines(format_buf), "\n"))
 assert(payload_before == payload_after, "Conform/shfmt changed the delivered heredoc payload")
 
 print("LazyVim/plugin coexistence tests: PASS")
+
+end
+
+vim.schedule(function()
+  local ok, err = xpcall(run_tests, debug.traceback)
+  if ok then
+    vim.cmd("qa!")
+  else
+    print(err)
+    vim.cmd("cquit 1")
+  end
+end)
