@@ -1,6 +1,6 @@
 # Task 001 — Shared region model and executable core
 
-**Status:** active  
+**Status:** active — initial scanner prototype and first validation commands added  
 **Priority:** foundational  
 **Scope:** establish and test the shared lexical model for managed `<<-` heredoc regions. Do not produce a user-facing installer yet.
 
@@ -61,6 +61,26 @@ The scanner is the common authority for later editing mechanisms. Automatic clos
 - `shfmt` is assigned only to Bash and POSIX `sh`; Zsh is excluded.
 - Formatting is independently validated against actual heredoc payload bytes.
 - CI is layered; the core and shell-semantic test paths do not require the LazyVim container. The container is an integration environment, not a runtime dependency.
+
+## Implementation progress
+
+### Present
+
+- `lua/nvim-heredoc/scanner.lua` provides an initial buffer-independent lexical scan and a shared region record for completed or incomplete managed heredocs.
+- Ordinary `<<` heredocs are queued and consumed so their body text is not scanned as shell code; they are not returned as managed regions.
+- Initial cases cover quoted delimiters, declaration-order queues, comments, quoted/escaped operators, here-strings, line continuations, tab-stripping terminators, and incomplete heredocs.
+- Shell-delivery fixture and runner are present. The equivalent fixture was executed locally with Bash and Dash and produced matching expected payload bytes. Zsh was not available in that environment.
+- Formatter payload-comparison fixture is present but has not yet been run because `shfmt` is unavailable in the development environment.
+- Initial GitHub Actions workflow runs core, shell-delivery, and formatter jobs. It has not yet been observed running on GitHub Actions.
+
+### Known prototype limits
+
+- This is not a complete shell parser. Command substitutions, backtick substitutions, multiline quoted commands, and other unsupported contexts are not yet recognised safely.
+- The scanner is not yet connected to Neovim buffer edits, extmarks, automatic closer insertion, or paste-range handling.
+- The Lua scanner tests have been authored but not executed in the current development environment because neither Lua nor Neovim is installed here.
+- The LazyVim container job is deferred until a real plugin integration and headless integration test command exist.
+
+Do not describe the scanner as production-ready or authorise source mutation from uncertain results.
 
 ## Handoff
 
