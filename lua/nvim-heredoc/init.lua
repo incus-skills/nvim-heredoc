@@ -121,36 +121,68 @@ function M.process_buffer(buf, changed_range, close_incomplete)
   return changed
 end
 
+local function add_changed_range(ranges, firstline, new_lastline)
+  local range = { start_row = firstline, end_row = new_lastline }
+  local index = 1
+  while index <= #ranges do
+    local existing = ranges[index]
+    -- Merge only overlapping or adjacent ranges. A bounding interval across
+    -- disjoint edits would incorrectly authorise changes to untouched lines.
+    if range.start_row <= existing.end_row and range.end_row >= existing.start_row then
+      range.start_row = math.min(range.start_row, existing.start_row)
+      range.end_row = math.max(range.end_row, existing.end_row)
+      table.remove(ranges, index)
+      index = 1
+    else
+      index = index + 1
+    end
+  end
+  ranges[#ranges + 1] = range
+end
+
+local function process_pending_ranges(buf, close_incomplete)
+  local pending = pending_ranges[buf]
+  pending_ranges[buf] = nil
+  if not pending then
+    M.process_buffer(buf, nil, close_incomplete)
+    return
+  end
+  for _, range in ipairs(pending.ranges) do
+    M.process_buffer(buf, range, close_incomplete)
+  end
+end
+
 local function schedule_changed_range(buf, firstline, new_lastline)
   if processing[buf] then
     return
   end
   local pending = pending_ranges[buf]
-  if pending then
-    pending.start_row = math.min(pending.start_row, firstline)
-    pending.end_row = math.max(pending.end_row, new_lastline)
+  if not pending then
+    pending = { ranges = {} }
+    pending_ranges[buf] = pending
+  end
+  add_changed_range(pending.ranges, firstline, new_lastline)
+
+  if pending.scheduled then
     return
   end
-
-  pending = {
-    start_row = firstline,
-    end_row = new_lastline,
-  }
-  pending_ranges[buf] = pending
+  pending.scheduled = true
   vim.schedule(function()
-    local range = pending_ranges[buf]
-    pending_ranges[buf] = nil
-    if range and vim.api.nvim_buf_is_valid(buf) and vim.api.nvim_buf_is_loaded(buf)
+    local current = pending_ranges[buf]
+    if current ~= pending then
+      return
+    end
+    if vim.api.nvim_buf_is_valid(buf) and vim.api.nvim_buf_is_loaded(buf)
       and supported(vim.bo[buf].filetype) then
-      M.process_buffer(buf, range, false)
+      process_pending_ranges(buf, false)
+    else
+      pending_ranges[buf] = nil
     end
   end)
 end
 
 local function process_text_changed(buf)
-  local range = pending_ranges[buf]
-  pending_ranges[buf] = nil
-  M.process_buffer(buf, range, true)
+  process_pending_ranges(buf, true)
 end
 
 local function attach(buf)
