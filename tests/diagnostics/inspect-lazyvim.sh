@@ -10,7 +10,7 @@ data_root="$data_home/nvim/lazy"
 
 printf '%s\n' "== Runtime =="
 if command -v nvim >/dev/null 2>&1; then
-  nvim --version | head -n 1
+  nvim --version | sed -n '1p'
 else
   echo "Neovim not found"
 fi
