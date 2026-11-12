@@ -70,3 +70,13 @@ jobs:
         run: shfmt --version
       - name: Compare payload before and after formatting
         run: bash tests/formatter/test-shfmt.sh
+
+  lazyvim-integration:
+    name: LazyVim plugin coexistence
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build pinned integration container
+        run: docker build --file ci/lazyvim/Dockerfile --tag nvim-heredoc-lazyvim-test .
+      - name: Run headless LazyVim/plugin tests
+        run: docker run --rm nvim-heredoc-lazyvim-test
