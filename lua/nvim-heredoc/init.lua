@@ -287,6 +287,15 @@ local function attach(buf)
   })
 end
 
+function M.setup_buffer(buf)
+  buf = buf or vim.api.nvim_get_current_buf()
+  if not vim.api.nvim_buf_is_valid(buf) or not vim.api.nvim_buf_is_loaded(buf) then
+    return false
+  end
+  attach(buf)
+  return attached[buf] == true
+end
+
 function M.setup(opts)
   opts = opts or {}
   local group = vim.api.nvim_create_augroup(group_name, { clear = true })
