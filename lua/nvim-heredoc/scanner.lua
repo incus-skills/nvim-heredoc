@@ -15,7 +15,11 @@ local function split_lines(source)
 end
 
 local function continued(line)
-  local _, count = line:gsub("\\", "")
+  local count, pos = 0, #line
+  while pos > 0 and line:sub(pos, pos) == "\\" do
+    count = count + 1
+    pos = pos - 1
+  end
   return count % 2 == 1
 end
 
@@ -41,7 +45,7 @@ local function parse_delimiter(s, pos)
         quote = nil
       elseif c == "\\" and pos < #s then
         local n = s:sub(pos + 1, pos + 1)
-        if n == "$" or n == "\`" or n == '"' or n == "\\" then
+        if n == "$" or n == "`" or n == '"' or n == "\\" then
           value[#value + 1] = n
           pos = pos + 1
           escaped = true
@@ -98,7 +102,7 @@ local function scan_command(chunk, first_line)
       quote = c
       word_boundary = false
       i = i + 1
-    elseif c == "\`" or (c == "$" and n == "(") then
+    elseif c == "`" or (c == "$" and n == "(") then
       diagnostics[#diagnostics + 1] = "command substitution is outside the lexical prototype"
       return queue, diagnostics
     elseif c == "#" and word_boundary then
