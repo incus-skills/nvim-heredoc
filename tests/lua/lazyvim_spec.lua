@@ -12,6 +12,7 @@ local function set_buffer(source, filetype)
   vim.bo[buf].filetype = filetype
   vim.api.nvim_set_current_buf(buf)
   dofile("tests/fixtures/provisioned/after/ftplugin/" .. filetype .. ".lua")
+  assert(vim.b[buf].nvim_heredoc_attached == true, filetype .. " provisioned ftplugin did not attach")
   return buf
 end
 
