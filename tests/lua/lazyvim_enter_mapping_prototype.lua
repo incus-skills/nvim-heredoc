@@ -211,7 +211,7 @@ local function test_minipairs_expression_fallback(done)
 
   local original = vim.fn.maparg("<CR>", "i", false, true)
   assert(original.expr == 1 and type(original.rhs) == "string"
-    and original.rhs:find("MiniPairs%.cr%(%") ~= nil and not original.callback,
+    and original.rhs:find("MiniPairs%.cr%(") ~= nil and not original.callback,
     "expected the pinned MiniPairs expression mapping; got " .. vim.inspect(mapping_inventory(original)))
 
   install_wrapper(buf, original)
