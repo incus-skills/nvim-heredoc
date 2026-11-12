@@ -24,6 +24,20 @@ jobs:
       - name: Run scanner tests
         run: bash tests/run-core.sh
 
+  buffer-integration:
+    name: Neovim buffer integration
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Neovim
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes neovim
+      - name: Report Neovim version
+        run: nvim --version | head -n 1
+      - name: Run headless buffer tests
+        run: bash tests/run-nvim.sh
+
   shell-delivery:
     name: shell delivery
     runs-on: ubuntu-24.04
