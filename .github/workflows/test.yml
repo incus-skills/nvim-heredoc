@@ -1,0 +1,56 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    name: core scanner
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lua
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes lua5.1
+      - name: Report runtime
+        run: lua5.1 -v
+      - name: Run scanner tests
+        run: bash tests/run-core.sh
+
+  shell-delivery:
+    name: shell delivery
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install shell matrix
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes dash zsh
+      - name: Report shell versions
+        run: |
+          bash --version | head -n 1
+          dash -c 'echo "dash: available"'
+          zsh --version
+      - name: Compare delivered payload bytes
+        run: bash tests/run-shell-delivery.sh
+
+  formatter:
+    name: shfmt payload preservation
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install shfmt
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes shfmt
+      - name: Report formatter version
+        run: shfmt --version
+      - name: Compare payload before and after formatting
+        run: bash tests/formatter/test-shfmt.sh
