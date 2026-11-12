@@ -49,13 +49,20 @@ local function prefix_region_range(buf, region, changed_range)
   return true
 end
 
-local function append_closer(buf, region)
+local function insert_closer(buf, region)
   local closer, err = editing.closer_line(region)
   if not closer then
     return false, err
   end
+
+  -- The first physical body line is already present when Enter is pressed
+  -- after the opener. Put the closer immediately after that line, not at EOF:
+  -- shell constructs following the command (for example a function's '}')
+  -- must remain outside the heredoc body.
+  local insertion_row = region.body_start_line
   local count = vim.api.nvim_buf_line_count(buf)
-  vim.api.nvim_buf_set_lines(buf, count, count, false, { closer })
+  insertion_row = math.max(0, math.min(insertion_row, count))
+  vim.api.nvim_buf_set_lines(buf, insertion_row, insertion_row, false, { closer })
   return true
 end
 
@@ -93,7 +100,7 @@ function M.process_buffer(buf, changed_range, close_incomplete)
         if not pending then
           break
         end
-        local inserted = append_closer(buf, pending)
+        local inserted = insert_closer(buf, pending)
         if not inserted then
           break
         end
@@ -236,7 +243,7 @@ local function schedule_changed_range(buf, firstline, lastline, new_lastline)
     end
     if vim.api.nvim_buf_is_valid(buf) and vim.api.nvim_buf_is_loaded(buf)
       and supported(vim.bo[buf].filetype) then
-      process_pending_ranges(buf, false)
+      process_pending_ranges(buf, true)
     else
       pending_ranges[buf] = nil
     end
