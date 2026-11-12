@@ -80,9 +80,9 @@ local function advance_insert_cursor(buf, row, count)
   end
 
   trace_event(buf, "cursor.advance.queue-right", { row = row })
-  -- Buffer API insertion at column zero does not move Neovim's Insert-mode
-  -- insertion point past the newly inserted TAB. Queue a literal Right key
-  -- at the front of typeahead so it is consumed before the next user key.
+  -- Buffer API insertion does not move Neovim's Insert-mode insertion point
+  -- past the inserted structural TAB. Queue Right keys at the front of
+  -- typeahead so they are consumed before the next user key.
   local right = vim.api.nvim_replace_termcodes("<Right>", true, false, true)
   vim.api.nvim_feedkeys(string.rep(right, math.max(1, count or 1)), "ni", false)
 end
