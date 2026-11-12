@@ -55,7 +55,8 @@ local function finish()
     return
   end
   finished = true
-  if vim.api.nvim_get_mode().mode == "i" then
+  local mode_at_capture = vim.api.nvim_get_mode().mode
+  if mode_at_capture == "i" then
     vim.api.nvim_input(vim.api.nvim_replace_termcodes("<Esc>", true, false, true))
   end
   vim.schedule(function()
@@ -64,7 +65,7 @@ local function finish()
       hypothesis = "TextChangedI after newline but before InsertCharPre for queued x",
       input = "<CR>x queued together via nvim_input",
       buffer = vim.api.nvim_buf_is_valid(buf) and vim.api.nvim_buf_get_lines(buf, 0, -1, false) or {},
-      mode_after_input = vim.api.nvim_get_mode().mode,
+      mode_at_capture = mode_at_capture,
       events = events,
       plugin_trace = heredoc.get_trace(),
       interpretation = nil,
