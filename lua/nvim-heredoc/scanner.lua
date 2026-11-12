@@ -138,7 +138,7 @@ local function skip_command_substitution(s, start)
       elseif c == "$" and n == "(" then
         depth = depth + 1
         i = i + 2
-      elseif c == "\`" then
+      elseif c == "`" then
         return nil, "backtick substitution inside command substitution is unsupported"
       else
         i = i + 1
@@ -150,7 +150,7 @@ local function skip_command_substitution(s, start)
       quote = c
       word_boundary = false
       i = i + 1
-    elseif c == "\`" then
+    elseif c == "`" then
       return nil, "backtick substitution inside command substitution is unsupported"
     elseif c == "$" and s:sub(i, i + 2) == "$((" then
       local next_pos, err = skip_arithmetic_expansion(s, i)
@@ -216,6 +216,13 @@ local function scan_command(chunk, first_line)
     elseif quote == '"' then
       if c == "\\" then i = i + 2
       elseif c == '"' then quote = nil; i = i + 1
+      elseif c == "$" and chunk:sub(i, i + 2) == "$((" then
+        local next_pos, err = skip_arithmetic_expansion(chunk, i)
+        if not next_pos then
+          diagnostics[#diagnostics + 1] = err
+          return queue, diagnostics
+        end
+        i = next_pos
       elseif c == "$" and n == "(" then
         local next_pos, err = skip_command_substitution(chunk, i)
         if not next_pos then
