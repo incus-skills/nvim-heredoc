@@ -210,6 +210,40 @@ do
 end
 
 do
+  local buf = set_buffer({ "\tcat <<-LIVE" })
+  vim.api.nvim_set_current_buf(buf)
+  plugin.setup()
+
+  -- Model Enter immediately after the opener. The on_lines path must create
+  -- the closer while the first body line is active, without InsertLeave.
+  vim.api.nvim_buf_set_lines(buf, 1, 1, false, { "" })
+  vim.api.nvim_win_set_cursor(0, { 2, 0 })
+  assert(vim.wait(1000, function()
+    local actual = lines(buf)
+    return actual[2] == "\t" and actual[3] == "\tLIVE"
+  end, 10), "Enter after a safe opener should create and indent the closer live")
+
+  local cursor = vim.api.nvim_win_get_cursor(0)
+  assert(cursor[1] == 2, "live closer insertion must leave the cursor in the body")
+
+  -- A multi-line paste is handled as one changed range. Structural TABs are
+  -- added while preserving each line's original content indentation.
+  vim.api.nvim_buf_set_lines(buf, 1, 2, false, {
+    "  pasted one",
+    "    pasted two",
+    "",
+  })
+  assert(vim.wait(1000, function()
+    local actual = lines(buf)
+    return actual[2] == "\t  pasted one"
+      and actual[3] == "\t    pasted two"
+      and actual[4] == "\t"
+  end, 10), "multi-line paste should receive live structural indentation")
+  local actual = lines(buf)
+  assert(actual[5] == "\tLIVE", "paste processing must preserve the reserved closer")
+end
+
+do
   local buf = set_buffer({ "\tcat <<-AUTO", "" })
   vim.api.nvim_set_current_buf(buf)
   plugin.setup()
