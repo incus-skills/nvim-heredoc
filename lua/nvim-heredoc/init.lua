@@ -49,18 +49,20 @@ local function prefix_region_range(buf, region, changed_range)
   return true
 end
 
-local function insert_closer(buf, region)
+local function insert_closer(buf, region, changed_range)
   local closer, err = editing.closer_line(region)
   if not closer then
     return false, err
   end
 
-  -- The first physical body line is already present when Enter is pressed
-  -- after the opener. Put the closer immediately after that line, not at EOF:
-  -- shell constructs following the command (for example a function's '}')
-  -- must remain outside the heredoc body.
-  local insertion_row = region.body_start_line
   local count = vim.api.nvim_buf_line_count(buf)
+  local insertion_row = count
+  if changed_range then
+    -- The first physical body line is present in the changed range when Enter
+    -- is pressed after the opener. Put the closer immediately after that line,
+    -- before any following shell syntax such as a function's '}'.
+    insertion_row = region.body_start_line
+  end
   insertion_row = math.max(0, math.min(insertion_row, count))
   vim.api.nvim_buf_set_lines(buf, insertion_row, insertion_row, false, { closer })
   return true
@@ -105,7 +107,7 @@ function M.process_buffer(buf, changed_range, close_incomplete)
         if not pending then
           break
         end
-        local inserted = insert_closer(buf, pending)
+        local inserted = insert_closer(buf, pending, changed_range)
         if not inserted then
           break
         end
