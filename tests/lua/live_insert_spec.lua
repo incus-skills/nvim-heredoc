@@ -25,11 +25,13 @@ local function assert_insert_mode(message)
     message .. "; mode=" .. vim.inspect(vim.api.nvim_get_mode()))
 end
 
+local buf
+
 local function wait_for(predicate, message)
   assert(vim.wait(1000, predicate, 10), message .. "; lines=" .. vim.inspect(lines(buf)))
 end
 
-local buf = vim.api.nvim_create_buf(true, false)
+buf = vim.api.nvim_create_buf(true, false)
 vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "\tcat <<-LIVE" })
 vim.bo[buf].filetype = "bash"
 vim.bo[buf].expandtab = false
