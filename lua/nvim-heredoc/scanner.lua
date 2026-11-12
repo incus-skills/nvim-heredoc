@@ -105,13 +105,8 @@ local function skip_arithmetic_expansion(s, start)
       depth = depth + 1
       i = i + 1
     elseif c == ")" then
-      if depth == 1 then return i + 1 end
-      local context = substitution_contexts[depth]
       depth = depth - 1
-      if context then
-        quote = context.quote
-        substitution_contexts[depth + 1] = nil
-      end
+      if depth == 0 then return i + 1 end
       i = i + 1
     else
       i = i + 1
@@ -198,8 +193,13 @@ local function skip_command_substitution(s, start)
       depth = depth + 1
       i = i + 1
     elseif c == ")" then
+      if depth == 1 then return i + 1 end
+      local context = substitution_contexts[depth]
       depth = depth - 1
-      if depth == 0 then return i + 1 end
+      if context then
+        quote = context.quote
+        substitution_contexts[depth + 1] = nil
+      end
       i = i + 1
     else
       if c:match("[ \t\r\n]") or c:match("[;|&]") then
