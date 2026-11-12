@@ -54,6 +54,18 @@ The stable commands each include a deliberate negative control:
 
 `tests/expect-failure.sh` checks both non-zero exit and a fixture-specific assertion marker. A setup error or unrelated crash is not accepted as a successful negative control.
 
+## Latest negative-control validation
+
+All five jobs passed with the contract-specific negative controls enabled in [workflow run 43196642359](https://github.com/incus-skills/nvim-heredoc/actions/runs/43196642359). Each job log contains its expected `PASS: ... negative control rejected the expected forbidden behaviour` line:
+
+- Core scanner: ordinary `<<` remains outside managed regions.
+- Neovim buffer integration: ordinary `<<` remains unchanged.
+- Shell delivery: `<<-` removes the leading TAB byte.
+- Formatter: `shfmt -i 0 -p` preserves the tested delivered payload.
+- LazyVim integration: the plugin leaves ordinary `<<` unchanged with the pinned plugin environment loaded.
+
+These controls are contract-specific negative assertions, not arbitrary failing commands. The wrapper also checks the expected marker so dependency/setup failures cannot be mistaken for a successful negative control.
+
 ## Container boundary
 
 The container is an integration test environment, not the product runtime and not a requirement for users installing the plugin. It exists to make LazyVim and its selected plugins reproducible. The scanner and shell-delivery tests should remain runnable without it.
