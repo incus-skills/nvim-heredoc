@@ -29,6 +29,8 @@ jobs:
             echo "Parsing $fixture"
             shfmt -ln=bash --to-json < "$fixture" >/dev/null
           done
+      - name: Validate provisioning installer
+        run: bash tests/run-installer.sh
       - name: Check local diagnostic script syntax
         run: bash -n tests/diagnostics/inspect-lazyvim.sh
       - name: Run scanner tests
