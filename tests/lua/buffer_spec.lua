@@ -224,7 +224,7 @@ do
   -- Insert mode remains active; no InsertLeave event has occurred.
   local opener = "\tcat <<-LIVE"
   vim.api.nvim_win_set_cursor(0, { 1, #opener })
-  vim.api.nvim_input("A\n")
+  vim.api.nvim_feedkeys("A\n", "n", false)
   assert(vim.wait(1000, function()
     local actual = lines(buf)
     local cursor = vim.api.nvim_win_get_cursor(0)
@@ -242,7 +242,7 @@ do
   -- insertion position without relying on normal-mode cursor coordinates.
 
   -- Ordinary typing is also processed before leaving Insert mode.
-  vim.api.nvim_input("typed")
+  vim.api.nvim_feedkeys("typed", "n", false)
   assert(vim.wait(1000, function()
     local cursor = vim.api.nvim_win_get_cursor(0)
     return lines(buf)[2] == "\ttyped"
