@@ -32,7 +32,12 @@ function M.prefix_lines(region, lines)
       output[index] = line
     else
       local column, insertion
-      if opener_prefix ~= "" and line:sub(1, #opener_prefix) == opener_prefix then
+      if region.space_indented then
+        -- Keep the removable TAB at byte zero so <<- strips it. The opener's
+        -- spaces follow it and survive shell delivery as the payload's base
+        -- indentation, including when Neovim auto-indents the new line.
+        column, insertion = 0, prefix
+      elseif opener_prefix ~= "" and line:sub(1, #opener_prefix) == opener_prefix then
         -- Neovim may already have copied the opener indentation onto the
         -- new line. Add only the body-level TAB after that indentation.
         column, insertion = #opener_prefix, "\t"
