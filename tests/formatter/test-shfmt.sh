@@ -44,3 +44,7 @@ SCRIPT
 done
 
 echo "formatter tests: PASS (Bash and POSIX sh payload bytes preserved)"
+
+bash tests/expect-failure.sh "shfmt payload negative control" \
+  "NEGATIVE_CONTROL: formatter unexpectedly changed delivered payload" \
+  bash tests/negative/formatter.sh
