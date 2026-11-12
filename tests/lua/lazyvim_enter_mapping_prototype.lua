@@ -4,6 +4,7 @@
 package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
 
 local scanner = require("nvim-heredoc.scanner")
+local prototype_events = {}
 
 local function fail(err)
   print(err)
@@ -47,11 +48,13 @@ local function canonical_transition(buf)
   local lines = get_lines(buf)
   local opener = lines[row + 1]
   if not opener or col ~= #opener then
+    prototype_events[#prototype_events + 1] = { event = "not-at-opener-eol", row = row, col = col, opener = opener }
     return false
   end
 
   local result = scanner.scan(table.concat(lines, "\n"))
   if result.complete or #result.regions == 0 then
+    prototype_events[#prototype_events + 1] = { event = "scanner-no-incomplete-region", result = result }
     return false
   end
 
@@ -64,6 +67,7 @@ local function canonical_transition(buf)
     end
   end
   if not region then
+    prototype_events[#prototype_events + 1] = { event = "no-safe-region", regions = result.regions }
     return false
   end
 
@@ -77,6 +81,7 @@ local function canonical_transition(buf)
     closer_line,
   })
   vim.api.nvim_win_set_cursor(win, { body_row + 1, #body_prefix })
+  prototype_events[#prototype_events + 1] = { event = "heredoc-transition", prefix = body_prefix, closer = closer_line }
   return true
 end
 
@@ -85,8 +90,10 @@ local function install_wrapper(buf, original)
     and type(original.rhs) == "string"
     and original.rhs ~= ""
     and not original.callback
+    and not original.expr
 
   vim.keymap.set("i", "<CR>", function()
+    prototype_events[#prototype_events + 1] = { event = "wrapper-enter", mode = vim.api.nvim_get_mode().mode }
     if canonical_transition(buf) then
       return ""
     end
