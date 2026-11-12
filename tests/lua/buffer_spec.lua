@@ -214,10 +214,11 @@ do
   vim.api.nvim_set_current_buf(buf)
   plugin.setup()
 
-  -- Model Enter immediately after the opener. The on_lines path must create
-  -- the closer while the first body line is active, without InsertLeave.
-  vim.api.nvim_buf_set_lines(buf, 1, 1, false, { "" })
-  vim.api.nvim_win_set_cursor(0, { 2, 0 })
+  -- Send real Insert-mode keys. The closer must appear after Enter while
+  -- Insert mode remains active; no InsertLeave event has occurred.
+  local opener = "\tcat <<-LIVE"
+  vim.api.nvim_win_set_cursor(0, { 1, #opener })
+  vim.api.nvim_feedkeys("A\n", "xt", false)
   assert(vim.wait(1000, function()
     local actual = lines(buf)
     return actual[2] == "\t" and actual[3] == "\tLIVE"
@@ -225,6 +226,13 @@ do
 
   local cursor = vim.api.nvim_win_get_cursor(0)
   assert(cursor[1] == 2, "live closer insertion must leave the cursor in the body")
+
+  -- Ordinary typing is also processed before leaving Insert mode.
+  vim.api.nvim_feedkeys("typed", "xt", false)
+  assert(vim.wait(1000, function()
+    return lines(buf)[2] == "\ttyped"
+  end, 10), "typed body text should receive its structural TAB while still in Insert mode")
+  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "xt", false)
 
   -- A multi-line paste is handled as one changed range. Structural TABs are
   -- added while preserving each line's original content indentation.
