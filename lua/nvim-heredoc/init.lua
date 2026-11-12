@@ -117,7 +117,9 @@ local function attach(buf)
     group = vim.api.nvim_create_augroup(group_name .. "Buffer" .. buf, { clear = true }),
     buffer = buf,
     callback = function()
-      M.process_buffer(buf)
+      if supported(vim.bo[buf].filetype) then
+        M.process_buffer(buf)
+      end
     end,
   })
 end
