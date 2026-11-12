@@ -19,6 +19,26 @@ local function get_source(lines)
   return table.concat(lines, "\n")
 end
 
+local function active_cursor_row(buf)
+  local win = vim.api.nvim_get_current_win()
+  if vim.api.nvim_win_get_buf(win) ~= buf then
+    return nil
+  end
+  return vim.api.nvim_win_get_cursor(win)[1] - 1
+end
+
+local function advance_insert_cursor(buf, row)
+  if active_cursor_row(buf) ~= row or vim.api.nvim_get_mode().mode ~= "i" then
+    return
+  end
+
+  -- Buffer API insertion at column zero does not move Neovim's Insert-mode
+  -- insertion point past the newly inserted TAB. Queue a literal Right key
+  -- at the front of typeahead so it is consumed before the next user key.
+  local right = vim.api.nvim_replace_termcodes("<Right>", true, false, true)
+  vim.api.nvim_feedkeys(right, "ni", false)
+end
+
 local function prefix_region_range(buf, region, changed_range)
   local first_row = region.body_start_line - 1
   local last_row = region.body_end_line
@@ -41,20 +61,22 @@ local function prefix_region_range(buf, region, changed_range)
   end
 
   if changed then
+    local cursor_row = active_cursor_row(buf)
+    local cursor_line_prefixed = false
     for index = #lines, 1, -1 do
       if prefixed[index] ~= lines[index] then
         local row = first_row + index - 1
         vim.api.nvim_buf_set_text(buf, row, 0, row, 0, { region.structural_prefix })
+        if row == cursor_row then
+          cursor_line_prefixed = true
+        end
       end
+    end
+    if cursor_line_prefixed then
+      advance_insert_cursor(buf, cursor_row)
     end
   end
 
-  -- Do not reposition the cursor with nvim_win_set_cursor here. In
-  -- Insert mode Neovim reports the byte column of the character immediately
-  -- before the insertion point; for a one-TAB prefix that is column zero.
-  -- Moving to column one is clamped at end-of-line and can also leave Insert
-  -- mode. The next typed byte is the reliable check that insertion is after
-  -- the structural prefix.
   return changed
 end
 
@@ -66,14 +88,6 @@ local function insert_closer(buf, region, row)
   row = math.max(0, math.min(row, vim.api.nvim_buf_line_count(buf)))
   vim.api.nvim_buf_set_lines(buf, row, row, false, { closer })
   return true
-end
-
-local function active_cursor_row(buf)
-  local win = vim.api.nvim_get_current_win()
-  if vim.api.nvim_win_get_buf(win) ~= buf then
-    return nil
-  end
-  return vim.api.nvim_win_get_cursor(win)[1] - 1
 end
 
 local function ensure_body_prefix(buf, region, body_row)
@@ -88,12 +102,8 @@ local function ensure_body_prefix(buf, region, body_row)
   end
   if line:sub(1, #prefix) ~= prefix then
     vim.api.nvim_buf_set_text(buf, body_row, 0, body_row, 0, { prefix })
+    advance_insert_cursor(buf, body_row)
   end
-
-  -- Leave the Insert-mode cursor alone. Its byte column identifies the
-  -- TAB immediately before the insertion point, so typing naturally follows
-  -- the structural prefix. nvim_win_set_cursor cannot represent a position
-  -- beyond this one-byte line and would force an incorrect normal-mode state.
 end
 
 function M.process_buffer(buf, changed_range, close_incomplete)
