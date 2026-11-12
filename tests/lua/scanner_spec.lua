@@ -47,6 +47,12 @@ do
 end
 
 do
+  local _, r = one("\tcat <<-''\nbody\n\t\n")
+  assert(r.delimiter == "" and r.delimiter_original == "''" and r.delimiter_quoted)
+  assert(r.terminator_line == 3 and editing.closer_line(r) == "\t")
+end
+
+do
   local _, r = one("cat <<-EOF\n  payload\nEOF\n")
   assert(r.structural_tabs_only and r.editable)
   assert(r.body_start_line == 2 and r.terminator_line == 3)
