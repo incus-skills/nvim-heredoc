@@ -32,9 +32,9 @@ local function wait_for(predicate, message)
 end
 
 buf = vim.api.nvim_create_buf(true, false)
-vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "\tcat <<-LIVE" })
+vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "    cat <<-LIVE" })
 vim.bo[buf].filetype = "bash"
-vim.bo[buf].expandtab = false
+vim.bo[buf].expandtab = true
 vim.bo[buf].tabstop = 2
 vim.bo[buf].softtabstop = 0
 vim.bo[buf].shiftwidth = 2
@@ -51,12 +51,12 @@ plugin.setup()
 -- nvim_input queues keys for Neovim's normal input loop. Unlike feedkeys(...,
 -- "x"), it does not drain the whole sequence inside this synchronous Lua
 -- command and accidentally turn the test into a Normal-mode observation.
-vim.api.nvim_win_set_cursor(0, { 1, #("\tcat <<-LIVE") })
+vim.api.nvim_win_set_cursor(0, { 1, #("    cat <<-LIVE") })
 vim.api.nvim_input("A\n")
 
 defer(function()
   local actual = lines(buf)
-  assert(actual[2] == "\t" and actual[3] == "\tLIVE",
+  assert(actual[2] == "\t    " and actual[3] == "\tLIVE",
     "Enter should create the first body prefix and reserve the closer; lines="
       .. vim.inspect(actual))
   assert_insert_mode("the first Enter transition must remain in Insert mode")
@@ -64,7 +64,7 @@ defer(function()
   vim.api.nvim_input("typed")
   defer(function()
     actual = lines(buf)
-    assert(actual[2] == "\ttyped",
+    assert(actual[2] == "\t    typed",
       "first body payload should follow the opener's structural TAB; lines="
         .. vim.inspect(actual))
     assert_insert_mode("typing the first payload must remain in Insert mode")
@@ -76,14 +76,14 @@ defer(function()
     vim.api.nvim_input("\n")
     defer(function()
       wait_for(function()
-        return lines(buf)[3] == "\t"
+        return lines(buf)[3] == "\t    "
       end, "a subsequent body line must receive its structural TAB")
       assert_insert_mode("indentation after Enter must remain in Insert mode")
 
       vim.api.nvim_input("second")
       defer(function()
         actual = lines(buf)
-        assert(actual[3] == "\tsecond",
+        assert(actual[3] == "\t    second",
           "second body payload must follow the structural TAB; lines=" .. vim.inspect(actual))
         assert_insert_mode("typing on the newly indented line must remain in Insert mode")
 
@@ -101,8 +101,8 @@ defer(function()
         defer(function()
           wait_for(function()
             actual = lines(buf)
-            return actual[4] == "\t  pasted one"
-              and actual[5] == "\t    pasted two"
+            return actual[4] == "\t      pasted one"
+              and actual[5] == "\t        pasted two"
               and actual[6] == "\tLIVE"
           end, "multi-line paste must be indented before InsertLeave/save without changing payload bytes")
           assert_insert_mode("live paste processing must remain in Insert mode")
@@ -111,8 +111,8 @@ defer(function()
           defer(function()
             assert(vim.api.nvim_get_mode().mode ~= "i", "Escape should leave Insert mode")
             actual = lines(buf)
-            assert(actual[2] == "\ttyped" and actual[3] == "\tsecond"
-              and actual[4] == "\t  pasted one" and actual[5] == "\t    pasted two"
+            assert(actual[2] == "\t    typed" and actual[3] == "\t    second"
+              and actual[4] == "\t      pasted one" and actual[5] == "\t        pasted two"
               and actual[6] == "\tLIVE",
               "InsertLeave must not be required to repair live body indentation; lines="
                 .. vim.inspect(actual))
