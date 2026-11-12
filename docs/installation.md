@@ -99,7 +99,15 @@ If anything is unexpected, capture the buffer with visible whitespace (for examp
 
 A temporary diagnostic trace is available for investigating event ordering in the user's actual Neovim configuration. It is disabled by default, makes no editing decisions, and stores its records in memory only.
 
-After installing this diagnostic branch and restarting Neovim, open a disposable Bash file containing a managed `<<-` heredoc. In that buffer, enable and clear the trace:
+From an existing checkout, fetch and switch to the diagnostic branch, then run the normal provisioner:
+
+~~~sh
+git fetch origin diagnostics/live-insert-event-order
+git switch --track origin/diagnostics/live-insert-event-order
+bash scripts/install.sh
+~~~
+
+After restarting Neovim, open a disposable Bash file containing a managed `<<-` heredoc. In that buffer, enable and clear the trace:
 
 ~~~vim
 :lua vim.g.nvim_heredoc_trace = true; require("nvim-heredoc").clear_trace()
