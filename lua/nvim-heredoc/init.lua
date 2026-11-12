@@ -6,6 +6,7 @@ local group_name = "NvimHeredoc"
 local processing = {}
 local attached = {}
 local pending_ranges = {}
+local trace_events = {}
 
 local function supported(ft)
   return ft == "bash" or ft == "sh" or ft == "zsh"
@@ -27,11 +28,58 @@ local function active_cursor_row(buf)
   return vim.api.nvim_win_get_cursor(win)[1] - 1
 end
 
+-- Opt-in event tracing for diagnosing live Insert-mode ordering. Enable with
+-- vim.g.nvim_heredoc_trace = true, then inspect M.get_trace(). The trace is
+-- in-memory only and records buffer text only while explicitly enabled.
+local function trace_event(buf, event, details, first_row, last_row)
+  if vim.g.nvim_heredoc_trace ~= true then
+    return
+  end
+
+  local entry = {
+    sequence = #trace_events + 1,
+    time_ns = (vim.uv or vim.loop).hrtime(),
+    event = event,
+    buf = buf,
+    mode = vim.api.nvim_get_mode().mode,
+    details = details and vim.deepcopy(details) or nil,
+  }
+
+  if vim.api.nvim_buf_is_valid(buf) and vim.api.nvim_buf_is_loaded(buf) then
+    local win = vim.api.nvim_get_current_win()
+    if vim.api.nvim_win_get_buf(win) == buf then
+      local cursor = vim.api.nvim_win_get_cursor(win)
+      entry.cursor = { row = cursor[1] - 1, col = cursor[2] }
+    end
+    local count = vim.api.nvim_buf_line_count(buf)
+    local start = math.max(0, (first_row or (entry.cursor and entry.cursor.row) or 0) - 1)
+    local finish = math.min(count, (last_row or (entry.cursor and entry.cursor.row + 1) or 1) + 2)
+    entry.lines = {}
+    for row = start, finish - 1 do
+      entry.lines[#entry.lines + 1] = {
+        row = row,
+        text = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1],
+      }
+    end
+  end
+
+  trace_events[#trace_events + 1] = entry
+end
+
+function M.get_trace()
+  return vim.deepcopy(trace_events)
+end
+
+function M.clear_trace()
+  trace_events = {}
+end
+
 local function advance_insert_cursor(buf, row)
   if active_cursor_row(buf) ~= row or vim.api.nvim_get_mode().mode ~= "i" then
     return
   end
 
+  trace_event(buf, "cursor.advance.queue-right", { row = row })
   -- Buffer API insertion at column zero does not move Neovim's Insert-mode
   -- insertion point past the newly inserted TAB. Queue a literal Right key
   -- at the front of typeahead so it is consumed before the next user key.
@@ -66,6 +114,7 @@ local function prefix_region_range(buf, region, changed_range)
     for index = #lines, 1, -1 do
       if prefixed[index] ~= lines[index] then
         local row = first_row + index - 1
+        trace_event(buf, "edit.prefix-line", { row = row, prefix = region.structural_prefix })
         vim.api.nvim_buf_set_text(buf, row, 0, row, 0, { region.structural_prefix })
         if row == cursor_row then
           cursor_line_prefixed = true
@@ -86,6 +135,7 @@ local function insert_closer(buf, region, row)
     return false, err
   end
   row = math.max(0, math.min(row, vim.api.nvim_buf_line_count(buf)))
+  trace_event(buf, "edit.insert-closer", { row = row, closer = closer })
   vim.api.nvim_buf_set_lines(buf, row, row, false, { closer })
   return true
 end
@@ -101,6 +151,7 @@ local function ensure_body_prefix(buf, region, body_row)
     return
   end
   if line:sub(1, #prefix) ~= prefix then
+    trace_event(buf, "edit.ensure-body-prefix", { row = body_row, prefix = prefix })
     vim.api.nvim_buf_set_text(buf, body_row, 0, body_row, 0, { prefix })
     advance_insert_cursor(buf, body_row)
   end
@@ -118,6 +169,11 @@ function M.process_buffer(buf, changed_range, close_incomplete)
     close_incomplete = true
   end
 
+  trace_event(buf, "process.begin", {
+    changed_range = changed_range,
+    close_incomplete = close_incomplete,
+    already_processing = processing[buf] == true,
+  })
   processing[buf] = true
   local changed = false
   local success, err = pcall(function()
@@ -180,6 +236,7 @@ function M.process_buffer(buf, changed_range, close_incomplete)
   end)
 
   processing[buf] = nil
+  trace_event(buf, "process.end", { changed = changed, success = success })
   if not success then
     vim.notify("nvim-heredoc: " .. tostring(err), vim.log.levels.WARN)
     return false
@@ -281,6 +338,12 @@ local function process_pending_ranges(buf, close_incomplete)
 end
 
 local function schedule_changed_range(buf, firstline, lastline, new_lastline)
+  trace_event(buf, "range.schedule-request", {
+    firstline = firstline,
+    lastline = lastline,
+    new_lastline = new_lastline,
+    processing = processing[buf] == true,
+  }, firstline, new_lastline)
   if processing[buf] then
     return
   end
@@ -295,7 +358,12 @@ local function schedule_changed_range(buf, firstline, lastline, new_lastline)
     return
   end
   pending.scheduled = true
+  trace_event(buf, "range.schedule-queued", { range_count = #pending.ranges })
   vim.schedule(function()
+    trace_event(buf, "range.scheduled-callback", {
+      pending_matches = pending_ranges[buf] == pending,
+      range_count = #pending.ranges,
+    })
     local current = pending_ranges[buf]
     if current ~= pending then
       return
@@ -310,6 +378,9 @@ local function schedule_changed_range(buf, firstline, lastline, new_lastline)
 end
 
 local function process_text_changed(buf)
+  trace_event(buf, "range.drain-textchanged", {
+    pending = pending_ranges[buf] ~= nil,
+  })
   process_pending_ranges(buf, true)
 end
 
@@ -325,6 +396,12 @@ local function attach(buf)
   vim.b[buf].nvim_heredoc_attached = true
   vim.api.nvim_buf_attach(buf, false, {
     on_lines = function(_, changed_buf, _, firstline, lastline, new_lastline)
+      trace_event(changed_buf, "on_lines", {
+        firstline = firstline,
+        lastline = lastline,
+        new_lastline = new_lastline,
+        processing = processing[changed_buf] == true,
+      }, firstline, new_lastline)
       schedule_changed_range(changed_buf, firstline, lastline, new_lastline)
     end,
     on_detach = function(_, detached_buf)
@@ -338,6 +415,7 @@ local function attach(buf)
     group = buffer_group,
     buffer = buf,
     callback = function()
+      trace_event(buf, "autocmd.InsertLeave")
       if supported(vim.bo[buf].filetype) then
         M.process_buffer(buf)
       end
@@ -347,6 +425,10 @@ local function attach(buf)
     group = buffer_group,
     buffer = buf,
     callback = function()
+      trace_event(buf, "autocmd.TextChanged", {
+        pending = pending_ranges[buf] ~= nil,
+        processing = processing[buf] == true,
+      })
       if supported(vim.bo[buf].filetype) then
         process_text_changed(buf)
       end
