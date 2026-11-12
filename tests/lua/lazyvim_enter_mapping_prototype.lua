@@ -104,7 +104,7 @@ local function install_wrapper(buf, original)
     and type(original.rhs) == "string"
     and original.rhs ~= ""
     and not original.callback
-    and not original.expr
+    and original.expr ~= 1
 
   vim.keymap.set("i", "<CR>", function()
     prototype_events[#prototype_events + 1] = {
