@@ -44,6 +44,8 @@ local function snapshot(event, details)
     row = row,
     byte_col = cursor[2],
     line = current,
+    time_ns = (vim.uv or vim.loop).hrtime(),
+    buffer_lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false),
     details = details,
   }
 end
@@ -134,6 +136,7 @@ vim.defer_fn(function()
     return
   end
   events = {}
+  heredoc.clear_trace()
   vim.api.nvim_input(vim.api.nvim_replace_termcodes("<CR>x", true, false, true))
   -- Capture after Neovim has drained the submitted input. The event callbacks
   -- above preserve the order at the point each event actually ran.
