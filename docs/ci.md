@@ -6,7 +6,7 @@ CI must validate the heredoc implementation at the same independent layers as th
 
 The CI workflow reports five validation layers independently:
 
-1. **Core scanner** — deterministic Lua tests, independent of Neovim and LazyVim.
+1. **Core scanner** — deterministic Lua tests, independent of Neovim and LazyVim, with selected grammar fixtures validated by mvdan/sh through shfmt's JSON syntax-tree output.
 2. **Neovim buffer integration** — headless editing and changed-range tests, independent of LazyVim.
 3. **Shell delivery** — execute fixtures with Bash, a POSIX shell, and Zsh; compare exact payload bytes.
 4. **Formatter behaviour** — run the supported `shfmt -i 0 -p` invocation against Bash and POSIX `sh` fixtures and compare payload bytes.
@@ -16,7 +16,7 @@ The CI workflow reports five validation layers independently:
 
 The workflow is `.github/workflows/test.yml`. It runs five independent jobs on pushes to `main`, pull requests, and manual dispatch: `core`, `buffer-integration`, `shell-delivery`, `formatter`, and `lazyvim-integration`. The LazyVim job is separate so failures identify distribution/plugin integration rather than being conflated with scanner or shell-semantic failures.
 
-The core, shell-delivery, and formatter jobs use a lightweight `ubuntu-24.04` hosted runner. The buffer-integration job also uses that runner but installs the distribution's Neovim package (observed version 0.9.5); it does not bootstrap LazyVim. The current workflow installs Lua 5.1, Zsh, and shfmt from the runner's Ubuntu package repositories and prints their runtime versions. This is an initial repeatable baseline, not yet a fully locked toolchain: package versions should be pinned once the supported version floor is selected.
+The core, shell-delivery, and formatter jobs use a lightweight `ubuntu-24.04` hosted runner. The buffer-integration job also uses that runner but installs the distribution's Neovim package (observed version 0.9.5); it does not bootstrap LazyVim. The current workflow installs Lua 5.1, Zsh, and shfmt from the runner's Ubuntu package repositories and prints their runtime versions. The core job invokes `shfmt -ln=bash --to-json` on selected valid-but-not-yet-supported Bash fixtures. The Lua tests then assert that the scanner refuses to treat those constructs as safe. This uses mvdan/sh as an independent syntax oracle without adding Go, cgo, a parser binary, or any subprocess dependency to the plugin runtime. This is an initial repeatable baseline, not yet a fully locked toolchain: package versions should be pinned once the supported version floor is selected.
 
 The LazyVim job builds and runs the repository-owned image in `ci/lazyvim/Dockerfile`. Its revision manifest is `ci/lazyvim/versions.env`; it pins Neovim 0.12.4 and the exact LazyVim, lazy.nvim, mini.pairs, blink.cmp, and conform.nvim commits observed in the supplied workstation inventory. The plugin under test is copied from the checked-out commit into the image, not fetched from a moving branch.
 
