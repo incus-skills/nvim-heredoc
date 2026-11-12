@@ -147,6 +147,12 @@ local function schedule_changed_range(buf, firstline, new_lastline)
   end)
 end
 
+local function process_text_changed(buf)
+  local range = pending_ranges[buf]
+  pending_ranges[buf] = nil
+  M.process_buffer(buf, range, true)
+end
+
 local function attach(buf)
   if attached[buf] then
     return
@@ -166,12 +172,22 @@ local function attach(buf)
     end,
   })
 
-  vim.api.nvim_create_autocmd({ "InsertLeave", "TextChanged" }, {
-    group = vim.api.nvim_create_augroup(group_name .. "Buffer" .. buf, { clear = true }),
+  local buffer_group = vim.api.nvim_create_augroup(group_name .. "Buffer" .. buf, { clear = true })
+  vim.api.nvim_create_autocmd("InsertLeave", {
+    group = buffer_group,
     buffer = buf,
     callback = function()
       if supported(vim.bo[buf].filetype) then
         M.process_buffer(buf)
+      end
+    end,
+  })
+  vim.api.nvim_create_autocmd("TextChanged", {
+    group = buffer_group,
+    buffer = buf,
+    callback = function()
+      if supported(vim.bo[buf].filetype) then
+        process_text_changed(buf)
       end
     end,
   })
