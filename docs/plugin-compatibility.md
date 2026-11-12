@@ -68,6 +68,7 @@ The pinned fixture should use the observed versions above as an initial reproduc
 - Do not copy the legacy `after/ftplugin/bash.lua`, `sh.lua`, or `zsh.lua` files into the fixture.
 - Load the checked-out `nvim-heredoc` source, not a separately installed moving copy.
 - Exercise mini.pairs and blink.cmp with their normal LazyVim-derived configuration enabled before considering any suppression.
+- Trigger Blink's actual buffer-source completion menu from inside a managed heredoc body and verify that it becomes visible with at least one candidate; an enabled-state assertion alone is insufficient.
 - Exercise mini.pairs by sending an actual insert-mode quote keystroke in ordinary shell code and in a managed heredoc body; verify pair insertion and that the heredoc changed-range callback preserves the body bytes.
 - Include ordinary `<<` and here-string `<<<` cases as non-managed controls.
 - Exercise Conform formatting only where the fixture explicitly configures it; assert payload bytes before and after formatting.
