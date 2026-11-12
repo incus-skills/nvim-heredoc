@@ -71,8 +71,9 @@ The scanner is the common authority for later editing mechanisms. Automatic clos
 - Initial cases cover quoted delimiters, declaration-order queues, comments, quoted/escaped operators, here-strings, line continuations, tab-stripping terminators, and incomplete heredocs.
 - Shell-delivery fixture and runner are present. GitHub Actions run 43150720234 passed the payload comparison with Bash 5.2.21, Dash, and Zsh 5.9.
 - Formatter payload-comparison fixture passed in run 43150720234 with shfmt 3.8.0 for the Bash and POSIX-shell-subset fixtures. This is fixture-specific evidence, not a general guarantee. The test uses the configured `shfmt -i 0 -p` invocation in default language mode because shfmt rejects combining `-p` with `-ln`.
-- Core scanner tests passed under Lua 5.1.5 in run 43150720234.
-- The initial three-job GitHub Actions workflow has completed successfully: https://github.com/incus-skills/nvim-heredoc/actions/runs/43150720234.
+- Core scanner tests, including added ambiguity-stop, arithmetic-context, and space-indented-opener cases, passed under Lua 5.1.5 in run 43150889806.
+- The initial three-job GitHub Actions workflow has completed successfully twice; the latest full run is https://github.com/incus-skills/nvim-heredoc/actions/runs/43150889806.
+- Scanner result fields and current lexical limits are documented in [scanner interface](../../docs/scanner.md).
 
 ### Known prototype limits
 
