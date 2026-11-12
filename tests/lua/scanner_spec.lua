@@ -27,12 +27,12 @@ do
 end
 
 do
-  local result = scanner.scan("echo '<<-NO' # <<-COMMENT\\ncat <<<VALUE\\necho \\<<<literal\\n")
+  local result = scanner.scan("echo '<<-NO' # <<-COMMENT\ncat <<<VALUE\necho \\<<<literal\n")
   assert(#result.regions == 0, "quoted/comment/here-string/escaped operators must be ignored")
 end
 
 do
-  local _, r = one("cat \\\\n  <<-E\\\\OF\\nbody\\nEOF\\n")
+  local _, r = one("cat \\\n  <<-E\\OF\nbody\nEOF\n")
   assert(r.opener_line == 2 and r.delimiter == "EOF")
   assert(r.terminator_line == 4)
 end
