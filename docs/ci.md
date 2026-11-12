@@ -4,12 +4,13 @@
 
 CI must validate the heredoc implementation at the same independent layers as the design contract. A green result from one layer must not stand in for another: a scanner can identify a region correctly while an editor integration corrupts bytes, and a visually correct buffer can still deliver the wrong payload to a shell.
 
-The initial CI design separates four validation layers:
+The CI workflow reports five validation layers independently:
 
-1. **Core scanner and buffer behaviour** — deterministic Lua/Neovim tests, independent of LazyVim.
-2. **Shell delivery** — execute fixtures with Bash, a POSIX shell, and Zsh; compare exact payload bytes.
-3. **Formatter behaviour** — run the supported `shfmt -i 0 -p` invocation against Bash and POSIX `sh` fixtures and compare payload bytes.
-4. **LazyVim integration** — exercise the plugin in a containerised, headless LazyVim environment with the relevant plugins present.
+1. **Core scanner** — deterministic Lua tests, independent of Neovim and LazyVim.
+2. **Neovim buffer integration** — headless editing and changed-range tests, independent of LazyVim.
+3. **Shell delivery** — execute fixtures with Bash, a POSIX shell, and Zsh; compare exact payload bytes.
+4. **Formatter behaviour** — run the supported `shfmt -i 0 -p` invocation against Bash and POSIX `sh` fixtures and compare payload bytes.
+5. **LazyVim integration** — exercise the plugin in a containerised, headless LazyVim environment with the relevant plugins present.
 
 ## Workflow shape
 
@@ -41,6 +42,18 @@ The implementation should define stable commands before the workflow is authored
 
 These commands should also be runnable locally where dependencies are available. CI invokes the same commands rather than containing a second implementation of test logic. The current commands are `bash tests/run-core.sh`, `bash tests/run-nvim.sh`, `bash tests/run-shell-delivery.sh`, `bash tests/formatter/test-shfmt.sh`, and `bash tests/run-lazyvim.sh` (the last runs inside `ci/lazyvim/Dockerfile`).
 
+## Positive and negative controls
+
+The stable commands each include a deliberate negative control:
+
+- `bash tests/run-core.sh`: the scanner must not classify an ordinary `<<` heredoc as managed.
+- `bash tests/run-nvim.sh`: the buffer integration must not edit an ordinary `<<` heredoc.
+- `bash tests/run-shell-delivery.sh`: `<<-` must not deliver the leading TAB byte.
+- `bash tests/formatter/test-shfmt.sh`: `shfmt` must not change the executed heredoc payload.
+- `bash tests/run-lazyvim.sh`: the plugin must not edit an ordinary `<<` heredoc with the pinned plugin environment loaded.
+
+`tests/expect-failure.sh` checks both non-zero exit and a fixture-specific assertion marker. A setup error or unrelated crash is not accepted as a successful negative control.
+
 ## Container boundary
 
 The container is an integration test environment, not the product runtime and not a requirement for users installing the plugin. It exists to make LazyVim and its selected plugins reproducible. The scanner and shell-delivery tests should remain runnable without it.
@@ -51,6 +64,6 @@ The container is an integration test environment, not the product runtime and no
 
 Keep job names aligned with the validation layers: `core`, `buffer-integration`, `shell-delivery`, `formatter`, and `lazyvim-integration`. Preserve separate reports so a failure identifies which contract was violated.
 
-The workflow is not complete merely because it parses or runs. It must be exercised against at least one known passing fixture and a deliberately failing fixture for each test command, demonstrating that regressions produce a failing job. The initial three-job workflow passed all tests in run [43151269417](https://github.com/incus-skills/nvim-heredoc/actions/runs/43151269417). After adding the first Neovim buffer integration, all four jobs passed in run [43151626549](https://github.com/incus-skills/nvim-heredoc/actions/runs/43151626549). The latest run [43153320144](https://github.com/incus-skills/nvim-heredoc/actions/runs/43153320144) passed all four jobs after adding empty quoted delimiter coverage to the scanner and shell-delivery tests. The buffer job used Neovim 0.9.5. The observed runtime versions were Lua 5.1.5, Bash 5.2.21, Zsh 5.9, and shfmt 3.8.0; Dash was present and passed the payload comparison. The formatter test exercises the configured `shfmt -i 0 -p` invocation against a Bash fixture and a POSIX-shell-subset fixture, then compares actual shell output before and after formatting. It does not establish preservation for every heredoc grammar or payload shape.
+Each test command now runs a positive fixture and a negative control. The negative controls assert a deliberately forbidden outcome and are wrapped by `tests/expect-failure.sh`, which requires the assertion to fail for its specific marker. If the forbidden outcome starts occurring, the negative fixture unexpectedly succeeds and the wrapper fails the CI job. Controls cover ordinary-heredoc classification (core), ordinary-heredoc mutation (buffer and LazyVim integration), leading-TAB removal by `<<-` (shell delivery), and payload preservation by shfmt (formatter). This checks each layer's own contract rather than merely testing generic non-zero exit propagation. The initial three-job workflow passed all tests in run [43151269417](https://github.com/incus-skills/nvim-heredoc/actions/runs/43151269417). After adding the first Neovim buffer integration, all four jobs passed in run [43151626549](https://github.com/incus-skills/nvim-heredoc/actions/runs/43151626549). The latest run [43153320144](https://github.com/incus-skills/nvim-heredoc/actions/runs/43153320144) passed all four jobs after adding empty quoted delimiter coverage to the scanner and shell-delivery tests. The buffer job used Neovim 0.9.5. The observed runtime versions were Lua 5.1.5, Bash 5.2.21, Zsh 5.9, and shfmt 3.8.0; Dash was present and passed the payload comparison. The formatter test exercises the configured `shfmt -i 0 -p` invocation against a Bash fixture and a POSIX-shell-subset fixture, then compares actual shell output before and after formatting. It does not establish preservation for every heredoc grammar or payload shape.
 
 The initial formatter test command combined `-p` with `-ln`, which shfmt rejects. The command was corrected to use the configured `-i 0 -p` invocation without `-ln`; the successful run therefore uses shfmt's default language mode for both fixtures. This is a test-harness correction, not evidence of a formatter payload defect.
