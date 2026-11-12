@@ -68,6 +68,8 @@ local function assert_insert_mode(message)
     message .. "; mode=" .. vim.inspect(vim.api.nvim_get_mode()))
 end
 
+local prefix_before_next_payload = nil
+
 local function start()
   vim.api.nvim_win_set_buf(win, buf)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "\tcat <<-LIVE" })
@@ -162,7 +164,6 @@ local function start()
   end)
 end
 
-local prefix_before_next_payload = nil
 vim.api.nvim_create_autocmd("InsertCharPre", {
   buffer = buf,
   callback = function()
