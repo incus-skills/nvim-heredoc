@@ -44,6 +44,28 @@ end, 20), "blink.cmp did not finish initialising")
 assert(blink_config.enabled(), "blink.cmp should remain enabled by default")
 assert(vim.b.completion == nil, "the fixture must not inject a buffer-wide completion override")
 
+-- Conform is configured as observed: shfmt for Bash and POSIX sh only.
+-- No format_on_save callback is installed; the test invokes formatting explicitly.
+local conform = require("conform")
+conform.setup({
+  formatters_by_ft = {
+    bash = { "shfmt" },
+    sh = { "shfmt" },
+  },
+  formatters = {
+    shfmt = {
+      prepend_args = { "-i", "0", "-p" },
+    },
+  },
+})
+local bash = set_buffer("echo ok", "bash")
+assert(conform.list_formatters_for_buffer(bash)[1] == "shfmt", "Bash should resolve to shfmt")
+local zsh = set_buffer("print -r -- ok", "zsh")
+assert(#conform.list_formatters_for_buffer(zsh) == 0, "Zsh must not resolve to shfmt")
+vim.api.nvim_set_current_buf(bash)
+
+plugin.setup()
+
 -- Trigger Blink's real buffer-source completion menu while the cursor is
 -- inside a managed heredoc body. Enabled-state alone is not sufficient evidence.
 local blink = require("blink.cmp")
@@ -67,28 +89,6 @@ end, 20), "Blink did not display buffer completion inside the managed heredoc bo
 blink.hide()
 vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "xt", false)
 assert(vim.b.completion == nil, "Blink completion must remain buffer-enabled in heredoc")
-
--- Conform is configured as observed: shfmt for Bash and POSIX sh only.
--- No format_on_save callback is installed; the test invokes formatting explicitly.
-local conform = require("conform")
-conform.setup({
-  formatters_by_ft = {
-    bash = { "shfmt" },
-    sh = { "shfmt" },
-  },
-  formatters = {
-    shfmt = {
-      prepend_args = { "-i", "0", "-p" },
-    },
-  },
-})
-local bash = set_buffer("echo ok", "bash")
-assert(conform.list_formatters_for_buffer(bash)[1] == "shfmt", "Bash should resolve to shfmt")
-local zsh = set_buffer("print -r -- ok", "zsh")
-assert(#conform.list_formatters_for_buffer(zsh) == 0, "Zsh must not resolve to shfmt")
-vim.api.nvim_set_current_buf(bash)
-
-plugin.setup()
 
 -- Managed heredoc: scanner editing remains safe while pair/completion plugins
 -- are active in the same buffer.
