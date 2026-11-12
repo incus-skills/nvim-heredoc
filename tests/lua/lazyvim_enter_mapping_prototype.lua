@@ -197,7 +197,7 @@ local function test_controlled_string_fallback(done)
   vim.bo[buf].filetype = "text"
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "seed" })
 
-  vim.keymap.set("i", "<CR>", "OBSERVED_NORMAL_ENTER", { buffer = buf })
+  vim.keymap.set("i", "<CR>", "<CR>OBSERVED_NORMAL_ENTER", { buffer = buf })
   local original = vim.fn.maparg("<CR>", "i", false, true)
   assert(type(original.rhs) == "string" and original.rhs ~= "" and not original.callback,
     "controlled fallback mapping was not captured as a string RHS: " .. vim.inspect(mapping_inventory(original)))
