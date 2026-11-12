@@ -10,7 +10,7 @@ function M.closer_line(region)
     or region.delimiter_original == "" then
     return nil, "heredoc delimiter is unavailable"
   end
-  return (region.structural_prefix or "") .. region.delimiter
+  return (region.closer_prefix or region.structural_prefix or "") .. region.delimiter
 end
 
 function M.prefix_lines(region, lines)
