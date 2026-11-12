@@ -343,7 +343,7 @@ local function attach(buf)
       end
     end,
   })
-  vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
+  vim.api.nvim_create_autocmd("TextChanged", {
     group = buffer_group,
     buffer = buf,
     callback = function()
