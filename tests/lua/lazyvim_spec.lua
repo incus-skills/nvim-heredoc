@@ -44,6 +44,30 @@ end, 20), "blink.cmp did not finish initialising")
 assert(blink_config.enabled(), "blink.cmp should remain enabled by default")
 assert(vim.b.completion == nil, "the fixture must not inject a buffer-wide completion override")
 
+-- Trigger Blink's real buffer-source completion menu while the cursor is
+-- inside a managed heredoc body. Enabled-state alone is not sufficient evidence.
+local blink = require("blink.cmp")
+local completion_buf = set_buffer(table.concat({
+  "if true; then",
+  "\tcat <<-EOF",
+  "\tpayloadcandidate",
+  "\tpay",
+  "\tEOF",
+  "fi",
+}, "\n"), "bash")
+vim.api.nvim_win_set_cursor(0, { 4, 3 })
+vim.api.nvim_feedkeys("A", "xt", false)
+assert(vim.wait(1000, function()
+  return vim.api.nvim_get_mode().mode:sub(1, 1) == "i"
+end, 10), "could not enter insert mode for Blink completion test")
+blink.show({ providers = { "buffer" } })
+assert(vim.wait(5000, function()
+  return blink.is_menu_visible() and #blink.get_items() > 0
+end, 20), "Blink did not display buffer completion inside the managed heredoc body")
+blink.hide()
+vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "xt", false)
+assert(vim.b.completion == nil, "Blink completion must remain buffer-enabled in heredoc")
+
 -- Conform is configured as observed: shfmt for Bash and POSIX sh only.
 -- No format_on_save callback is installed; the test invokes formatting explicitly.
 local conform = require("conform")
