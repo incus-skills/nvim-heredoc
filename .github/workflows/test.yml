@@ -21,6 +21,8 @@ jobs:
           sudo apt-get install --yes lua5.1
       - name: Report runtime
         run: lua5.1 -v
+      - name: Check local diagnostic script syntax
+        run: bash -n tests/diagnostics/inspect-lazyvim.sh
       - name: Run scanner tests
         run: bash tests/run-core.sh
 
