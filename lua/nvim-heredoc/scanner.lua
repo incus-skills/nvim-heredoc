@@ -369,7 +369,8 @@ function M.scan(source)
       if item.operator == "<<-" then
         local opener = lines[item.opener_line] or ""
         local prefix = opener:match("^([ \t]*)") or ""
-        item.structural_prefix = prefix
+        item.closer_prefix = prefix
+        item.structural_prefix = prefix .. "\t"
         item.structural_tabs_only = not prefix:find(" ", 1, true)
       end
 
@@ -403,6 +404,7 @@ function M.scan(source)
             body_end_line = nil,
             terminator_line = nil,
             structural_prefix = item.structural_prefix,
+            closer_prefix = item.closer_prefix,
             structural_tabs_only = item.structural_tabs_only,
             opener_safe = item.structural_tabs_only,
             confidence = "incomplete",
@@ -426,6 +428,7 @@ function M.scan(source)
           body_end_line = terminator - 1,
           terminator_line = terminator,
           structural_prefix = item.structural_prefix,
+          closer_prefix = item.closer_prefix,
           structural_tabs_only = safe,
           opener_safe = safe,
           confidence = safe and "lexical" or "unsupported-indent",
