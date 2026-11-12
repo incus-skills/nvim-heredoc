@@ -92,6 +92,29 @@ local function active_cursor_row(buf)
   return vim.api.nvim_win_get_cursor(win)[1] - 1
 end
 
+local function ensure_body_prefix_and_cursor(buf, region, body_row)
+  local prefix = region.structural_prefix or ""
+  if prefix == "" then
+    return
+  end
+
+  local line = vim.api.nvim_buf_get_lines(buf, body_row, body_row + 1, false)[1]
+  if not line then
+    return
+  end
+  if line:sub(1, #prefix) ~= prefix then
+    vim.api.nvim_buf_set_text(buf, body_row, 0, body_row, 0, { prefix })
+  end
+
+  local win = vim.api.nvim_get_current_win()
+  if vim.api.nvim_win_get_buf(win) == buf then
+    local cursor = vim.api.nvim_win_get_cursor(win)
+    if cursor[1] - 1 == body_row and cursor[2] < #prefix then
+      vim.api.nvim_win_set_cursor(win, { cursor[1], #prefix })
+    end
+  end
+end
+
 function M.process_buffer(buf, changed_range, close_incomplete)
   buf = buf or vim.api.nvim_get_current_buf()
   if not vim.api.nvim_buf_is_valid(buf) or not vim.api.nvim_buf_is_loaded(buf) then
@@ -134,6 +157,13 @@ function M.process_buffer(buf, changed_range, close_incomplete)
         -- below it so the closer is reserved before an enclosing brace.
         if cursor_row == body_row and changed_body_line then
           inserted = insert_closer(buf, pending, body_row + 1)
+          if inserted then
+            -- Complete the Enter transition synchronously: Neovim may have
+            -- auto-indented the new line already, but can leave the cursor
+            -- before that TAB. Ensure both the prefix and insertion point
+            -- are correct before the user types the first payload byte.
+            ensure_body_prefix_and_cursor(buf, pending, body_row)
+          end
         elseif close_incomplete then
           -- Retain the fallback for buffers opened with an incomplete region.
           inserted = insert_closer(buf, pending, vim.api.nvim_buf_line_count(buf))
