@@ -22,19 +22,31 @@ function M.prefix_lines(region, lines)
   end
 
   local prefix = region.structural_prefix or ""
-  local output, changed = {}, false
+  local opener_prefix = region.closer_prefix or ""
+  local output, insertions, changed = {}, {}, false
   for index, line in ipairs(lines) do
     if type(line) ~= "string" then
-      return nil, "every changed line must be a string"
+      return nil, "every line must be a string"
     end
-    if prefix ~= "" and line:sub(1, #prefix) ~= prefix then
-      output[index] = prefix .. line
-      changed = true
-    else
+    if line:sub(1, #prefix) == prefix then
       output[index] = line
+    else
+      local column, insertion
+      if opener_prefix ~= "" and line:sub(1, #opener_prefix) == opener_prefix then
+        -- Neovim may already have copied the opener indentation onto the
+        -- new line. Add only the body-level TAB after that indentation.
+        column, insertion = #opener_prefix, "\t"
+      else
+        -- Unindented or differently indented content needs the complete
+        -- opener-relative body prefix at column zero.
+        column, insertion = 0, prefix
+      end
+      output[index] = line:sub(1, column) .. insertion .. line:sub(column + 1)
+      insertions[index] = { column = column, text = insertion }
+      changed = true
     end
   end
-  return output, changed
+  return output, changed, insertions
 end
 
 return M
