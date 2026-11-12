@@ -199,6 +199,7 @@ function M.scan(source)
       -- heredoc payload. Do not continue scanning them as shell source.
       for _, region in ipairs(result.regions) do
         region.editable = false
+        region.opener_safe = false
         region.confidence = "uncertain"
       end
       return result
@@ -245,6 +246,7 @@ function M.scan(source)
             terminator_line = nil,
             structural_prefix = item.structural_prefix,
             structural_tabs_only = item.structural_tabs_only,
+            opener_safe = item.structural_tabs_only,
             confidence = "incomplete",
             editable = false,
           }
@@ -267,7 +269,8 @@ function M.scan(source)
           terminator_line = terminator,
           structural_prefix = item.structural_prefix,
           structural_tabs_only = safe,
-          confidence = safe and (#diagnostics == 0 and "lexical" or "uncertain") or "unsupported-indent",
+          opener_safe = safe,
+          confidence = safe and "lexical" or "unsupported-indent",
           editable = safe and #diagnostics == 0,
         }
       end
@@ -278,6 +281,7 @@ function M.scan(source)
   if not result.complete then
     for _, region in ipairs(result.regions) do
       region.editable = false
+      region.opener_safe = false
       if region.confidence ~= "incomplete" then
         region.confidence = "uncertain"
       end
