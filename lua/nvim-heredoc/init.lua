@@ -434,6 +434,19 @@ local function attach(buf)
       end
     end,
   })
+  -- These are observation-only hooks. In particular, TextChangedI does
+  -- not invoke the processor and therefore cannot alter closer event order.
+  vim.api.nvim_create_autocmd({ "InsertEnter", "InsertCharPre", "TextChangedI" }, {
+    group = buffer_group,
+    buffer = buf,
+    callback = function(args)
+      local details
+      if args.event == "InsertCharPre" then
+        details = { char = vim.v.char }
+      end
+      trace_event(buf, "autocmd." .. args.event, details)
+    end,
+  })
 end
 
 function M.setup_buffer(buf)
