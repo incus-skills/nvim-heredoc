@@ -281,8 +281,8 @@ function M.scan(source)
   if not result.complete then
     for _, region in ipairs(result.regions) do
       region.editable = false
-      region.opener_safe = false
       if region.confidence ~= "incomplete" then
+        region.opener_safe = false
         region.confidence = "uncertain"
       end
     end
