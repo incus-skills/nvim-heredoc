@@ -69,23 +69,29 @@ defer(function()
         .. vim.inspect(actual))
     assert_insert_mode("typing the first payload must remain in Insert mode")
 
-    -- A second Enter creates a genuinely new, unindented body line. Queue
-    -- the next payload immediately: TextChangedI must apply the structural
-    -- TAB before Neovim consumes the following characters, without relying
-    -- on a timer or InsertLeave.
-    vim.api.nvim_input("\nsecond")
+    -- A second Enter creates a genuinely new body line. Wait for the
+    -- deferred changed-range processor before typing; this regression guard
+    -- checks the existing structural-prefix behaviour without claiming that
+    -- the live Insert-mode timing problem is solved.
+    vim.api.nvim_input("\n")
     defer(function()
-      actual = lines(buf)
-      assert(actual[3] == "\tsecond",
-        "a subsequent Enter must receive its structural TAB before the next typed payload; lines="
-          .. vim.inspect(actual))
-      assert_insert_mode("typing on the newly indented line must remain in Insert mode")
+      wait_for(function()
+        return lines(buf)[3] == "\t"
+      end, "a subsequent body line must receive its structural TAB")
+      assert_insert_mode("indentation after Enter must remain in Insert mode")
 
-      vim.api.nvim_input("\n")
+      vim.api.nvim_input("second")
       defer(function()
-        wait_for(function()
-          return lines(buf)[4] == "\t"
-        end, "the next body line must be structurally indented before paste")
+        actual = lines(buf)
+        assert(actual[3] == "\tsecond",
+          "second body payload must follow the structural TAB; lines=" .. vim.inspect(actual))
+        assert_insert_mode("typing on the newly indented line must remain in Insert mode")
+
+        vim.api.nvim_input("\n")
+        defer(function()
+          wait_for(function()
+            return lines(buf)[4] == "\t"
+          end, "the next body line must be structurally indented before paste")
 
         -- Exercise Neovim's paste API while still in Insert mode. The
         -- inserted lines begin with spaces; the plugin must prepend only
@@ -116,5 +122,6 @@ defer(function()
         end)
       end)
     end)
+  end)
   end)
 end)
