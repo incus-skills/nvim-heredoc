@@ -74,7 +74,7 @@ local function parse_delimiter(s, pos)
   end
 
   if quote then return nil, pos, "unterminated quoted delimiter" end
-  if pos == start or #value == 0 then return nil, pos, "missing delimiter word" end
+  if pos == start then return nil, pos, "missing delimiter word" end
   return {
     original = s:sub(start, pos - 1),
     value = table.concat(value),
