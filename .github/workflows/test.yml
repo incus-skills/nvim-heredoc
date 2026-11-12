@@ -31,8 +31,10 @@ jobs:
           done
       - name: Validate provisioning installer
         run: bash tests/run-installer.sh
-      - name: Check local diagnostic script syntax
-        run: bash -n tests/diagnostics/inspect-lazyvim.sh
+      - name: Check local diagnostic and live-test syntax
+        run: |
+          bash -n tests/diagnostics/inspect-lazyvim.sh
+          lua5.1 -e 'assert(loadfile("tests/lua/local_lazyvim_live_insert.lua"))'
       - name: Run scanner tests
         run: bash tests/run-core.sh
 

@@ -95,7 +95,64 @@ For <<-, the shell strips leading TAB bytes from body lines and the terminator; 
 
 If anything is unexpected, capture the buffer with visible whitespace (for example :set list) and collect :messages before changing other configuration.
 
-## 5. Remove or roll back the provisioned implementation
+## 5. Run the live input test in the current LazyVim instance
+
+The repository also provides a self-contained test for the user's already-running Neovim/LazyVim process. It uses a disposable scratch buffer, exercises the installed Bash ftplugin and currently loaded configuration, then restores the original buffer. It does not edit or save the user's open file, reconfigure completion/pair plugins, or close Neovim.
+
+After installing the diagnostic branch and restarting Neovim, run this from Normal mode:
+
+~~~vim
+:luafile /absolute/path/to/nvim-heredoc/tests/lua/local_lazyvim_live_insert.lua
+~~~
+
+Replace the path with the location of the repository checkout. The test automatically:
+
+- checks that the provisioned Bash ftplugin attached and established literal-TAB settings;
+- presses Enter after a `<<-` opener and checks that the closer is reserved;
+- types payload on the first body line;
+- presses Enter again and checks at `InsertCharPre` that the next line already has its structural TAB before the next character is inserted;
+- types the remainder of that line;
+- creates another body line and submits a deterministic multi-line paste through Neovim's paste API;
+- verifies the TAB prefixes and preserved payload spaces before InsertLeave;
+- restores the original buffer and reports PASS or the failing assertion with a notification.
+
+The paste payload is supplied by the test rather than read from the system clipboard. This makes the buffer-editing test repeatable and removes clipboard selection/paste timing as sources of user error; it does not test a particular desktop clipboard provider or key mapping. The result also reports whether mini.pairs and Blink were already loaded, without changing their configuration.
+
+## 6. Capture a live Insert-mode event trace
+
+A temporary diagnostic trace is available for investigating event ordering in the user's actual Neovim configuration. It is disabled by default, makes no editing decisions, and stores its records in memory only.
+
+From an existing checkout, fetch and switch to the diagnostic branch, then run the normal provisioner:
+
+~~~sh
+git fetch origin diagnostics/live-insert-event-order
+git switch --track origin/diagnostics/live-insert-event-order
+bash scripts/install.sh
+~~~
+
+After restarting Neovim, open a disposable Bash file containing a managed `<<-` heredoc. In that buffer, enable and clear the trace:
+
+~~~vim
+:lua vim.g.nvim_heredoc_trace = true; require("nvim-heredoc").clear_trace()
+~~~
+
+Reproduce the sequence without pausing between actions: press Enter after the opener, type one character, type several characters rapidly, then create another body line and paste multiple lines. Do not save until the sequence is complete. Then inspect the trace:
+
+~~~vim
+:lua vim.print(require("nvim-heredoc").get_trace())
+~~~
+
+The trace records sequence numbers, monotonic timestamps, Neovim mode, cursor position, nearby buffer lines, changed-range coordinates, and plugin edit/cursor-correction operations. It observes `InsertEnter`, `InsertCharPre`, `TextChangedI`, `TextChanged`, `InsertLeave`, and `on_lines`. The observation-only `TextChangedI` hook does not call the processor or edit the buffer.
+
+Disable tracing afterwards:
+
+~~~vim
+:lua vim.g.nvim_heredoc_trace = false; require("nvim-heredoc").clear_trace()
+~~~
+
+The trace includes nearby buffer text, so review it before sharing if the buffer contains sensitive content. A useful capture should include the complete sequence from the opener Enter through the rapid typing and paste, while preserving the order of all events. This is diagnostic instrumentation, not a proposed live-indentation fix.
+
+## 7. Remove or roll back the provisioned implementation
 
 To disable the implementation, remove only the three generated ftplugin shims and the installed module directory:
 

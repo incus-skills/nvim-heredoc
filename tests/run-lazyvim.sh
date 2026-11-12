@@ -13,6 +13,9 @@ command -v shfmt >/dev/null 2>&1 || {
 nvim --headless -u ci/lazyvim/init.lua \
   -c 'lua local ok, err = pcall(dofile, "tests/lua/lazyvim_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
 
+nvim --headless -u ci/lazyvim/init.lua \
+  -c 'lua local ok, err = pcall(dofile, "tests/lua/lazyvim_live_insert_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
+
 bash tests/expect-failure.sh "LazyVim integration negative control" \
   "NEGATIVE_CONTROL: ordinary heredoc was unexpectedly left unchanged" \
   nvim --headless -u ci/lazyvim/init.lua \
