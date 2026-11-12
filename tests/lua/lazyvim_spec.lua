@@ -110,7 +110,7 @@ local function type_quote(buf, row)
   vim.api.nvim_set_current_buf(buf)
   local current = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1]
   vim.api.nvim_win_set_cursor(0, { row + 1, #current })
-  vim.api.nvim_feedkeys('A"\\27', "xt", false)
+  vim.api.nvim_feedkeys('A"\27', "xt", false)
   assert(vim.wait(1000, function()
     local updated = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1]
     return updated:sub(-2) == '""'
