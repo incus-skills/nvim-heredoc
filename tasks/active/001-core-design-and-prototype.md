@@ -41,7 +41,7 @@ The scanner is the common authority for later editing mechanisms. Automatic clos
 - The scanner does not depend on Treesitter being installed or able to parse an incomplete buffer.
 - Test output is reproducible with documented commands.
 - A layered CI workflow runs core, shell-delivery, and formatter tests independently of LazyVim, with LazyVim integration isolated in a pinned container environment.
-- Each test command has a known passing fixture and a deliberately failing fixture that proves regressions fail the relevant job. The deliberate-failure checks remain outstanding.
+- Each test command has a known passing fixture and a deliberately failing, contract-specific negative control. `tests/expect-failure.sh` requires both non-zero exit and the expected assertion marker, so unrelated setup failures do not count as successful controls.
 
 ## Boundaries
 
@@ -79,6 +79,7 @@ The scanner is the common authority for later editing mechanisms. Automatic clos
 - Scanner result fields and current lexical limits are documented in [scanner interface](../../docs/scanner.md).
 
 ### Known prototype limits
+- Added contract-specific negative controls for all five test commands. They verify that ordinary `<<` is not classified or edited (core, buffer, LazyVim), that `<<-` removes a leading TAB at shell delivery, and that shfmt preserves the delivered payload. The shared `tests/expect-failure.sh` requires the expected assertion marker as well as a non-zero exit, so setup failures cannot masquerade as successful negative controls. The full five-job workflow is being exercised against these controls.
 
 - This is not a complete shell parser. Command substitutions, backtick substitutions, multiline quoted commands, and other unsupported contexts are not yet recognised safely.
 - Changed-range notifications are tracked through `nvim_buf_attach(on_lines)`. Pending notifications now retain disjoint ranges separately and merge only overlapping or adjacent ranges. A regression test performs two disjoint edits in one scheduling window and verifies that the untouched line between them remains unchanged. This does not yet use extmarks; edit sequences that shift earlier line coordinates, other plugins mutating the same buffer, and more complex rapid edits still need testing.
