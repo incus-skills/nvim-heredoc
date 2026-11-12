@@ -34,7 +34,7 @@ do
 end
 
 do
-  local _, r = one("cat \\\n  <<-E\\OF\nbody\nEOF\n")
+  local _, r = one("cat \\\n<<-E\\OF\nbody\nEOF\n")
   assert(r.opener_line == 2 and r.delimiter == "EOF")
   assert(r.terminator_line == 4)
   assert(editing.closer_line(r) == "EOF")
