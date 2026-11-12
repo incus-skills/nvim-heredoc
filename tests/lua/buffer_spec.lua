@@ -58,6 +58,28 @@ do
 end
 
 do
+  local buf = set_buffer({
+    "\tcat <<-EOF",
+    "\tfirst",
+    "untouched middle",
+    "\tthird",
+    "\tEOF",
+  })
+  vim.api.nvim_set_current_buf(buf)
+  plugin.setup()
+  -- Two disjoint edits in one scheduling window must remain separate ranges.
+  vim.api.nvim_buf_set_lines(buf, 1, 2, false, { "  first changed" })
+  vim.api.nvim_buf_set_lines(buf, 3, 4, false, { "  third changed" })
+  assert(vim.wait(1000, function()
+    local actual = lines(buf)
+    return actual[2] == "\t  first changed" and actual[4] == "\t  third changed"
+  end, 10), "both disjoint changed ranges should receive their structural prefix")
+  local actual = lines(buf)
+  assert(actual[3] == "untouched middle",
+    "coalescing disjoint edits must not prefix an untouched line between them")
+end
+
+do
   local buf = set_buffer({ "\tcat <<-AUTO", "" })
   vim.api.nvim_set_current_buf(buf)
   plugin.setup()
