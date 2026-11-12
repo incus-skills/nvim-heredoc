@@ -71,6 +71,16 @@ do
 end
 
 do
+  local _, r = one('value=$(printf "x")\necho "$((1 + 2))"\ncat <<-EOF\npayload\nEOF\n')
+  assert(r.delimiter == "EOF", "ordinary command and arithmetic substitutions should not hide later heredocs")
+end
+
+do
+  local result = scanner.scan('value=$(cat <<-INNER)\nINNER\ncat <<-OUTER\nbody\nOUTER\n')
+  assert(not result.complete and #result.regions == 0, "nested heredoc in command substitution must remain explicitly unsupported")
+end
+
+do
   local result = scanner.scan('echo "$(nested)" <<-REAL\n<<-FALSE_POSITIVE\nREAL\n')
   assert(not result.complete)
   assert(#result.regions == 0, "scanner must not parse possible heredoc payload as shell after ambiguity")
