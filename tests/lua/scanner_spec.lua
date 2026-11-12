@@ -43,7 +43,7 @@ do
   local _, r = one("cat \\\n<<-E\\OF\nbody\nEOF\n")
   assert(r.opener_line == 2 and r.delimiter == "EOF")
   assert(r.terminator_line == 4)
-  assert(editing.closer_line(r) == "")
+  assert(editing.closer_line(r) == "EOF")
 end
 
 do
@@ -56,7 +56,7 @@ do
   local _, r = one("cat <<-EOF\n  payload\nEOF\n")
   assert(r.structural_tabs_only and r.editable and r.structural_prefix == "\t" and r.closer_prefix == "")
   assert(r.body_start_line == 2 and r.terminator_line == 3)
-  assert(editing.closer_line(r) == "", "unindented opener should keep its closer at column zero")
+  assert(editing.closer_line(r) == "EOF", "unindented opener should keep its closer at column zero")
 end
 
 do
