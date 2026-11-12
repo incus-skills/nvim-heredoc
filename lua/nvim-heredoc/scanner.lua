@@ -378,6 +378,7 @@ function M.scan(source)
         -- delivered payload. Mixed TAB/space opener prefixes are declined.
         item.structural_safe = not (has_spaces and has_tabs)
         item.space_indented = has_spaces and not has_tabs
+        item.opener_prefix = prefix
         item.closer_prefix = has_spaces and "\t" or prefix
         item.structural_prefix = has_spaces and ("\t" .. prefix) or (prefix .. "\t")
         item.structural_tabs_only = not has_spaces
@@ -415,7 +416,7 @@ function M.scan(source)
             terminator_line = nil,
             structural_prefix = item.structural_prefix,
             closer_prefix = item.closer_prefix,
-          space_indented = item.space_indented,
+            opener_prefix = item.opener_prefix,
             space_indented = item.space_indented,
             structural_tabs_only = item.structural_tabs_only,
             opener_safe = item.structural_safe,
@@ -441,6 +442,7 @@ function M.scan(source)
           terminator_line = terminator,
           structural_prefix = item.structural_prefix,
           closer_prefix = item.closer_prefix,
+          opener_prefix = item.opener_prefix,
           space_indented = item.space_indented,
           structural_tabs_only = item.structural_tabs_only,
           opener_safe = safe,
