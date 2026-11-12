@@ -219,10 +219,20 @@ do
 end
 
 do
-  local buf = set_buffer({ "    cat <<-EOF", "body" })
-  assert(not plugin.process_buffer(buf))
+  local buf = set_buffer({ "    cat <<-EOF", "" })
+  assert(plugin.process_buffer(buf))
   local actual = lines(buf)
-  assert(#actual == 2 and actual[1] == "    cat <<-EOF" and actual[2] == "body")
+  assert(actual[1] == "    cat <<-EOF")
+  assert(actual[2] == "\t    ",
+    "space-indented opener must put the structural TAB before preserved opener spaces")
+  assert(actual[3] == "\tEOF",
+    "space-indented opener must use a TAB-only terminator prefix")
+end
+
+do
+  local buf = set_buffer({ "  \tcat <<-EOF", "body", "EOF" })
+  assert(not plugin.process_buffer(buf),
+    "mixed TAB/space opener indentation must remain unsupported")
 end
 
 do
