@@ -210,6 +210,45 @@ do
 end
 
 do
+  -- Enter after an opener inside a function must create the closer immediately
+  -- before the existing function terminator, without waiting for InsertLeave.
+  local buf = set_buffer({ "my_function() {", "\tcat <<-EOF", "}" })
+  vim.api.nvim_set_current_buf(buf)
+  plugin.setup()
+  vim.api.nvim_buf_set_lines(buf, 2, 2, false, { "" })
+  assert(vim.wait(1000, function()
+    local actual = lines(buf)
+    return actual[4] == "\tEOF"
+  end, 10), "on_lines should insert the closer immediately after Enter")
+  local actual = lines(buf)
+  assert(actual[1] == "my_function() {")
+  assert(actual[2] == "\tcat <<-EOF")
+  assert(actual[3] == "\t", "the new body line should receive its structural TAB")
+  assert(actual[4] == "\tEOF", "the closer must precede the enclosing function terminator")
+  assert(actual[5] == "}", "the enclosing function terminator must remain outside the heredoc")
+
+  -- Typing into the body should be prefixed by the scheduled on_lines path,
+  -- while still in the editing session (no InsertLeave event is fired).
+  vim.api.nvim_buf_set_lines(buf, 2, 3, false, { "typed payload" })
+  assert(vim.wait(1000, function()
+    return lines(buf)[3] == "\ttyped payload"
+  end, 10), "typed body content should receive structural indentation live")
+
+  -- A multi-line paste is one changed range; preserve payload spaces and
+  -- relative indentation while adding only the structural TAB.
+  vim.api.nvim_buf_set_lines(buf, 3, 3, false, { "  pasted one", "    pasted two", "" })
+  assert(vim.wait(1000, function()
+    local actual_lines = lines(buf)
+    return actual_lines[4] == "\t  pasted one"
+      and actual_lines[5] == "\t    pasted two"
+      and actual_lines[6] == "\t"
+  end, 10), "pasted body lines should receive structural indentation live")
+  actual = lines(buf)
+  assert(actual[7] == "\tEOF", "live body edits must leave the closer below the payload")
+  assert(actual[8] == "}", "live body edits must preserve the enclosing function")
+end
+
+do
   local buf = set_buffer({ "\tcat <<-AUTO", "" })
   vim.api.nvim_set_current_buf(buf)
   plugin.setup()
