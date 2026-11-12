@@ -40,7 +40,9 @@ Formatting is separate from interactive editing. `shfmt` is for Bash and POSIX `
 
 - Repository initialisation complete.
 - Architecture and indentation invariants recorded in [the design contract](docs/design.md).
-- Layered CI and a containerised LazyVim integration environment are specified in [the CI design](docs/ci.md); test commands and the workflow are not implemented yet.
-- [Task 001](tasks/active/001-core-design-and-prototype.md) is active: implement the shared region model, buffer-independent Lua core, editing/paste prototype, and byte-level regression tests.
-- No implementation or installer has yet been validated. Do not treat an installer as ready until buffer, shell-delivery, and formatter tests pass.
+- A first conservative Lua scanner prototype and initial regression cases are present under `lua/` and `tests/`; the scanner tests have not yet been executed in this development environment.
+- [The CI workflow](.github/workflows/test.yml) runs core, shell-delivery, and formatter jobs. The shell-delivery fixture has passed locally with Bash and Dash; Zsh and formatter coverage await CI execution.
+- Containerised LazyVim integration remains deferred until the editor integration and its test command exist; see [the CI design](docs/ci.md).
+- [Task 001](tasks/active/001-core-design-and-prototype.md) remains active: expand and validate the shared region model, implement editing/paste behaviour, and complete byte-level regression coverage.
+- No editor integration or installer has yet been validated. Do not treat an installer as ready until buffer, shell-delivery, and formatter tests pass.
 
