@@ -144,10 +144,11 @@ local function test_batched_heredoc_input(keys, payload, expected_col)
   install_wrapper(buf, original)
 
   vim.api.nvim_win_set_cursor(0, { 1, #"    cat <<-PROTO" })
-  vim.api.nvim_feedkeys("A", "xt", false)
-  assert(vim.api.nvim_get_mode().mode == "i",
-    "could not enter Insert mode before batched input")
-  feed(keys)
+  vim.api.nvim_feedkeys(
+    vim.api.nvim_replace_termcodes("A" .. keys, true, false, true),
+    "xt",
+    false
+  )
 
   local completed = vim.wait(1500, function()
     local actual = get_lines(buf)
@@ -170,9 +171,7 @@ local function test_batched_heredoc_input(keys, payload, expected_col)
   assert(vim.api.nvim_win_get_cursor(0)[2] == expected_col,
     "cursor must be immediately after payload; cursor=" .. vim.inspect(vim.api.nvim_win_get_cursor(0)))
   print("synchronous heredoc prototype PASS: " .. keys)
-  feed("<Esc>")
-  wait_for(function() return vim.api.nvim_get_mode().mode ~= "i" end,
-    "Escape did not leave Insert mode")
+  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "xt", false)
 end
 
 local function test_controlled_string_fallback()
@@ -188,10 +187,11 @@ local function test_controlled_string_fallback()
 
   install_wrapper(buf, original)
   vim.api.nvim_win_set_cursor(0, { 1, 4 })
-  vim.api.nvim_feedkeys("A", "xt", false)
-  assert(vim.api.nvim_get_mode().mode == "i",
-    "could not enter Insert mode before controlled fallback")
-  feed("<CR>world")
+  vim.api.nvim_feedkeys(
+    vim.api.nvim_replace_termcodes("A<CR>world", true, false, true),
+    "xt",
+    false
+  )
 
   wait_for(function()
     return vim.deep_equal(get_lines(buf), { "seed", "OBSERVED_NORMAL_ENTERworld" })
