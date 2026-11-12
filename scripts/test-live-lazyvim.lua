@@ -140,7 +140,7 @@ local function start()
   -- Prepare the opener while the scratch buffer is not current and before
   -- the plugin attaches. Otherwise TextChanged can observe this setup edit in
   -- Normal mode and close the incomplete heredoc before the simulated Return.
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "cat <<-LIVE" })
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "    cat <<-LIVE" })
   vim.bo[buf].filetype = "bash"
   vim.api.nvim_win_set_buf(win, buf)
 
@@ -153,7 +153,7 @@ local function start()
     "the installed Bash ftplugin did not establish the expected TAB settings")
 
   stage = "first Return (closer and first body TAB)"
-  vim.api.nvim_win_set_cursor(win, { 1, #"cat <<-LIVE" })
+  vim.api.nvim_win_set_cursor(win, { 1, #"    cat <<-LIVE" })
   vim.api.nvim_input("A\n")
 
   defer(function()
@@ -204,7 +204,7 @@ local function start()
                   local actual = lines()
                   return actual[4] == "\t  pasted one"
                     and actual[5] == "\t    pasted two"
-                    and actual[6] == "LIVE"
+                    and actual[6] == "\\tLIVE"
                 end, 10), "multi-line paste was not prefixed before InsertLeave")
                 assert_insert_mode("paste processing must remain in Insert mode")
 
@@ -217,7 +217,7 @@ local function start()
                   assert_lines(actual[2] == "\ttyped" and actual[3] == "\tsecond"
                     and actual[4] == "\t  pasted one"
                     and actual[5] == "\t    pasted two"
-                    and actual[6] == "LIVE",
+                    and actual[6] == "\\tLIVE",
                     "InsertLeave must not be required to repair indentation")
 
                   cleanup(true, "PASS (first Return, typing, pre-keystroke TAB, and multi-line paste); "
