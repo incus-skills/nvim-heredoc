@@ -85,7 +85,8 @@ Interactive editing is region-based rather than a sequence of isolated current-l
 
 - Automatic closer insertion is driven by a recognised opener and the shared region model, not by the first blank line encountered after an opener.
 - Paste handling must identify the complete changed range. It must not assume that a `TextChangedI` event describes only the cursor's current line.
-- The paste operation must preserve the relative indentation of the inserted lines. It must not trim leading whitespace from each line.
+- The paste operation must preserve the relative indentation of the inserted lines. It must not trim leading whitespace from each line, including whitespace-only pasted lines.
+- On an interactive Enter transition, a whitespace-only line whose indentation width exactly matches the opener's visual column is Neovim's copied structural autoindent; replace that copied prefix with the derived TAB prefix before further typing. Do not apply this conversion to paste ranges, where the same bytes may be intentional payload whitespace.
 - Structural indentation may be added only when the edit context establishes that the prefix is not already present. Repeated events must not duplicate prefixes.
 - Empty lines, lines containing only spaces, and lines containing tabs require explicit handling and tests.
 - If the changed range cannot be reliably identified, or the region is ambiguous, leave the inserted text unchanged rather than guessing.
