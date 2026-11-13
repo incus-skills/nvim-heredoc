@@ -373,7 +373,7 @@ function M.scan(source, opts)
         local opener = lines[item.opener_line] or ""
         local prefix = opener:match("^([ \t]*)") or ""
         local has_spaces = prefix:find(" ", 1, true) ~= nil
-        local has_tabs = prefix:find("\\t", 1, true) ~= nil
+        local has_tabs = prefix:find("\t", 1, true) ~= nil
         -- The editor-only body indentation must be entirely TABs: <<-
         -- strips every leading TAB, so no structural spaces may leak into
         -- the delivered payload. Convert the opener's visual indentation
@@ -381,7 +381,7 @@ function M.scan(source, opts)
         -- prefixes and columns that cannot be represented exactly.
         local column = 0
         for char in prefix:gmatch(".") do
-          if char == "\\t" then
+          if char == "\t" then
             column = column + tabstop - (column % tabstop)
           else
             column = column + 1
@@ -389,14 +389,14 @@ function M.scan(source, opts)
         end
         local body_column = column + shiftwidth
         local opener_tab_prefix = column % tabstop == 0
-          and string.rep("\\t", column / tabstop) or ""
+          and string.rep("\t", column / tabstop) or ""
         item.structural_safe = not (has_spaces and has_tabs)
           and column % tabstop == 0 and body_column % tabstop == 0
         item.space_indented = has_spaces and not has_tabs
         item.opener_prefix = prefix
         item.closer_prefix = has_spaces and opener_tab_prefix or prefix
         item.structural_prefix = item.structural_safe
-          and string.rep("\\t", body_column / tabstop) or ""
+          and string.rep("\t", body_column / tabstop) or ""
         item.structural_tabs_only = true
       end
 
