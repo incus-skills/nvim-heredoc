@@ -328,7 +328,10 @@ local function scan_command(chunk, first_line)
   return queue, diagnostics
 end
 
-function M.scan(source)
+function M.scan(source, opts)
+  opts = opts or {}
+  local tabstop = math.max(1, tonumber(opts.tabstop) or 2)
+  local shiftwidth = math.max(1, tonumber(opts.shiftwidth) or tabstop)
   local lines = split_lines(source or "")
   local result = { regions = {}, diagnostics = {}, complete = true }
   local i = 1
@@ -370,18 +373,29 @@ function M.scan(source)
         local opener = lines[item.opener_line] or ""
         local prefix = opener:match("^([ \t]*)") or ""
         local has_spaces = prefix:find(" ", 1, true) ~= nil
-        local has_tabs = prefix:find("\t", 1, true) ~= nil
-        -- A space-indented opener cannot put spaces before the structural
-        -- TAB: <<- would then stop stripping at those spaces. Put the
-        -- removable TAB first, followed by the opener's spaces. The shell
-        -- removes the TAB and preserves the opener indentation in the
-        -- delivered payload. Mixed TAB/space opener prefixes are declined.
+        local has_tabs = prefix:find("\\t", 1, true) ~= nil
+        -- The editor-only body indentation must be entirely TABs: <<-
+        -- strips every leading TAB, so no structural spaces may leak into
+        -- the delivered payload. Convert the opener's visual indentation
+        -- plus one shiftwidth of body indentation into TABs. Decline mixed
+        -- prefixes and columns that cannot be represented exactly.
+        local column = 0
+        for char in prefix:gmatch(".") do
+          if char == "\\t" then
+            column = column + tabstop - (column % tabstop)
+          else
+            column = column + 1
+          end
+        end
+        local body_column = column + shiftwidth
         item.structural_safe = not (has_spaces and has_tabs)
+          and body_column % tabstop == 0
         item.space_indented = has_spaces and not has_tabs
         item.opener_prefix = prefix
-        item.closer_prefix = has_spaces and "\t" or prefix
-        item.structural_prefix = has_spaces and ("\t" .. prefix) or (prefix .. "\t")
-        item.structural_tabs_only = not has_spaces
+        item.closer_prefix = has_spaces and "\\t" or prefix
+        item.structural_prefix = item.structural_safe
+          and string.rep("\\t", body_column / tabstop) or ""
+        item.structural_tabs_only = true
       end
 
 
