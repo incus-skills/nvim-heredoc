@@ -105,20 +105,18 @@ local function main()
   local buf = vim.api.nvim_create_buf(true, false)
   vim.api.nvim_set_current_buf(buf)
   vim.bo[buf].filetype = "bash"
-  vim.bo[buf].expandtab = true
-  vim.bo[buf].tabstop = 2
-  vim.bo[buf].softtabstop = 0
-  vim.bo[buf].shiftwidth = 2
   vim.bo[buf].autoindent = true
   vim.bo[buf].smartindent = false
   vim.bo[buf].cindent = false
   vim.bo[buf].indentexpr = ""
   vim.bo[buf].formatoptions = ""
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "    cat <<-PROTO" })
-  require("nvim-heredoc").setup_buffer()
+  dofile("tests/fixtures/provisioned/after/ftplugin/bash.lua")
   assert(vim.b[buf].nvim_heredoc_attached == true)
-  assert(vim.bo[buf].expandtab == true and vim.bo[buf].autoindent == true,
-    "test must exercise expandtab plus active autoindent")
+  assert(vim.bo[buf].expandtab == true and vim.bo[buf].tabstop == 2
+    and vim.bo[buf].softtabstop == 0 and vim.bo[buf].shiftwidth == 2
+    and vim.bo[buf].autoindent == true,
+    "test must exercise the generated provisioned settings plus active autoindent")
   install_test_mapping(buf)
 
   vim.api.nvim_win_set_cursor(0, { 1, #"    cat <<-PROTO" })
