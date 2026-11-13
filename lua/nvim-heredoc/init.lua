@@ -66,7 +66,7 @@ local function prefix_region_range(buf, region, changed_range)
     for index = #lines, 1, -1 do
       if prefixed[index] ~= lines[index] then
         local row = first_row + index - 1
-        if lines[index]:match("^[ \\t]*$") and prefixed[index] == region.structural_prefix then
+        if lines[index]:match("^[ \t]*$") and prefixed[index] == region.structural_prefix then
           vim.api.nvim_buf_set_text(buf, row, 0, row, #lines[index], { prefixed[index] })
         else
           vim.api.nvim_buf_set_text(buf, row, 0, row, 0, { region.structural_prefix })
