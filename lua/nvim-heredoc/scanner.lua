@@ -329,9 +329,6 @@ local function scan_command(chunk, first_line)
 end
 
 local function structural_tab_prefix(prefix, tabstop)
-  if prefix == "" then return "" end
-  if not prefix:find(" ", 1, true) then return prefix end
-
   local column = 0
   for index = 1, #prefix do
     local byte = prefix:sub(index, index)
@@ -340,12 +337,13 @@ local function structural_tab_prefix(prefix, tabstop)
     elseif byte == " " then
       column = column + 1
     else
-      return nil
+      return nil, column
     end
   end
 
-  if column % tabstop ~= 0 then return nil end
-  return string.rep("\t", column / tabstop)
+  if not prefix:find(" ", 1, true) then return prefix, column end
+  if column % tabstop ~= 0 then return nil, column end
+  return string.rep("\t", column / tabstop), column
 end
 
 function M.scan(source, opts)
@@ -393,7 +391,7 @@ function M.scan(source, opts)
         local opener = lines[item.opener_line] or ""
         local prefix = opener:match("^([ \t]*)") or ""
         item.opener_prefix = prefix
-        item.structural_prefix = structural_tab_prefix(prefix, tabstop)
+        item.structural_prefix, item.structural_column = structural_tab_prefix(prefix, tabstop)
         item.structural_tabs_only = item.structural_prefix ~= nil
       end
 
@@ -428,6 +426,8 @@ function M.scan(source, opts)
             terminator_line = nil,
             structural_prefix = item.structural_prefix or "",
             opener_prefix = item.opener_prefix,
+            structural_column = item.structural_column,
+            tabstop = tabstop,
             structural_tabs_only = item.structural_tabs_only,
             opener_safe = item.structural_tabs_only,
             confidence = "incomplete",
@@ -452,6 +452,8 @@ function M.scan(source, opts)
           terminator_line = terminator,
           structural_prefix = item.structural_prefix or "",
           opener_prefix = item.opener_prefix,
+          structural_column = item.structural_column,
+          tabstop = tabstop,
           structural_tabs_only = safe,
           opener_safe = safe,
           confidence = safe and "lexical" or "unsupported-indent",
