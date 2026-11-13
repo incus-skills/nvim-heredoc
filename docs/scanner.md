@@ -31,6 +31,8 @@ A completed region currently contains:
 | `terminator_line` | 1-based terminator line |
 | `opener_prefix` | Original leading whitespace bytes before the opener command; never rewritten by the editor |
 | `structural_prefix` | Literal TAB bytes representing the opener's visual indentation column at the supplied buffer tabstop |
+| `structural_column` | Visual column occupied by the opener's original leading whitespace |
+| `tabstop` | Buffer tabstop used to calculate visual columns |
 | `structural_tabs_only` | Whether that visual column can be represented exactly by a TAB-only prefix |
 | `confidence` | `lexical`, `unsupported-indent`, `uncertain`, or `incomplete` |
 | `editable` | Whether this prototype considers the region safe for an editing operation |
