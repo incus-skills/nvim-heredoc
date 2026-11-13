@@ -108,10 +108,12 @@ do
   assert(r.structural_prefix == "\t" and r.structural_column == 2)
   assert(r.structural_tabs_only and r.editable and r.opener_safe)
   assert(editing.closer_line(r) == "\tEOF")
-  local normalized = editing.prefix_lines(r, { "  ", "payload", "    nested" })
+  local normalized = editing.prefix_lines(r, { "  ", "payload", "    nested" }, { normalize_autoindent = true })
   assert(normalized[1] == "\t", "copied blank-line autoindent must become a structural TAB")
   assert(normalized[2] == "\tpayload")
   assert(normalized[3] == "\t    nested", "additional payload spaces must remain unchanged")
+  local pasted = editing.prefix_lines(r, { "  " })
+  assert(pasted[1] == "\\t  ", "pasted whitespace-only payload must retain its spaces")
 end
 
 do
