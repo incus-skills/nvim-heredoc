@@ -72,7 +72,7 @@ vim.api.nvim_create_autocmd("InsertCharPre", {
     if vim.v.char == "s" and prefix_before_next_payload == nil then
       local row = vim.api.nvim_win_get_cursor(0)[1] - 1
       local line = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1] or ""
-      prefix_before_next_payload = line:sub(1, 3) == "\t\t"
+      prefix_before_next_payload = line:sub(1, 2) == "\t\t"
     end
   end,
 })
