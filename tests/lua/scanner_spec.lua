@@ -103,11 +103,30 @@ do
 end
 
 do
-  local _, r = one("    cat <<-EOF\nbody\nEOF\n")
-  assert(not r.structural_tabs_only and not r.editable and not r.opener_safe)
-  assert(r.confidence == "unsupported-indent")
-  local closer = editing.closer_line(r)
-  assert(closer == nil, "space-indented opener must not authorise closer placement")
+  local _, r = one("  cat <<-EOF\nbody\nEOF\n")
+  assert(r.opener_prefix == "  ", "the opener's original spaces must be recorded unchanged")
+  assert(r.structural_prefix == "\\t", "two visual columns at tabstop=2 must map to one structural TAB")
+  assert(r.structural_tabs_only and r.editable and r.opener_safe)
+  assert(editing.closer_line(r) == "\\tEOF")
+end
+
+do
+  local result = scanner.scan("    cat <<-EOF\\nbody\\nEOF\\n", { tabstop = 2 })
+  local r = result.regions[1]
+  assert(r and r.structural_prefix == "\\t\\t", "four spaces must map to two structural TABs at tabstop=2")
+  assert(editing.closer_line(r) == "\\t\\tEOF")
+end
+
+do
+  local result = scanner.scan("    cat <<-EOF\\nbody\\nEOF\\n", { tabstop = 4 })
+  assert(result.regions[1].structural_prefix == "\\t", "four spaces must map to one structural TAB at tabstop=4")
+end
+
+do
+  local result = scanner.scan("   cat <<-EOF\\nbody\\nEOF\\n", { tabstop = 2 })
+  local r = result.regions[1]
+  assert(not r.opener_safe and not r.editable and r.confidence == "unsupported-indent",
+    "a visual column not representable by leading TABs must remain untouched")
 end
 
 -- mvdan/sh (through shfmt --to-json in CI) validates these as legal Bash
