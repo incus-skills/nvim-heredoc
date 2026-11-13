@@ -27,7 +27,7 @@ fi
 # <<- removes all structural TABs, so opener indentation does not leak
 # into the delivered payload.
 {
-  printf '    cat <<-EOF\n\t\t\tpasted\n\tEOF\n'
+  printf '    cat <<-EOF\n\t\t\tpasted\n\t\tEOF\n'
 } > "$tmp/space-indented.sh"
 bash "$tmp/space-indented.sh" > "$tmp/space-indented-bash.out"
 dash "$tmp/space-indented.sh" > "$tmp/space-indented-dash.out"
