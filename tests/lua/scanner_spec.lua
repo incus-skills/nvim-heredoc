@@ -113,7 +113,7 @@ do
   assert(editing.closer_line(r) == "\tEOF")
   local prefixed, changed = editing.prefix_lines(r, { "payload", "    autoindented", "  pasted" })
   assert(changed)
-  assert(prefixed[1] == "\t\t\t payload")
+  assert(prefixed[1] == "\t\t\tpayload")
   assert(prefixed[2] == "\t\t\t    autoindented",
     "TAB must precede Neovim's existing opener spaces")
   assert(prefixed[3] == "\t\t\t  pasted",
@@ -129,7 +129,14 @@ do
     "mixed TAB/space opener indentation must remain unsupported")
 end
 
--- mvdan/sh (through shfmt --to-json in CI) validates these as legal Bash
+
+do
+  local _, r = one("      cat <<-EOF\\nbody\\nEOF\\n")
+  assert(r.structural_prefix == "\\t\\t\\t\\t",
+    "six-space opener indentation plus one body level should become four structural TABs")
+  assert(r.structural_tabs_only and r.editable)
+end
+\n-- mvdan/sh (through shfmt --to-json in CI) validates these as legal Bash
 -- programs. The Lua scanner intentionally declines them until their lexical
 -- constructs have explicit support; parser validity must not imply edit safety.
 for _, path in ipairs({
