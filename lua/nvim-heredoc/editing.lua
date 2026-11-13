@@ -27,7 +27,7 @@ function M.prefix_lines(region, lines)
     local column, tabstop = 0, region.tabstop or 2
     for index = 1, #value do
       local byte = value:sub(index, index)
-      if byte == "\\t" then
+      if byte == "\t" then
         column = column + tabstop - (column % tabstop)
       elseif byte == " " then
         column = column + 1
@@ -42,7 +42,7 @@ function M.prefix_lines(region, lines)
       return nil, "every changed line must be a string"
     end
     if prefix ~= "" and line:sub(1, #prefix) ~= prefix then
-      local width = line:match("^[ \\t]*$") and visual_width(line) or nil
+      local width = line:match("^[ \t]*$") and visual_width(line) or nil
       if width ~= nil and width == region.structural_column then
         -- Neovim may copy the opener's indentation onto a newly-created
         -- blank line. Convert that structural autoindent to TABs instead of
