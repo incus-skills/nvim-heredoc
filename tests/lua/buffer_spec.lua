@@ -219,10 +219,21 @@ do
 end
 
 do
-  local buf = set_buffer({ "    cat <<-EOF", "body" })
-  assert(not plugin.process_buffer(buf))
+  local buf = set_buffer({ "  cat <<-EOF", "body" })
+  vim.bo[buf].tabstop = 2
+  assert(plugin.process_buffer(buf))
   local actual = lines(buf)
-  assert(#actual == 2 and actual[1] == "    cat <<-EOF" and actual[2] == "body")
+  assert(actual[1] == "  cat <<-EOF", "the opener must retain its original visual indentation bytes")
+  assert(actual[2] == "\\tbody", "body structural indentation must align visually with the opener")
+  assert(actual[3] == "\\tEOF", "the closer must align visually with the opener and use a strip-able TAB")
+end
+
+do
+  local buf = set_buffer({ "   cat <<-EOF", "body" })
+  vim.bo[buf].tabstop = 2
+  assert(not plugin.process_buffer(buf), "unrepresentable visual columns must not be silently shifted")
+  local actual = lines(buf)
+  assert(#actual == 2 and actual[1] == "   cat <<-EOF" and actual[2] == "body")
 end
 
 do
