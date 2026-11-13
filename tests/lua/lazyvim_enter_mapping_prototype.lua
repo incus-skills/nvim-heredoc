@@ -189,8 +189,8 @@ local function test_batched_heredoc_input(keys, payload, expected_col, done)
       local actual = get_lines(buf)
       assert(vim.deep_equal(actual, {
         "    cat <<-PROTO",
-        "\t    " .. payload,
-        "\tPROTO",
+        "\t\t\t" .. payload,
+        "\t\tPROTO",
       }), "batched input failed for " .. vim.inspect(keys)
         .. "; lines=" .. vim.inspect(actual)
         .. "; cursor=" .. vim.inspect(vim.api.nvim_win_get_cursor(0))
@@ -273,8 +273,8 @@ end
 local ok, err = xpcall(function()
   setup_plugins_and_inventory()
 
-  test_batched_heredoc_input("<CR>x", "x", 6, function()
-    test_batched_heredoc_input("<CR>abc", "abc", 8, function()
+  test_batched_heredoc_input("<CR>x", "x", 4, function()
+    test_batched_heredoc_input("<CR>abc", "abc", 6, function()
     test_minipairs_expression_fallback(function()
       test_controlled_string_fallback(function()
         print("LazyVim synchronous Enter prototype: PASS")
