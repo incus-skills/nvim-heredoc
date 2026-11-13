@@ -220,13 +220,15 @@ end
 
 do
   local buf = set_buffer({ "    cat <<-EOF", "" })
+  vim.bo[buf].tabstop = 2
+  vim.bo[buf].shiftwidth = 2
   assert(plugin.process_buffer(buf))
   local actual = lines(buf)
   assert(actual[1] == "    cat <<-EOF")
-  assert(actual[2] == "\t    ",
-    "space-indented opener must put the structural TAB before preserved opener spaces")
-  assert(actual[3] == "\tEOF",
-    "space-indented opener must use a TAB-only terminator prefix")
+  assert(actual[2] == "\t\t\t",
+    "space-indented opener must use TAB-only body indentation")
+  assert(actual[3] == "\t\tEOF",
+    "space-indented opener must use TAB-only terminator indentation matching the opener")
 end
 
 do
