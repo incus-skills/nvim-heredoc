@@ -228,6 +228,7 @@ do
   assert(actual[3] == "\tpayload", "body structural indentation must align visually with the opener")
   assert(actual[4] == "\t    nested", "additional payload spaces must remain unchanged")
   assert(actual[5] == "\tEOF", "the closer must align visually with the opener and use a strip-able TAB")
+end
 
 do
   local buf = set_buffer({ "   cat <<-EOF", "body" })
