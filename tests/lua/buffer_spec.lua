@@ -224,8 +224,8 @@ do
   assert(plugin.process_buffer(buf))
   local actual = lines(buf)
   assert(actual[1] == "  cat <<-EOF", "the opener must retain its original visual indentation bytes")
-  assert(actual[2] == "\\tbody", "body structural indentation must align visually with the opener")
-  assert(actual[3] == "\\tEOF", "the closer must align visually with the opener and use a strip-able TAB")
+  assert(actual[2] == "\tbody", "body structural indentation must align visually with the opener")
+  assert(actual[3] == "\tEOF", "the closer must align visually with the opener and use a strip-able TAB")
 end
 
 do
