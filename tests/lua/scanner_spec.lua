@@ -136,7 +136,8 @@ do
     "six-space opener indentation plus one body level should become four structural TABs")
   assert(r.structural_tabs_only and r.editable)
 end
-\n-- mvdan/sh (through shfmt --to-json in CI) validates these as legal Bash
+
+-- mvdan/sh (through shfmt --to-json in CI) validates these as legal Bash
 -- programs. The Lua scanner intentionally declines them until their lexical
 -- constructs have explicit support; parser validity must not imply edit safety.
 for _, path in ipairs({
