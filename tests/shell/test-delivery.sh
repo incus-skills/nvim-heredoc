@@ -26,7 +26,7 @@ fi
 # A naturally space-indented opener remains in its surrounding code flow.
 # At tabstop=2, the editor's one-TAB body/terminator prefix is visually
 # aligned with the two-space opener and is stripped by <<- at runtime.
-printf 'conf_print_test() {\n  cat <<-EOF\n\\talpha\n\\t  beta\n\\tEOF\n}\nconf_print_test\n' > "$tmp/nested.sh"
+printf 'conf_print_test() {\n  cat <<-EOF\n\talpha\n\t  beta\n\tEOF\n}\nconf_print_test\n' > "$tmp/nested.sh"
 bash "$tmp/nested.sh" > "$tmp/nested.out"
 printf 'alpha\n  beta\n' > "$tmp/nested.expected"
 cmp "$tmp/nested.expected" "$tmp/nested.out"
