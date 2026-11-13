@@ -13,7 +13,8 @@ function M.closer_line(region)
   return (region.structural_prefix or "") .. region.delimiter
 end
 
-function M.prefix_lines(region, lines)
+function M.prefix_lines(region, lines, opts)
+  opts = opts or {}
   if not region or not region.opener_safe then
     return nil, "heredoc opener is not safe to edit"
   end
@@ -42,7 +43,7 @@ function M.prefix_lines(region, lines)
       return nil, "every changed line must be a string"
     end
     if prefix ~= "" and line:sub(1, #prefix) ~= prefix then
-      local width = line:match("^[ \t]*$") and visual_width(line) or nil
+      local width = opts.normalize_autoindent and line:match("^[ \t]*$") and visual_width(line) or nil
       if width ~= nil and width == region.structural_column then
         -- Neovim may copy the opener's indentation onto a newly-created
         -- blank line. Convert that structural autoindent to TABs instead of
