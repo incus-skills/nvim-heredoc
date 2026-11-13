@@ -132,7 +132,7 @@ end
 
 do
   local _, r = one("      cat <<-EOF\\nbody\\nEOF\\n")
-  assert(r.structural_prefix == "\\t\\t\\t\\t",
+  assert(r.structural_prefix == "\t\t\t\t",
     "six-space opener indentation plus one body level should become four structural TABs")
   assert(r.structural_tabs_only and r.editable)
 end
