@@ -113,7 +113,7 @@ do
   assert(normalized[2] == "\tpayload")
   assert(normalized[3] == "\t    nested", "additional payload spaces must remain unchanged")
   local pasted = editing.prefix_lines(r, { "  " })
-  assert(pasted[1] == "\\t  ", "pasted whitespace-only payload must retain its spaces")
+  assert(pasted[1] == "\t  ", "pasted whitespace-only payload must retain its spaces")
 end
 
 do
