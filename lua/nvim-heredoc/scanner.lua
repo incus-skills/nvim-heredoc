@@ -328,7 +328,30 @@ local function scan_command(chunk, first_line)
   return queue, diagnostics
 end
 
-function M.scan(source)
+local function structural_tab_prefix(prefix, tabstop)
+  if prefix == "" then return "" end
+  if not prefix:find(" ", 1, true) then return prefix end
+
+  local column = 0
+  for index = 1, #prefix do
+    local byte = prefix:sub(index, index)
+    if byte == "\t" then
+      column = column + tabstop - (column % tabstop)
+    elseif byte == " " then
+      column = column + 1
+    else
+      return nil
+    end
+  end
+
+  if column % tabstop ~= 0 then return nil end
+  return string.rep("\t", column / tabstop)
+end
+
+function M.scan(source, opts)
+  opts = opts or {}
+  local tabstop = tonumber(opts.tabstop) or 2
+  if tabstop < 1 then tabstop = 2 end
   local lines = split_lines(source or "")
   local result = { regions = {}, diagnostics = {}, complete = true }
   local i = 1
@@ -369,8 +392,9 @@ function M.scan(source)
       if item.operator == "<<-" then
         local opener = lines[item.opener_line] or ""
         local prefix = opener:match("^([ \t]*)") or ""
-        item.structural_prefix = prefix
-        item.structural_tabs_only = not prefix:find(" ", 1, true)
+        item.opener_prefix = prefix
+        item.structural_prefix = structural_tab_prefix(prefix, tabstop)
+        item.structural_tabs_only = item.structural_prefix ~= nil
       end
 
       local body_start, terminator = i, nil
@@ -402,7 +426,8 @@ function M.scan(source)
             body_start_line = body_start,
             body_end_line = nil,
             terminator_line = nil,
-            structural_prefix = item.structural_prefix,
+            structural_prefix = item.structural_prefix or "",
+            opener_prefix = item.opener_prefix,
             structural_tabs_only = item.structural_tabs_only,
             opener_safe = item.structural_tabs_only,
             confidence = "incomplete",
@@ -425,7 +450,8 @@ function M.scan(source)
           body_start_line = body_start,
           body_end_line = terminator - 1,
           terminator_line = terminator,
-          structural_prefix = item.structural_prefix,
+          structural_prefix = item.structural_prefix or "",
+          opener_prefix = item.opener_prefix,
           structural_tabs_only = safe,
           opener_safe = safe,
           confidence = safe and "lexical" or "unsupported-indent",
