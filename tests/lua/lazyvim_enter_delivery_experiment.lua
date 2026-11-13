@@ -126,14 +126,28 @@ local function main()
   install_test_mapping(buf)
 
   vim.api.nvim_win_set_cursor(0, { 1, #"    cat <<-PROTO" })
-  input("A<CR>hello1<CR>  hello2<CR>hello3")
+  input("A")
+  wait_for(function() return vim.api.nvim_get_mode().mode == "i" end,
+    "could not enter Insert mode")
+  input("<CR>hello1")
+  wait_for(function()
+    local actual = lines(buf)
+    return actual[2] == "\t\t\thello1" and actual[3] == "\t\tPROTO"
+  end, "first body transition failed: " .. vim.inspect(lines(buf)))
+  input("<CR>  hello2")
+  wait_for(function()
+    local actual = lines(buf)
+    return actual[2] == "\t\t\thello1"
+      and actual[3] == "\t\t\t  hello2" and actual[4] == "\t\tPROTO"
+  end, "second body transition failed: " .. vim.inspect(lines(buf)))
+  input("<CR>hello3")
   wait_for(function()
     local actual = lines(buf)
     return #actual == 5 and actual[2] == "\t\t\thello1"
       and actual[3] == "\t\t\t  hello2"
       and actual[4] == "\t\t\thello3"
       and actual[5] == "\t\tPROTO"
-  end, "synchronous transition produced unexpected buffer: " .. vim.inspect(lines(buf)))
+  end, "third body transition failed: " .. vim.inspect(lines(buf)))
 
   input("<Esc>")
   wait_for(function() return vim.api.nvim_get_mode().mode ~= "i" end,
