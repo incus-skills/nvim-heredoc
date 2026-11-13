@@ -22,7 +22,7 @@ The editor must distinguish two different kinds of indentation:
 1. **Structural indentation** places the opener and terminator within the surrounding shell construct. For a managed `<<-` heredoc, structural indentation is represented by leading TAB bytes so the shell can remove it.
 2. **Content indentation** belongs to the payload. Leading spaces are preserved. Leading TAB bytes are subject to the shell's `<<-` stripping rule and therefore cannot be promised as payload indentation.
 
-The displayed width of a structural TAB is a Neovim presentation choice (for example, a tabstop of two or four columns); it is not a conversion to spaces. A visually nested example must not be interpreted as evidence that literal leading spaces on a terminator are valid.
+The displayed width of a structural TAB is determined by the buffer's `tabstop`; it is not a conversion to spaces. The opener may retain leading spaces when its visual indentation column is exactly representable by leading TABs at that tabstop. In that case, the editor leaves the opener bytes unchanged and derives an equivalent TAB prefix for body lines and the terminator. For example, with `tabstop=2`, an opener indented by two spaces is visually aligned with a body/terminator prefix of one literal TAB. If the opener's visual column cannot be represented exactly by leading TABs (for example, three spaces at `tabstop=2`), the region remains non-editable rather than being silently shifted. A visually nested example must not be interpreted as evidence that literal leading spaces on a terminator are valid.
 
 For example, the structural TABs below are literal TAB bytes; the spaces inside the body are payload:
 
@@ -73,7 +73,7 @@ The scanner is conservative, not a claim to implement every shell grammar produc
 - Track multiple pending heredocs on a command in declaration order.
 - Recognise delimiter lines according to shell tab-stripping semantics.
 - Insert a matching closer automatically without placing it at hard column zero when the opener has structural TAB indentation.
-- The closer uses the opener's structural TAB prefix. Leading spaces are not a valid substitute for those tabs.
+- The closer uses a leading-TAB prefix that occupies the same visual column as the opener. The opener's original indentation bytes are not rewritten; a space-indented opener is supported only when its visual column is exactly representable by TABs at the buffer's tabstop. Leading spaces are not a valid substitute for TABs on the closer.
 - Preserve all existing body whitespace when indenting or pasting. Never implement paste handling by removing all leading whitespace and prefixing a replacement.
 - Any structural prefix added to a body line must be a TAB byte if the resulting script is expected to rely on `<<-` tab stripping.
 - If the opener's indentation uses spaces in a way that cannot be represented by structural tabs without changing alignment, do not silently rewrite it. Report or document the limitation and leave the source intact.
