@@ -109,7 +109,7 @@ end
 do
   local _, r = one("    cat <<-EOF\nbody\nEOF\n")
   assert(r.space_indented and r.opener_safe and r.editable)
-  assert(r.structural_prefix == "\t\t\t" and r.closer_prefix == "\t")
+  assert(r.structural_prefix == "\t\t\t" and r.closer_prefix == "\t\t")
   assert(editing.closer_line(r) == "\tEOF")
   local prefixed, changed = editing.prefix_lines(r, { "payload", "    autoindented", "  pasted" })
   assert(changed)
@@ -132,7 +132,7 @@ end
 
 do
   local _, r = one("      cat <<-EOF\\nbody\\nEOF\\n")
-  assert(r.structural_prefix == "\t\t\t\t",
+  assert(r.structural_prefix == "\t\t\t\t" and r.closer_prefix == "\t\t\t",
     "six-space opener indentation plus one body level should become four structural TABs")
   assert(r.structural_tabs_only and r.editable)
 end
