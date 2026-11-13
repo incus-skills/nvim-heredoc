@@ -127,48 +127,68 @@ local function main()
 
   vim.api.nvim_win_set_cursor(0, { 1, #"    cat <<-PROTO" })
   input("A")
-  wait_for(function() return vim.api.nvim_get_mode().mode == "i" end,
-    "could not enter Insert mode")
-  input("<CR>hello1")
-  wait_for(function()
-    local actual = lines(buf)
-    return actual[2] == "\t\t\thello1" and actual[3] == "\t\tPROTO"
-  end, "first body transition failed: " .. vim.inspect(lines(buf)))
-  input("<CR>  hello2")
-  wait_for(function()
-    local actual = lines(buf)
-    return actual[2] == "\t\t\thello1"
-      and actual[3] == "\t\t\t  hello2" and actual[4] == "\t\tPROTO"
-  end, "second body transition failed: " .. vim.inspect(lines(buf)))
-  input("<CR>hello3")
-  wait_for(function()
-    local actual = lines(buf)
-    return #actual == 5 and actual[2] == "\t\t\thello1"
-      and actual[3] == "\t\t\t  hello2"
-      and actual[4] == "\t\t\thello3"
-      and actual[5] == "\t\tPROTO"
-  end, "third body transition failed: " .. vim.inspect(lines(buf)))
 
-  input("<Esc>")
-  wait_for(function() return vim.api.nvim_get_mode().mode ~= "i" end,
-    "Escape did not leave Insert mode")
+  local function defer(fn)
+    vim.defer_fn(function()
+      local ok, err = xpcall(fn, debug.traceback)
+      if not ok then fail(err) end
+    end, 25)
+  end
 
-  local expected = "hello1\n  hello2\nhello3\n"
-  local script = table.concat(lines(buf), "\n") .. "\n"
-  local path = vim.fn.tempname()
-  local file = assert(io.open(path, "wb"))
-  file:write(script)
-  file:close()
-  local output = vim.fn.system({ "bash", path })
-  local status = vim.v.shell_error
-  os.remove(path)
-  assert(status == 0, "Bash execution failed: " .. output)
-  assert(output == expected,
-    "Bash delivery mismatch; expected=" .. vim.inspect(expected)
-      .. "; actual=" .. vim.inspect(output)
-      .. "; buffer=" .. vim.inspect(lines(buf)))
+  local function verify_delivery()
+    local expected = "hello1\\n  hello2\\nhello3\\n"
+    local script = table.concat(lines(buf), "\\n") .. "\\n"
+    local path = vim.fn.tempname()
+    local file = assert(io.open(path, "wb"))
+    file:write(script)
+    file:close()
+    local output = vim.fn.system({ "bash", path })
+    local status = vim.v.shell_error
+    os.remove(path)
+    assert(status == 0, "Bash execution failed: " .. output)
+    assert(output == expected,
+      "Bash delivery mismatch; expected=" .. vim.inspect(expected)
+        .. "; actual=" .. vim.inspect(output)
+        .. "; buffer=" .. vim.inspect(lines(buf)))
+    print(\"synchronous Enter + provisioned indentation + Bash delivery: PASS\")
+    print("transitions: " .. table.concat(events, ", "))
+    vim.cmd("qa!")
+  end
 
-  print("synchronous Enter + provisioned indentation + Bash delivery: PASS")
+  defer(function()
+    assert(vim.api.nvim_get_mode().mode == "i",
+      "could not enter Insert mode; mode=" .. vim.inspect(vim.api.nvim_get_mode()))
+    input("<CR>hello1")
+    defer(function()
+      local actual = lines(buf)
+      assert(actual[2] == "\\t\\t\\thello1" and actual[3] == "\\t\\tPROTO",
+        "first body transition failed: " .. vim.inspect(actual))
+      input("<CR>  hello2")
+      defer(function()
+        actual = lines(buf)
+        assert(actual[2] == "\\t\\t\\thello1"
+          and actual[3] == "\\t\\t\\t  hello2" and actual[4] == "\\t\\tPROTO",
+          "second body transition failed: " .. vim.inspect(actual))
+        input("<CR>hello3")
+        defer(function()
+          actual = lines(buf)
+          assert(#actual == 5 and actual[2] == "\\t\\t\\thello1"
+            and actual[3] == "\\t\\t\\t  hello2"
+            and actual[4] == "\\t\\t\\thello3"
+            and actual[5] == "\\t\\tPROTO",
+            "third body transition failed: " .. vim.inspect(actual))
+          input("<Esc>")
+          defer(function()
+            assert(vim.api.nvim_get_mode().mode ~= "i", "Escape did not leave Insert mode")
+            verify_delivery()
+          end)
+        end)
+      end)
+    end)
+  end)
+end
+
+
   print("transitions: " .. table.concat(events, ", "))
   vim.cmd("qa!")
 end
