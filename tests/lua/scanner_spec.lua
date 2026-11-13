@@ -105,9 +105,13 @@ end
 do
   local _, r = one("  cat <<-EOF\nbody\nEOF\n")
   assert(r.opener_prefix == "  ", "the opener's original spaces must be recorded unchanged")
-  assert(r.structural_prefix == "\t", "two visual columns at tabstop=2 must map to one structural TAB")
+  assert(r.structural_prefix == "\\t" and r.structural_column == 2)
   assert(r.structural_tabs_only and r.editable and r.opener_safe)
-  assert(editing.closer_line(r) == "\tEOF")
+  assert(editing.closer_line(r) == "\\tEOF")
+  local normalized = editing.prefix_lines(r, { "  ", "payload", "    nested" })
+  assert(normalized[1] == "\\t", "copied blank-line autoindent must become a structural TAB")
+  assert(normalized[2] == "\\tpayload")
+  assert(normalized[3] == "\\t    nested", "additional payload spaces must remain unchanged")
 end
 
 do
