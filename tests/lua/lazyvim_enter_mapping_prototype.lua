@@ -60,7 +60,10 @@ local function canonical_transition(buf)
     return false
   end
 
-  local result = scanner.scan(table.concat(lines, "\n"))
+  local result = scanner.scan(table.concat(lines, "\n"), {
+    tabstop = vim.bo[buf].tabstop,
+    shiftwidth = vim.bo[buf].shiftwidth,
+  })
   if result.complete or #result.regions == 0 then
     prototype_events[#prototype_events + 1] = { event = "scanner-no-incomplete-region", result = result }
     return false
