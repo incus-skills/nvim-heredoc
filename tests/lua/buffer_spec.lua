@@ -13,21 +13,21 @@ local function lines(buf)
 end
 
 do
-  local buf = set_buffer({ "\tcat <<-EOF", "" })
+  local buf = set_buffer({ "cat <<-EOF", "" })
   assert(plugin.process_buffer(buf))
   local actual = lines(buf)
-  assert(actual[1] == "\tcat <<-EOF")
+  assert(actual[1] == "cat <<-EOF")
   assert(actual[2] == "\t")
-  assert(actual[3] == "\tEOF")
+  assert(actual[3] == "EOF")
 end
 
 do
   local buf = set_buffer({ "\tcat <<-EOF", "\t  already", "  pasted", "" })
   assert(plugin.process_buffer(buf))
   local actual = lines(buf)
-  assert(actual[2] == "\t  already", "existing structural prefix must not duplicate")
-  assert(actual[3] == "\t  pasted", "body spaces must remain after structural TAB")
-  assert(actual[4] == "\t")
+  assert(actual[2] == "\t\t  already", "existing body content must receive the additional structural TAB")
+  assert(actual[3] == "\t\t  pasted", "body spaces must remain after structural TAB")
+  assert(actual[4] == "\t\t")
   assert(actual[5] == "\tEOF")
 end
 
@@ -39,9 +39,9 @@ do
   assert(changed)
   local actual = lines(buf)
   assert(actual[2] == "\tfirst", "unmodified body lines must remain untouched by a changed-range operation")
-  assert(actual[3] == "\t  changed", "only the supplied changed range should receive the structural prefix")
+  assert(actual[3] == "\t\t  changed", "only the supplied changed range should receive the structural prefix")
   local cursor = vim.api.nvim_win_get_cursor(0)
-  assert(cursor[1] == 3 and cursor[2] == 3, "cursor should remain on the same payload byte after prefix insertion")
+  assert(cursor[1] == 3 and cursor[2] == 4, "cursor should remain on the same payload byte after prefix insertion")
   assert(not plugin.process_buffer(buf, { start_row = 2, end_row = 3 }, false), "repeated changed-range processing must be idempotent")
 end
 
@@ -51,7 +51,7 @@ do
   plugin.setup()
   vim.api.nvim_buf_set_lines(buf, 2, 3, false, { "  changed by API" })
   assert(vim.wait(1000, function()
-    return lines(buf)[3] == "\t  changed by API"
+    return lines(buf)[3] == "\t\t  changed by API"
   end, 10), "on_lines should schedule prefixing for the changed body range")
   local actual = lines(buf)
   assert(actual[2] == "\tuntouched", "on_lines must not rewrite an unchanged body line")
@@ -72,7 +72,7 @@ do
   vim.api.nvim_buf_set_lines(buf, 3, 4, false, { "  third changed" })
   assert(vim.wait(1000, function()
     local actual = lines(buf)
-    return actual[2] == "\t  first changed" and actual[4] == "\t  third changed"
+    return actual[2] == "\t\t  first changed" and actual[4] == "\t\t  third changed"
   end, 10), "both disjoint changed ranges should receive their structural prefix")
   local actual = lines(buf)
   assert(actual[3] == "untouched middle",
@@ -95,8 +95,8 @@ do
   vim.api.nvim_buf_set_lines(buf, 1, 1, false, { "  inserted before first" })
   assert(vim.wait(1000, function()
     local actual = lines(buf)
-    return actual[2] == "\t  inserted before first"
-      and actual[5] == "\t  third changed"
+    return actual[2] == "\t\t  inserted before first"
+      and actual[5] == "\t\t  third changed"
   end, 10), "pending changed ranges should be rebased after a line insertion")
   local actual = lines(buf)
   assert(actual[4] == "untouched middle",
@@ -120,7 +120,7 @@ do
   vim.api.nvim_buf_set_lines(buf, 1, 2, false, {})
   assert(vim.wait(1000, function()
     local actual = lines(buf)
-    return actual[3] == "\t  third changed"
+    return actual[3] == "\t\t  third changed"
   end, 10), "pending changed ranges should be rebased after a line deletion")
   local actual = lines(buf)
   assert(actual[2] == "untouched middle",
@@ -148,9 +148,9 @@ do
   })
   assert(vim.wait(1000, function()
     local actual = lines(buf)
-    return actual[3] == "\t  replacement one"
-      and actual[4] == "\t  replacement two"
-      and actual[5] == "\t  replacement three"
+    return actual[3] == "\t\t  replacement one"
+      and actual[4] == "\t\t  replacement two"
+      and actual[5] == "\t\t  replacement three"
   end, 10), "overlapping replacement should rebase and merge the pending interval")
   local actual = lines(buf)
   assert(actual[2] == "\tbefore", "overlapping replacement must not expand into the preceding line")
@@ -178,7 +178,7 @@ do
   })
   assert(vim.wait(1000, function()
     local actual = lines(buf)
-    return actual[2] == "\t  merged one" and actual[3] == "\t  merged two"
+    return actual[2] == "\t\t  merged one" and actual[3] == "\t\t  merged two"
   end, 10), "replacement spanning multiple pending ranges should merge onto new content")
   local actual = lines(buf)
   assert(actual[4] == "\tfourth", "replacement merge must not prefix the untouched line after it")
@@ -201,8 +201,8 @@ do
   vim.api.nvim_buf_set_lines(buf, 2, 2, false, { "  inserted at range start" })
   assert(vim.wait(1000, function()
     local actual = lines(buf)
-    return actual[3] == "\t  inserted at range start"
-      and actual[4] == "\t  changed"
+    return actual[3] == "\t\t  inserted at range start"
+      and actual[4] == "\t\t  changed"
   end, 10), "insertion at a pending range boundary should retain both changed lines")
   local actual = lines(buf)
   assert(actual[2] == "\tbefore" and actual[5] == "\tafter",
@@ -215,14 +215,26 @@ do
   plugin.setup()
   vim.api.nvim_exec_autocmds("InsertLeave", { buffer = buf })
   local actual = lines(buf)
-  assert(actual[3] == "\tAUTO", "InsertLeave should invoke automatic closer placement")
+  assert(actual[3] == "\tAUTO", "InsertLeave should place the closer at opener indentation")
 end
 
 do
-  local buf = set_buffer({ "    cat <<-EOF", "body" })
-  assert(not plugin.process_buffer(buf))
+  local buf = set_buffer({ "    cat <<-EOF", "" })
+  vim.bo[buf].tabstop = 2
+  vim.bo[buf].shiftwidth = 2
+  assert(plugin.process_buffer(buf))
   local actual = lines(buf)
-  assert(#actual == 2 and actual[1] == "    cat <<-EOF" and actual[2] == "body")
+  assert(actual[1] == "    cat <<-EOF")
+  assert(actual[2] == "\t\t\t",
+    "space-indented opener must use TAB-only body indentation")
+  assert(actual[3] == "\t\tEOF",
+    "space-indented opener must use TAB-only terminator indentation matching the opener")
+end
+
+do
+  local buf = set_buffer({ "  \tcat <<-EOF", "body", "EOF" })
+  assert(not plugin.process_buffer(buf),
+    "mixed TAB/space opener indentation must remain unsupported")
 end
 
 do
@@ -236,7 +248,7 @@ do
   local buf = set_buffer({ "\tcat <<-A <<-B", "", "first", "A", "second" })
   assert(plugin.process_buffer(buf))
   local actual = lines(buf)
-  assert(actual[5] == "\tsecond")
+  assert(actual[5] == "\t\tsecond")
   assert(actual[6] == "\tB")
 end
 

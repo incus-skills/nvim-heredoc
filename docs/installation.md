@@ -42,13 +42,13 @@ It generates the three filetype entrypoints:
 Each entrypoint establishes the required buffer-local indentation settings and calls require("nvim-heredoc").setup_buffer():
 
 ~~~lua
-vim.opt_local.expandtab = false
+vim.opt_local.expandtab = true
 vim.opt_local.tabstop = 2
 vim.opt_local.softtabstop = 0
 vim.opt_local.shiftwidth = 2
 ~~~
 
-These are functional requirements, not cosmetic defaults. Shell `<<-` processing strips leading TAB bytes from heredoc body lines and the terminating delimiter; it does not strip spaces. `expandtab = false` ensures Neovim indentation operations use literal TAB bytes. `tabstop = 2` controls their display width only; each TAB remains one byte. `softtabstop = 0` and `shiftwidth = 2` retain the compact two-column editing behaviour.
+These are functional requirements, not cosmetic defaults. Shell `<<-` processing strips leading TAB bytes from heredoc body lines and the terminating delimiter; it does not strip spaces. `expandtab = true` keeps ordinary editing consistent with the provisioned configuration; the heredoc integration inserts structural TAB bytes explicitly rather than relying on Neovim indentation operations to create them. `tabstop = 2` controls their display width only; each TAB remains one byte. `softtabstop = 0` and `shiftwidth = 2` retain the compact two-column editing behaviour.
 
 The settings are buffer-local and are established by the provisioned filetype entrypoints for Bash, POSIX `sh`, and Zsh. They intentionally take precedence over conflicting buffer-local indentation settings for those filetypes. Do not run `:retab!` on these shell buffers: it can convert structural TABs to spaces and invalidate the heredoc layout.
 

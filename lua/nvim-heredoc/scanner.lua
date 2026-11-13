@@ -328,7 +328,12 @@ local function scan_command(chunk, first_line)
   return queue, diagnostics
 end
 
-function M.scan(source)
+function M.scan(source, opts)
+  opts = opts or {}
+  local tabstop = math.max(1, tonumber(opts.tabstop) or 2)
+  local shiftwidth = tonumber(opts.shiftwidth)
+  if not shiftwidth or shiftwidth == 0 then shiftwidth = tabstop end
+  shiftwidth = math.max(1, shiftwidth)
   local lines = split_lines(source or "")
   local result = { regions = {}, diagnostics = {}, complete = true }
   local i = 1
@@ -369,9 +374,34 @@ function M.scan(source)
       if item.operator == "<<-" then
         local opener = lines[item.opener_line] or ""
         local prefix = opener:match("^([ \t]*)") or ""
-        item.structural_prefix = prefix
-        item.structural_tabs_only = not prefix:find(" ", 1, true)
+        local has_spaces = prefix:find(" ", 1, true) ~= nil
+        local has_tabs = prefix:find("\t", 1, true) ~= nil
+        -- The editor-only body indentation must be entirely TABs: <<-
+        -- strips every leading TAB, so no structural spaces may leak into
+        -- the delivered payload. Convert the opener's visual indentation
+        -- plus one shiftwidth of body indentation into TABs. Decline mixed
+        -- prefixes and columns that cannot be represented exactly.
+        local column = 0
+        for char in prefix:gmatch(".") do
+          if char == "\t" then
+            column = column + tabstop - (column % tabstop)
+          else
+            column = column + 1
+          end
+        end
+        local body_column = column + shiftwidth
+        local opener_tab_prefix = column % tabstop == 0
+          and string.rep("\t", column / tabstop) or ""
+        item.structural_safe = not (has_spaces and has_tabs)
+          and column % tabstop == 0 and body_column % tabstop == 0
+        item.space_indented = has_spaces and not has_tabs
+        item.opener_prefix = prefix
+        item.closer_prefix = has_spaces and opener_tab_prefix or prefix
+        item.structural_prefix = item.structural_safe
+          and string.rep("\t", body_column / tabstop) or ""
+        item.structural_tabs_only = true
       end
+
 
       local body_start, terminator = i, nil
       while i <= #lines do
@@ -403,8 +433,11 @@ function M.scan(source)
             body_end_line = nil,
             terminator_line = nil,
             structural_prefix = item.structural_prefix,
+            closer_prefix = item.closer_prefix,
+            opener_prefix = item.opener_prefix,
+            space_indented = item.space_indented,
             structural_tabs_only = item.structural_tabs_only,
-            opener_safe = item.structural_tabs_only,
+            opener_safe = item.structural_safe,
             confidence = "incomplete",
             editable = false,
           }
@@ -413,7 +446,7 @@ function M.scan(source)
       end
 
       if item.operator == "<<-" then
-        local safe = item.structural_tabs_only
+        local safe = item.structural_safe
         result.regions[#result.regions + 1] = {
           operator = item.operator,
           opener_line = item.opener_line,
@@ -426,7 +459,10 @@ function M.scan(source)
           body_end_line = terminator - 1,
           terminator_line = terminator,
           structural_prefix = item.structural_prefix,
-          structural_tabs_only = safe,
+          closer_prefix = item.closer_prefix,
+          opener_prefix = item.opener_prefix,
+          space_indented = item.space_indented,
+          structural_tabs_only = item.structural_tabs_only,
           opener_safe = safe,
           confidence = safe and "lexical" or "unsupported-indent",
           editable = safe and #diagnostics == 0,

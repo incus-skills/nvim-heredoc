@@ -46,9 +46,9 @@ end, 20), "blink.cmp did not finish initialising")
 assert(blink_config.enabled(), "Blink should remain enabled during live input")
 
 local buf = vim.api.nvim_create_buf(true, false)
-vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "\tcat <<-LIVE" })
+vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "  cat <<-LIVE" })
 vim.bo[buf].filetype = "bash"
-vim.bo[buf].expandtab = false
+vim.bo[buf].expandtab = true
 vim.bo[buf].tabstop = 2
 vim.bo[buf].softtabstop = 0
 vim.bo[buf].shiftwidth = 2
@@ -66,23 +66,25 @@ assert(vim.b[buf].nvim_heredoc_attached == true,
 -- after a subsequent Enter is inserted. This distinguishes a prefix that is
 -- ready for the next keystroke from one repaired later by a deferred wait.
 local prefix_before_next_payload = nil
+local prefix_before_next_payload_line = nil
 vim.api.nvim_create_autocmd("InsertCharPre", {
   buffer = buf,
   callback = function()
     if vim.v.char == "s" and prefix_before_next_payload == nil then
       local row = vim.api.nvim_win_get_cursor(0)[1] - 1
       local line = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1] or ""
-      prefix_before_next_payload = line:sub(1, 1) == "\t"
+      prefix_before_next_payload_line = line
+      prefix_before_next_payload = line:sub(1, 2) == "\t\t"
     end
   end,
 })
 
-vim.api.nvim_win_set_cursor(0, { 1, #("\tcat <<-LIVE") })
+vim.api.nvim_win_set_cursor(0, { 1, #("  cat <<-LIVE") })
 vim.api.nvim_input("A\n")
 
 defer(function()
   local actual = lines(buf)
-  assert(actual[2] == "\t" and actual[3] == "\tLIVE",
+  assert(actual[2] == "\t\t" and actual[3] == "\tLIVE",
     "LazyVim: Enter should create the first body prefix and reserve the closer; lines="
       .. vim.inspect(actual))
   assert_insert_mode("LazyVim: first Enter must remain in Insert mode")
@@ -90,7 +92,7 @@ defer(function()
   vim.api.nvim_input("typed")
   defer(function()
     actual = lines(buf)
-    assert(actual[2] == "\ttyped",
+    assert(actual[2] == "\t\ttyped",
       "LazyVim: first payload should follow the structural TAB; lines=" .. vim.inspect(actual))
     assert_insert_mode("LazyVim: typing first payload must remain in Insert mode")
 
@@ -101,9 +103,10 @@ defer(function()
       vim.api.nvim_input("s")
       defer(function()
         assert(prefix_before_next_payload == true,
-          "LazyVim: the new body line must already have its structural TAB at InsertCharPre")
+          "LazyVim: the new body line must already have its structural TAB at InsertCharPre; observed="
+            .. vim.inspect(prefix_before_next_payload_line))
         actual = lines(buf)
-        assert(actual[3] == "\ts",
+        assert(actual[3] == "\t\ts",
           "LazyVim: first character after Enter must follow the structural TAB; lines="
             .. vim.inspect(actual))
         assert_insert_mode("LazyVim: subsequent Enter and first payload must remain in Insert mode")
@@ -111,22 +114,38 @@ defer(function()
         vim.api.nvim_input("econd")
         defer(function()
           actual = lines(buf)
-          assert(actual[3] == "\tsecond",
+          assert(actual[3] == "\t\tsecond",
             "LazyVim: second payload must follow the structural TAB; lines=" .. vim.inspect(actual))
 
           vim.api.nvim_input("\n")
           defer(function()
-            wait_for(buf, function() return lines(buf)[4] == "\t" end,
-              "LazyVim: next body line must be prefixed before paste")
+            wait_for(buf, function() return lines(buf)[4] == "\t\t" end,
+              "LazyVim: third body line must be prefixed before typing")
+            vim.api.nvim_input("third")
+            defer(function()
+              vim.api.nvim_input("\n")
+              defer(function()
+                vim.api.nvim_input("fourth")
+                defer(function()
+                  actual = lines(buf)
+                  assert(actual[2] == "\t\ttyped" and actual[3] == "\t\tsecond"
+                    and actual[4] == "\t\tthird" and actual[5] == "\t\tfourth",
+                    "LazyVim: every typed body line must have the same opener-relative prefix; lines="
+                      .. vim.inspect(actual))
+                  assert_insert_mode("typing subsequent body lines must remain in Insert mode")
+                  vim.api.nvim_input("\n")
+                  defer(function()
+                    wait_for(buf, function() return lines(buf)[6] == "\t\t" end,
+                      "LazyVim: next body line must be prefixed before paste")
 
-            assert(vim.api.nvim_paste("  pasted one\n    pasted two", false, -1),
+                    assert(vim.api.nvim_paste("  pasted one\n    pasted two", false, -1),
               "LazyVim: Neovim rejected the multi-line paste")
             defer(function()
               wait_for(buf, function()
                 actual = lines(buf)
-                return actual[4] == "\t  pasted one"
-                  and actual[5] == "\t    pasted two"
-                  and actual[6] == "\tLIVE"
+                return actual[6] == "\t\t  pasted one"
+                  and actual[7] == "\t\t    pasted two"
+                  and actual[8] == "\tLIVE"
               end, "LazyVim: multi-line paste must be prefixed before InsertLeave")
               assert_insert_mode("LazyVim: paste processing must remain in Insert mode")
 
@@ -134,18 +153,24 @@ defer(function()
               defer(function()
                 actual = lines(buf)
                 assert(vim.api.nvim_get_mode().mode ~= "i", "LazyVim: Escape should leave Insert mode")
-                assert(actual[2] == "\ttyped" and actual[3] == "\tsecond"
-                  and actual[4] == "\t  pasted one" and actual[5] == "\t    pasted two"
-                  and actual[6] == "\tLIVE",
+                assert(actual[2] == "\t\ttyped" and actual[3] == "\t\tsecond"
+                  and actual[4] == "\t\tthird" and actual[5] == "\t\tfourth"
+                  and actual[6] == "\t\t  pasted one" and actual[7] == "\t\t    pasted two"
+                  and actual[8] == "\tLIVE",
                   "LazyVim: InsertLeave must not be required to repair indentation; lines="
                     .. vim.inspect(actual))
                 print("LazyVim live Insert-mode tests: PASS")
                 vim.cmd("qa!")
+                  end)
+                end)
               end)
             end)
           end)
         end)
       end)
-    end, 1)
-  end)
+    end)
+    end)
+  end, 1)
 end)
+end)
+

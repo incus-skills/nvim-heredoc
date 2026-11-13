@@ -22,9 +22,9 @@ write_file() {
 }
 conf_print_nvim_heredoc_ftplugin() {
   cat <<'LUA'
--- <<- heredocs require literal TAB bytes; spaces are not stripped by the shell.
--- Keep the display compact without converting indentation to spaces.
-vim.opt_local.expandtab = false
+-- The opener is space-indented; the plugin inserts structural TABs explicitly.
+-- <<- strips literal leading TAB bytes from body and closing-delimiter lines.
+vim.opt_local.expandtab = true
 vim.opt_local.tabstop = 2
 vim.opt_local.softtabstop = 0
 vim.opt_local.shiftwidth = 2
@@ -45,7 +45,7 @@ glow - <<REPORT
 - Configuration: $NVIM_CONFIG_DIR
 - Lua modules: lua/nvim-heredoc/
 - Filetype entrypoints: after/ftplugin/{bash,sh,zsh}.lua
-- Indentation: expandtab=false, tabstop=2, softtabstop=0, shiftwidth=2
+- Indentation: expandtab=true, tabstop=2, softtabstop=0, shiftwidth=2
 - Write behaviour: replace the three owned ftplugins and implementation modules
 - Runtime plugin-manager entrypoint: not required
 REPORT

@@ -28,7 +28,7 @@ The implementation distinguishes:
 - **Structural indentation:** leading TAB bytes used to nest the opener and delimiter in shell code and removed by `<<-`.
 - **Content indentation:** payload whitespace, especially leading spaces, which must remain unchanged.
 
-Leading TAB bytes in the body are also stripped by the shell. The editor therefore cannot promise to preserve them as payload indentation. The provisioned filetype entrypoints set `expandtab = false`, `tabstop = 2`, `softtabstop = 0`, and `shiftwidth = 2` for Bash, POSIX `sh`, and Zsh. This is required for the intended literal-TAB editing model; the two-column tab display is only cosmetic.
+Leading TAB bytes in the body are also stripped by the shell. The editor therefore cannot promise to preserve them as payload indentation. The provisioned filetype entrypoints set `expandtab = true`, `tabstop = 2`, `softtabstop = 0`, and `shiftwidth = 2` for Bash, POSIX `sh`, and Zsh. The current editor model explicitly inserts structural TAB bytes rather than relying on indentation commands to create them; `expandtab = true` therefore remains enabled for ordinary editing.
 
 Ordinary `<<` heredocs and `<<<` here-strings are outside the managed scope and must remain untouched.
 

@@ -19,7 +19,7 @@ do
   assert(r.operator == "<<-")
   assert(r.delimiter == "END" and r.delimiter_quoted)
   assert(r.opener_line == 2 and r.body_start_line == 3 and r.terminator_line == 4)
-  assert(r.structural_prefix == "\t" and r.editable and r.opener_safe)
+  assert(r.structural_prefix == "\t\t" and r.closer_prefix == "\t" and r.editable and r.opener_safe)
   assert(editing.closer_line(r) == "\tEND")
 end
 
@@ -49,13 +49,14 @@ end
 do
   local _, r = one("\tcat <<-''\nbody\n\t\n")
   assert(r.delimiter == "" and r.delimiter_original == "''" and r.delimiter_quoted)
-  assert(r.terminator_line == 3 and editing.closer_line(r) == "\t")
+  assert(r.terminator_line == 3 and r.structural_prefix == "\t\t" and editing.closer_line(r) == "\t")
 end
 
 do
   local _, r = one("cat <<-EOF\n  payload\nEOF\n")
-  assert(r.structural_tabs_only and r.editable)
+  assert(r.structural_tabs_only and r.editable and r.structural_prefix == "\t" and r.closer_prefix == "")
   assert(r.body_start_line == 2 and r.terminator_line == 3)
+  assert(editing.closer_line(r) == "EOF", "unindented opener should keep its closer at column zero")
 end
 
 do
@@ -73,10 +74,13 @@ end
 do
   local _, r = one("\tcat <<-END\nbody\n\tEND\n")
   local pasted = { "  alpha", "", "   ", "\tbeta", "\t\tgamma" }
-  local once, changed = editing.prefix_lines(r, pasted)
+  local once, changed, insertions = editing.prefix_lines(r, pasted)
   assert(changed)
-  assert(once[1] == "\t  alpha" and once[2] == "\t" and once[3] == "\t   ")
-  assert(once[4] == "\tbeta" and once[5] == "\t\tgamma")
+  assert(insertions[1].column == 0 and insertions[1].text == "\t\t")
+  assert(insertions[4].column == 1 and insertions[4].text == "\t",
+    "existing opener indentation should receive one additional body TAB")
+  assert(once[1] == "\t\t  alpha" and once[2] == "\t\t" and once[3] == "\t\t   ")
+  assert(once[4] == "\t\tbeta" and once[5] == "\t\tgamma")
   local twice, changed_again = editing.prefix_lines(r, once)
   assert(not changed_again, "repeated paste notifications must not duplicate structural prefix")
   for i, line in ipairs(once) do assert(twice[i] == line) end
@@ -104,10 +108,33 @@ end
 
 do
   local _, r = one("    cat <<-EOF\nbody\nEOF\n")
-  assert(not r.structural_tabs_only and not r.editable and not r.opener_safe)
-  assert(r.confidence == "unsupported-indent")
-  local closer = editing.closer_line(r)
-  assert(closer == nil, "space-indented opener must not authorise closer placement")
+  assert(r.space_indented and r.opener_safe and r.editable)
+  assert(r.structural_prefix == "\t\t\t" and r.closer_prefix == "\t\t")
+  assert(editing.closer_line(r) == "\t\tEOF")
+  local prefixed, changed = editing.prefix_lines(r, { "payload", "    autoindented", "  pasted" })
+  assert(changed)
+  assert(prefixed[1] == "\t\t\tpayload")
+  assert(prefixed[2] == "\t\t\t    autoindented",
+    "TAB must precede Neovim's existing opener spaces")
+  assert(prefixed[3] == "\t\t\t  pasted",
+    "opener indentation and pasted leading spaces must both be retained")
+  local twice, changed_again = editing.prefix_lines(r, prefixed)
+  assert(not changed_again)
+  for i, line in ipairs(prefixed) do assert(twice[i] == line) end
+end
+
+do
+  local _, r = one("  \tcat <<-EOF\nbody\nEOF\n")
+  assert(not r.opener_safe and not r.editable,
+    "mixed TAB/space opener indentation must remain unsupported")
+end
+
+
+do
+  local _, r = one("      cat <<-EOF\nbody\nEOF\n")
+  assert(r.structural_prefix == "\t\t\t\t" and r.closer_prefix == "\t\t\t",
+    "six-space opener indentation plus one body level should become four structural TABs")
+  assert(r.structural_tabs_only and r.editable)
 end
 
 -- mvdan/sh (through shfmt --to-json in CI) validates these as legal Bash

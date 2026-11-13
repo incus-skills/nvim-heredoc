@@ -76,7 +76,7 @@ local prefix_before_next_payload = nil
 
 local function start()
   vim.api.nvim_win_set_buf(win, buf)
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "\tcat <<-LIVE" })
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "cat <<-LIVE" })
   vim.bo[buf].filetype = "bash"
 
   assert(vim.b[buf].nvim_heredoc_attached == true,
@@ -87,12 +87,12 @@ local function start()
     and vim.bo[buf].shiftwidth == 2,
     "the installed Bash ftplugin did not establish the expected TAB settings")
 
-  vim.api.nvim_win_set_cursor(win, { 1, #("\tcat <<-LIVE") })
+  vim.api.nvim_win_set_cursor(win, { 1, #("cat <<-LIVE") })
   vim.api.nvim_input("A\n")
 
   defer(function()
     local actual = lines()
-    assert_lines(actual[2] == "\t" and actual[3] == "\tLIVE",
+    assert_lines(actual[2] == "\t" and actual[3] == "LIVE",
       "first Enter must create the body TAB and reserve the closer")
     assert_insert_mode("first Enter must remain in Insert mode")
 
@@ -135,7 +135,7 @@ local function start()
                   actual = lines()
                   return actual[4] == "\t  pasted one"
                     and actual[5] == "\t    pasted two"
-                    and actual[6] == "\tLIVE"
+                    and actual[6] == "LIVE"
                 end, 10), "multi-line paste was not prefixed before InsertLeave")
                 assert_insert_mode("paste processing must remain in Insert mode")
 
