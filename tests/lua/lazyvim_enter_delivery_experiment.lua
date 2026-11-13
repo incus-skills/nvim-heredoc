@@ -18,10 +18,6 @@ local function lines(buf)
   return vim.api.nvim_buf_get_lines(buf, 0, -1, false)
 end
 
-local function wait_for(predicate, message)
-  assert(vim.wait(1500, predicate, 10), message)
-end
-
 local function scan(buf)
   return scanner.scan(table.concat(lines(buf), "\n"), {
     tabstop = vim.bo[buf].tabstop,
@@ -136,8 +132,8 @@ local function main()
   end
 
   local function verify_delivery()
-    local expected = "hello1\\n  hello2\\nhello3\\n"
-    local script = table.concat(lines(buf), "\\n") .. "\\n"
+    local expected = "hello1\n  hello2\nhello3\n"
+    local script = table.concat(lines(buf), "\n") .. "\n"
     local path = vim.fn.tempname()
     local file = assert(io.open(path, "wb"))
     file:write(script)
@@ -150,7 +146,7 @@ local function main()
       "Bash delivery mismatch; expected=" .. vim.inspect(expected)
         .. "; actual=" .. vim.inspect(output)
         .. "; buffer=" .. vim.inspect(lines(buf)))
-    print(\"synchronous Enter + provisioned indentation + Bash delivery: PASS\")
+    print("synchronous Enter + provisioned indentation + Bash delivery: PASS")
     print("transitions: " .. table.concat(events, ", "))
     vim.cmd("qa!")
   end
@@ -161,21 +157,21 @@ local function main()
     input("<CR>hello1")
     defer(function()
       local actual = lines(buf)
-      assert(actual[2] == "\\t\\t\\thello1" and actual[3] == "\\t\\tPROTO",
+      assert(actual[2] == "\t\t\thello1" and actual[3] == "\t\tPROTO",
         "first body transition failed: " .. vim.inspect(actual))
       input("<CR>  hello2")
       defer(function()
         actual = lines(buf)
-        assert(actual[2] == "\\t\\t\\thello1"
-          and actual[3] == "\\t\\t\\t  hello2" and actual[4] == "\\t\\tPROTO",
+        assert(actual[2] == "\t\t\thello1"
+          and actual[3] == "\t\t\t  hello2" and actual[4] == "\t\tPROTO",
           "second body transition failed: " .. vim.inspect(actual))
         input("<CR>hello3")
         defer(function()
           actual = lines(buf)
-          assert(#actual == 5 and actual[2] == "\\t\\t\\thello1"
-            and actual[3] == "\\t\\t\\t  hello2"
-            and actual[4] == "\\t\\t\\thello3"
-            and actual[5] == "\\t\\tPROTO",
+          assert(#actual == 5 and actual[2] == "\t\t\thello1"
+            and actual[3] == "\t\t\t  hello2"
+            and actual[4] == "\t\t\thello3"
+            and actual[5] == "\t\tPROTO",
             "third body transition failed: " .. vim.inspect(actual))
           input("<Esc>")
           defer(function()
@@ -186,11 +182,6 @@ local function main()
       end)
     end)
   end)
-end
-
-
-  print("transitions: " .. table.concat(events, ", "))
-  vim.cmd("qa!")
 end
 
 local ok, err = xpcall(main, debug.traceback)
