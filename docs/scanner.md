@@ -34,7 +34,7 @@ A completed region currently contains:
 | `confidence` | `lexical`, `unsupported-indent`, `uncertain`, or `incomplete` |
 | `editable` | Whether this prototype considers the region safe for an editing operation |
 
-An unterminated managed heredoc is returned with `confidence = "incomplete"`, no body end/terminator line, and `editable = false`. Its opener may still be marked safe for closer insertion when its structural prefix contains only TAB bytes. If lexical state becomes ambiguous, scanning stops rather than treating possible heredoc payload as subsequent shell source. Any uncertainty disables editing for all regions returned by that scan.
+An unterminated managed heredoc is returned with `confidence = "incomplete"`, no body end/terminator line, and `editable = false`. Its opener may still be marked safe for closer insertion when its visual indentation column can be represented exactly by a TAB-only prefix. If lexical state becomes ambiguous, scanning stops rather than treating possible heredoc payload as subsequent shell source. Any uncertainty disables editing for all regions returned by that scan.
 
 ## Current supported lexical subset
 
