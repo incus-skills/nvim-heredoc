@@ -169,6 +169,8 @@ local function test_batched_heredoc_input(keys, payload, expected_col, done)
   vim.api.nvim_set_current_buf(buf)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "    cat <<-PROTO" })
   vim.bo[buf].filetype = "bash"
+  vim.bo[buf].tabstop = 2
+  vim.bo[buf].shiftwidth = 2
 
   -- Capture the effective mapping before installing the buffer-local wrapper.
   local original = vim.fn.maparg("<CR>", "i", false, true)
