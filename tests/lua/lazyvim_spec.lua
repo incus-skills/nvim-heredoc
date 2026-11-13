@@ -127,15 +127,15 @@ assert(type_quote(code_pair, 0) == 'printf ok""',
 local body_pair = set_buffer(table.concat({
   "if true; then",
   "    cat <<-EOF",
-  "\t    payload",
-  "\tEOF",
+  "\t\t\t    payload",
+  "\t\tEOF",
   "fi",
 }, "\n"), "bash")
 local body_line = type_quote(body_pair, 2)
-assert(body_line == '\t    payload""',
+assert(body_line == '\t\t\t    payload""',
   "mini.pairs changed the heredoc body's structural prefix or payload")
 vim.wait(100, function() return false end, 10)
-assert(vim.api.nvim_buf_get_lines(body_pair, 2, 3, false)[1] == '\t    payload""',
+assert(vim.api.nvim_buf_get_lines(body_pair, 2, 3, false)[1] == '\t\t\t    payload""',
   "heredoc changed-range processing corrupted mini.pairs' inserted pair")
 
 -- Ordinary heredoc is a non-managed control and must remain byte-for-byte intact.
