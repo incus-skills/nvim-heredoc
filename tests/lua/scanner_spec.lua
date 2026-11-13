@@ -109,14 +109,14 @@ end
 do
   local _, r = one("    cat <<-EOF\nbody\nEOF\n")
   assert(r.space_indented and r.opener_safe and r.editable)
-  assert(r.structural_prefix == "\t    " and r.closer_prefix == "\t")
+  assert(r.structural_prefix == "\t\t\t" and r.closer_prefix == "\t")
   assert(editing.closer_line(r) == "\tEOF")
   local prefixed, changed = editing.prefix_lines(r, { "payload", "    autoindented", "  pasted" })
   assert(changed)
-  assert(prefixed[1] == "\t    payload")
-  assert(prefixed[2] == "\t    autoindented",
+  assert(prefixed[1] == "\t\t\t payload")
+  assert(prefixed[2] == "\t\t\t    autoindented",
     "TAB must precede Neovim's existing opener spaces")
-  assert(prefixed[3] == "\t      pasted",
+  assert(prefixed[3] == "\t\t\t  pasted",
     "opener indentation and pasted leading spaces must both be retained")
   local twice, changed_again = editing.prefix_lines(r, prefixed)
   assert(not changed_again)
