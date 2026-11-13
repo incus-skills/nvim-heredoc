@@ -388,11 +388,13 @@ function M.scan(source, opts)
           end
         end
         local body_column = column + shiftwidth
+        local opener_tab_prefix = column % tabstop == 0
+          and string.rep("\\t", column / tabstop) or ""
         item.structural_safe = not (has_spaces and has_tabs)
           and column % tabstop == 0 and body_column % tabstop == 0
         item.space_indented = has_spaces and not has_tabs
         item.opener_prefix = prefix
-        item.closer_prefix = has_spaces and string.rep("\\t", column / tabstop) or prefix
+        item.closer_prefix = has_spaces and opener_tab_prefix or prefix
         item.structural_prefix = item.structural_safe
           and string.rep("\\t", body_column / tabstop) or ""
         item.structural_tabs_only = true
