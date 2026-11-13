@@ -331,7 +331,9 @@ end
 function M.scan(source, opts)
   opts = opts or {}
   local tabstop = math.max(1, tonumber(opts.tabstop) or 2)
-  local shiftwidth = math.max(1, tonumber(opts.shiftwidth) or tabstop)
+  local shiftwidth = tonumber(opts.shiftwidth)
+  if not shiftwidth or shiftwidth == 0 then shiftwidth = tabstop end
+  shiftwidth = math.max(1, shiftwidth)
   local lines = split_lines(source or "")
   local result = { regions = {}, diagnostics = {}, complete = true }
   local i = 1
