@@ -193,7 +193,10 @@ function M.process_buffer(buf, changed_range, close_incomplete)
     -- heredocs are resolved in declaration order rather than guessed.
     for _ = 1, 32 do
       local lines = get_lines(buf)
-      local result = scanner.scan(get_source(lines))
+      local result = scanner.scan(get_source(lines), {
+        tabstop = vim.bo[buf].tabstop,
+        shiftwidth = vim.bo[buf].shiftwidth,
+      })
       if not result.complete then
         local pending
         for _, region in ipairs(result.regions) do
