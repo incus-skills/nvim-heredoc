@@ -44,10 +44,10 @@ fi
 # structure only. The two leading TABs are stripped by <<-, so output starts
 # at column zero.
 {
-  printf 'conf_print_test() {\\n  cat <<-EOF\\n\\t\\thello1\\n\\t\\thello2\\n\\t\\thello3\\n\\t\\thello4\\n\\tEOF\\n}\\nconf_print_test\\n'
+  printf 'conf_print_test() {\n  cat <<-EOF\n\\t\\thello1\n\\t\\thello2\n\\t\\thello3\n\\t\\thello4\n\\tEOF\n}\nconf_print_test\n'
 } > "$tmp/nested-function.sh"
 bash "$tmp/nested-function.sh" > "$tmp/nested-function.out"
-printf 'hello1\\nhello2\\nhello3\\nhello4\\n' > "$tmp/nested-function.expected"
+printf 'hello1\nhello2\nhello3\nhello4\n' > "$tmp/nested-function.expected"
 cmp "$tmp/nested-function.expected" "$tmp/nested-function.out"
 
 # An empty quoted delimiter is a valid delimiter word.
