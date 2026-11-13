@@ -95,8 +95,8 @@ assert(vim.b.completion == nil, "Blink completion must remain buffer-enabled in 
 local managed_source = table.concat({
   "if true; then",
   "    cat <<-EOF",
-  "\t      payload with two leading spaces",
-  "\tEOF",
+  "\t\t\t      payload with two leading spaces",
+  "\t\tEOF",
   "fi",
 }, "\n")
 local managed = set_buffer(managed_source, "bash")
