@@ -66,11 +66,7 @@ local function prefix_region_range(buf, region, changed_range)
     for index = #lines, 1, -1 do
       if prefixed[index] ~= lines[index] then
         local row = first_row + index - 1
-        if lines[index]:match("^[ \t]*$") and prefixed[index] == region.structural_prefix then
-          vim.api.nvim_buf_set_text(buf, row, 0, row, #lines[index], { prefixed[index] })
-        else
-          vim.api.nvim_buf_set_text(buf, row, 0, row, 0, { region.structural_prefix })
-        end
+        vim.api.nvim_buf_set_text(buf, row, 0, row, 0, { region.structural_prefix })
         if row == cursor_row then
           cursor_line_prefixed = true
         end
@@ -105,7 +101,7 @@ local function ensure_body_prefix(buf, region, body_row)
     return
   end
   if line:sub(1, #prefix) ~= prefix then
-    local prefixed = editing.prefix_lines(region, { line })
+    local prefixed = editing.prefix_lines(region, { line }, { normalize_autoindent = true })
     if prefixed and prefixed[1] then
       vim.api.nvim_buf_set_text(buf, body_row, 0, body_row, #line, { prefixed[1] })
       advance_insert_cursor(buf, body_row)
