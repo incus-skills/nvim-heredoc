@@ -110,7 +110,7 @@ do
   local _, r = one("    cat <<-EOF\nbody\nEOF\n")
   assert(r.space_indented and r.opener_safe and r.editable)
   assert(r.structural_prefix == "\t\t\t" and r.closer_prefix == "\t\t")
-  assert(editing.closer_line(r) == "\tEOF")
+  assert(editing.closer_line(r) == "\t\tEOF")
   local prefixed, changed = editing.prefix_lines(r, { "payload", "    autoindented", "  pasted" })
   assert(changed)
   assert(prefixed[1] == "\t\t\tpayload")
