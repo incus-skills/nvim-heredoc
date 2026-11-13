@@ -219,14 +219,15 @@ do
 end
 
 do
-  local buf = set_buffer({ "  cat <<-EOF", "body" })
+  local buf = set_buffer({ "  cat <<-EOF", "  ", "payload", "    nested" })
   vim.bo[buf].tabstop = 2
   assert(plugin.process_buffer(buf))
   local actual = lines(buf)
   assert(actual[1] == "  cat <<-EOF", "the opener must retain its original visual indentation bytes")
-  assert(actual[2] == "\tbody", "body structural indentation must align visually with the opener")
-  assert(actual[3] == "\tEOF", "the closer must align visually with the opener and use a strip-able TAB")
-end
+  assert(actual[2] == "\t", "copied blank-line indentation must become a structural TAB")
+  assert(actual[3] == "\tpayload", "body structural indentation must align visually with the opener")
+  assert(actual[4] == "\t    nested", "additional payload spaces must remain unchanged")
+  assert(actual[5] == "\tEOF", "the closer must align visually with the opener and use a strip-able TAB")
 
 do
   local buf = set_buffer({ "   cat <<-EOF", "body" })
