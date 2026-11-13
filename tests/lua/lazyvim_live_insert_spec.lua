@@ -66,12 +66,14 @@ assert(vim.b[buf].nvim_heredoc_attached == true,
 -- after a subsequent Enter is inserted. This distinguishes a prefix that is
 -- ready for the next keystroke from one repaired later by a deferred wait.
 local prefix_before_next_payload = nil
+local prefix_before_next_payload_line = nil
 vim.api.nvim_create_autocmd("InsertCharPre", {
   buffer = buf,
   callback = function()
     if vim.v.char == "s" and prefix_before_next_payload == nil then
       local row = vim.api.nvim_win_get_cursor(0)[1] - 1
       local line = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1] or ""
+      prefix_before_next_payload_line = line
       prefix_before_next_payload = line:sub(1, 2) == "\t\t"
     end
   end,
@@ -101,7 +103,8 @@ defer(function()
       vim.api.nvim_input("s")
       defer(function()
         assert(prefix_before_next_payload == true,
-          "LazyVim: the new body line must already have its structural TAB at InsertCharPre")
+          "LazyVim: the new body line must already have its structural TAB at InsertCharPre; observed="
+            .. vim.inspect(prefix_before_next_payload_line))
         actual = lines(buf)
         assert(actual[3] == "\t\ts",
           "LazyVim: first character after Enter must follow the structural TAB; lines="
