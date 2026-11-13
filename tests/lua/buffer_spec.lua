@@ -224,7 +224,7 @@ do
   assert(plugin.process_buffer(buf))
   local actual = lines(buf)
   assert(actual[1] == "  cat <<-EOF", "the opener must retain its original visual indentation bytes")
-  assert(actual[2] == "\t", "copied blank-line indentation must become a structural TAB")
+  assert(actual[2] == "\t  ", "pre-existing whitespace-only payload must retain its spaces after structural TAB")
   assert(actual[3] == "\tpayload", "body structural indentation must align visually with the opener")
   assert(actual[4] == "\t    nested", "additional payload spaces must remain unchanged")
   assert(actual[5] == "\tEOF", "the closer must align visually with the opener and use a strip-able TAB")
