@@ -23,14 +23,15 @@ if [ -f "$tmp/zsh.out" ]; then
   cmp "$tmp/expected" "$tmp/zsh.out"
 fi
 
-# A space-indented opener uses a leading structural TAB followed by
-# the opener's spaces. <<- removes only the TAB, preserving the base indent.
+# A space-indented opener uses TAB-only structural indentation.
+# <<- removes all structural TABs, so opener indentation does not leak
+# into the delivered payload.
 {
-  printf '    cat <<-EOF\n\t    pasted\n\tEOF\n'
+  printf '    cat <<-EOF\n\t\tpasted\n\tEOF\n'
 } > "$tmp/space-indented.sh"
 bash "$tmp/space-indented.sh" > "$tmp/space-indented-bash.out"
 dash "$tmp/space-indented.sh" > "$tmp/space-indented-dash.out"
-printf '    pasted\n' > "$tmp/space-indented.expected"
+printf 'pasted\n' > "$tmp/space-indented.expected"
 cmp "$tmp/space-indented.expected" "$tmp/space-indented-bash.out"
 cmp "$tmp/space-indented.expected" "$tmp/space-indented-dash.out"
 if command -v zsh >/dev/null 2>&1; then
