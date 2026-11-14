@@ -185,9 +185,13 @@ same lazy.nvim loading contract using a local repository checkout.
 
 There are no user-facing setup options at present. The supported filetypes
 and automatic closer behaviour are part of the current implementation
-contract, not user configuration defaults. The plugin does not override
-buffer-local indentation policy; `expandtab`, `tabstop`, `softtabstop`,
-and `shiftwidth` remain owned by the user's Neovim configuration.
+contract, not user configuration defaults. The earlier provisioner forced
+`expandtab`, `tabstop`, `softtabstop`, and `shiftwidth` to work around an
+implementation that required the opener to be positioned at column zero.
+That workaround is obsolete: opener positioning no longer requires a leading
+TAB before the opener or changes to those options. The plugin does not set
+them. `tabstop` remains an input to visual-column calculations when analysing
+an opener that is indented with spaces; it is read, not changed.
 
 ## 10. Continuous integration
 
