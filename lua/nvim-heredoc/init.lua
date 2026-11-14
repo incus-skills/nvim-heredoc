@@ -66,7 +66,7 @@ local function prefix_region_range(buf, region, changed_range)
     for index = #lines, 1, -1 do
       if prefixed[index] ~= lines[index] then
         local row = first_row + index - 1
-        vim.api.nvim_buf_set_text(buf, row, 0, row, 0, { region.structural_prefix })
+        vim.api.nvim_buf_set_text(buf, row, 0, row, 0, { region.body_prefix })
         if row == cursor_row then
           cursor_line_prefixed = true
         end
@@ -91,7 +91,7 @@ local function insert_closer(buf, region, row)
 end
 
 local function ensure_body_prefix(buf, region, body_row)
-  local prefix = region.structural_prefix or ""
+  local prefix = region.body_prefix or ((region.structural_prefix or "") .. "\t")
   if prefix == "" then
     return
   end
@@ -170,7 +170,7 @@ function M.process_buffer(buf, changed_range, close_incomplete)
       else
         local pass_changed = false
         for _, region in ipairs(result.regions) do
-          if region.editable and region.structural_prefix ~= "" then
+          if region.editable and (region.body_prefix or ((region.structural_prefix or "") .. "\t")) ~= "" then
             if prefix_region_range(buf, region, changed_range) then
               pass_changed = true
             end
