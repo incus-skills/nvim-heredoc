@@ -22,7 +22,7 @@ The editor must distinguish two different kinds of indentation:
 1. **Structural indentation** places the opener and terminator within the surrounding shell construct. For a managed `<<-` heredoc, structural indentation is represented by leading TAB bytes so the shell can remove it.
 2. **Content indentation** belongs to the payload. Leading spaces are preserved. Leading TAB bytes are subject to the shell's `<<-` stripping rule and therefore cannot be promised as payload indentation.
 
-The displayed width of a structural TAB is determined by the buffer's `tabstop`; it is not a conversion to spaces. The opener may retain leading spaces when its visual indentation column is exactly representable by leading TABs at that tabstop. In that case, the editor leaves the opener bytes unchanged and derives an equivalent TAB prefix for body lines and the terminator. For example, with `tabstop=2`, an opener indented by two spaces is visually aligned with a body/terminator prefix of one literal TAB. If the opener's visual column cannot be represented exactly by leading TABs (for example, three spaces at `tabstop=2`), the region remains non-editable rather than being silently shifted. A visually nested example must not be interpreted as evidence that literal leading spaces on a terminator are valid.
+The displayed width of a structural TAB is determined by the buffer's `tabstop`; it is not a conversion to spaces. The opener may retain leading spaces when its visual indentation column is exactly representable by leading TABs at that tabstop. In that case, the editor leaves the opener bytes unchanged and derives two prefixes: an opener-aligned structural prefix for the terminator, and a body prefix with one additional literal TAB. For example, with `tabstop=2`, an opener indented by two spaces maps to one literal TAB for the terminator and two literal TABs for body lines. If the opener's visual column cannot be represented exactly by leading TABs (for example, three spaces at `tabstop=2`), the region remains non-editable rather than being silently shifted. A visually nested example must not be interpreted as evidence that literal leading spaces on a terminator are valid.
 
 For example, the structural TABs below are literal TAB bytes; the spaces inside the body are payload:
 
@@ -41,7 +41,7 @@ some_function() {
 }
 ```
 
-The shell removes the structural TAB prefix from each body line and the terminator. The two spaces before each `level two` line remain in the payload.
+The shell removes the leading TABs from each body line and the terminator. The extra body TAB establishes visual indentation in the editor but is also stripped by the shell; the two spaces before each `level two` line remain in the payload.
 
 These rules need explicit regression tests. The editor must not claim to preserve payload tabs that the shell itself strips.
 
@@ -59,7 +59,7 @@ The scanner should expose a buffer-independent result with, at minimum:
 - queue position for multiple heredocs on the same command;
 - body start and end lines, when known;
 - terminator line and matched delimiter, when present;
-- structural indentation prefix and its byte representation;
+- opener-aligned structural prefix and its byte representation (used by the closing delimiter);\n- body prefix, consisting of the structural prefix plus one additional literal TAB;
 - confidence/ambiguity status and a reason when the region cannot safely be resolved.
 
 The scanner processes shell source in lexical order. It recognises pending heredocs on a command, waits until that command's complete logical line ends, then consumes bodies in declaration order. A completed earlier heredoc must not be mistaken for the active region when later nested shell constructs contain another opener.
@@ -73,7 +73,7 @@ The scanner is conservative, not a claim to implement every shell grammar produc
 - Track multiple pending heredocs on a command in declaration order.
 - Recognise delimiter lines according to shell tab-stripping semantics.
 - Insert a matching closer automatically without placing it at hard column zero when the opener has structural TAB indentation.
-- The closer uses a leading-TAB prefix that occupies the same visual column as the opener. The opener's original indentation bytes are not rewritten; a space-indented opener is supported only when its visual column is exactly representable by TABs at the buffer's tabstop. Leading spaces are not a valid substitute for TABs on the closer.
+- The closer uses the opener-aligned structural TAB prefix and occupies the same visual column as the opener.\n- Each body line uses that same prefix plus one additional literal TAB, so the body is visually indented one TAB beyond the opener and closer. The opener's original indentation bytes are not rewritten; a space-indented opener is supported only when its visual column is exactly representable by TABs at the buffer's tabstop. Leading spaces are not a valid substitute for TABs on the closer.
 - Preserve all existing body whitespace when indenting or pasting. Never implement paste handling by removing all leading whitespace and prefixing a replacement.
 - Any structural prefix added to a body line must be a TAB byte if the resulting script is expected to rely on `<<-` tab stripping.
 - If the opener's indentation uses spaces in a way that cannot be represented by structural tabs without changing alignment, do not silently rewrite it. Report or document the limitation and leave the source intact.
@@ -86,13 +86,13 @@ Interactive editing is region-based rather than a sequence of isolated current-l
 - Automatic closer insertion is driven by a recognised opener and the shared region model, not by the first blank line encountered after an opener.
 - Paste handling must identify the complete changed range. It must not assume that a `TextChangedI` event describes only the cursor's current line.
 - The paste operation must preserve the relative indentation of the inserted lines. It must not trim leading whitespace from each line, including whitespace-only pasted lines.
-- On an interactive Enter transition, a whitespace-only line whose indentation width exactly matches the opener's visual column is Neovim's copied structural autoindent; replace that copied prefix with the derived TAB prefix before further typing. Do not apply this conversion to paste ranges, where the same bytes may be intentional payload whitespace.
+- On an interactive Enter transition, a whitespace-only line whose indentation width exactly matches the opener's visual column is Neovim's copied structural autoindent; replace that copied prefix with the deeper body TAB prefix before further typing. Do not apply this conversion to paste ranges, where the same bytes may be intentional payload whitespace.
 - Structural indentation may be added only when the edit context establishes that the prefix is not already present. Repeated events must not duplicate prefixes.
 - Empty lines, lines containing only spaces, and lines containing tabs require explicit handling and tests.
 - If the changed range cannot be reliably identified, or the region is ambiguous, leave the inserted text unchanged rather than guessing.
 - Neovim's normal indentation, pair insertion, and completion behaviour should be allowed to coexist unless a verified, region-scoped integration is necessary.
 
-The initial Neovim integration runs on `InsertLeave` and `TextChanged`, uses the shared scanner, inserts a closer for a safe incomplete opener, and applies idempotent structural TAB prefixes to the recognised body range. It now tracks changed line ranges with `nvim_buf_attach(on_lines)` and prefixes only the intersection of a changed range and a recognised heredoc body. `InsertLeave` performs a full-region pass and inserts a closer for a safe incomplete opener. Headless tests verify range isolation and cursor preservation. This is still an initial integration prototype: extmark behaviour, plugin coexistence, and more complex edit sequences remain to be validated. A future implementation may use extmarks or another stable range-tracking mechanism, but the design contract does not prescribe a specific Neovim API until the prototype demonstrates the required behaviour.
+The initial Neovim integration runs on `InsertLeave` and `TextChanged`, uses the shared scanner, inserts a closer for a safe incomplete opener, and applies idempotent body TAB prefixes (one TAB beyond opener alignment) to the recognised body range. It now tracks changed line ranges with `nvim_buf_attach(on_lines)` and prefixes only the intersection of a changed range and a recognised heredoc body. `InsertLeave` performs a full-region pass and inserts a closer for a safe incomplete opener. Headless tests verify range isolation and cursor preservation. This is still an initial integration prototype: extmark behaviour, plugin coexistence, and more complex edit sequences remain to be validated. A future implementation may use extmarks or another stable range-tracking mechanism, but the design contract does not prescribe a specific Neovim API until the prototype demonstrates the required behaviour.
 
 ## 6. Plugin coexistence and formatting
 
