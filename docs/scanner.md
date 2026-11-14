@@ -30,7 +30,7 @@ A completed region currently contains:
 | `body_end_line` | Physical line immediately before the terminator |
 | `terminator_line` | 1-based terminator line |
 | `opener_prefix` | Original leading whitespace bytes before the opener command; never rewritten by the editor |
-| `structural_prefix` | Literal TAB bytes representing the opener's visual indentation column at the supplied buffer tabstop |
+| `structural_prefix` | Literal TAB bytes representing the opener's visual indentation column; used for the closing delimiter |\n| `body_prefix` | `structural_prefix` plus one additional literal TAB; used for every body line |
 | `structural_column` | Visual column occupied by the opener's original leading whitespace |
 | `tabstop` | Buffer tabstop used to calculate visual columns |
 | `structural_tabs_only` | Whether that visual column can be represented exactly by a TAB-only prefix |
@@ -67,7 +67,7 @@ The current integration:
 
 - attaches to Bash, `sh`, and Zsh buffers;
 - inserts a closer for a safely recognised incomplete managed heredoc;
-- derives the closer from the opener's structural TAB prefix;
+- derives the closer from the opener-aligned structural TAB prefix;\n- gives body lines a separate prefix with one additional literal TAB;
 - tracks changed line ranges with `nvim_buf_attach(on_lines)`;
 - retains disjoint notifications as separate ranges, rebases earlier pending ranges when edits insert/delete lines, and merges only overlapping or adjacent ranges;
 - prefixes only changed lines that intersect a scanner-confirmed body range;
