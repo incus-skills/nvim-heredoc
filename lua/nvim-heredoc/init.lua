@@ -66,7 +66,12 @@ local function prefix_region_range(buf, region, changed_range)
     for index = #lines, 1, -1 do
       if prefixed[index] ~= lines[index] then
         local row = first_row + index - 1
-        vim.api.nvim_buf_set_text(buf, row, 0, row, 0, { region.body_prefix })
+        local structural_prefix = region.structural_prefix or ""
+        local insert_col, insert_text = 0, region.body_prefix
+        if structural_prefix ~= "" and lines[index]:sub(1, #structural_prefix) == structural_prefix then
+          insert_col, insert_text = #structural_prefix, "\t"
+        end
+        vim.api.nvim_buf_set_text(buf, row, insert_col, row, insert_col, { insert_text })
         if row == cursor_row then
           cursor_line_prefixed = true
         end
