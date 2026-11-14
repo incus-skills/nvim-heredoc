@@ -172,27 +172,43 @@ A visually correct buffer is not sufficient evidence that the shell receives the
 
 ## 9. Delivery
 
-The canonical implementation is the tested Lua source in the repository. The initial workstation delivery mechanism is the repository provisioning script, not a plugin-manager installation route. The provisioner copies the same Lua modules used by the test suite and generates thin per-filetype entrypoints; it does not embed a second implementation.
+The canonical implementation is the tested Lua source in the repository and
+is distributed as a normal Neovim plugin. The supported installation path is
+lazy.nvim, using the repository specification with the supported filetypes
+(`bash`, `sh`, and `zsh`) and an empty `opts` table.
 
-The provisioner owns exactly six outputs: the three modules under `lua/nvim-heredoc/` and the three generated files under `after/ftplugin/{bash,sh,zsh}.lua`. Re-running it replaces those declared outputs and leaves unrelated configuration untouched. The previous three ftplugins were themselves provisioned outputs, so preserving or backing them up is not part of this replacement contract. This ownership rule would not justify overwriting independently maintained user files.
+The plugin owns its runtime loading and buffer attachment through
+`require("nvim-heredoc").setup()`. It does not require copied implementation
+modules, generated `after/ftplugin` files, a shell provisioner, or manual
+`runtimepath` changes. The local LazyVim integration fixture exercises the
+same lazy.nvim loading contract using a local repository checkout.
 
-The provisioner is repeatable and accepts an explicit `NVIM_CONFIG_DIR` for isolated testing or a non-default configuration tree. Its installer test verifies copied module bytes, generated entrypoint contents, and repeat-execution stability. The provisioner requires the project's adopted content-emission convention, including function-wrapped content and Markdown terminal reporting through `glow`.
-
-The provisioned entrypoints call `require("nvim-heredoc").setup_buffer()`; they do not require a plugin runtime entrypoint, plugin-manager specification, or user-authored setup callback. A plugin distribution route may be considered separately if a future delivery context requires it, but it is not part of the initial replacement.
-
-The pinned LazyVim fixture validates the provisioned entrypoint shape in a controlled environment. It does not replace live verification in the user's Neovim 0.12.4/LazyVim configuration. See [installation and replacement](installation.md) for the actual provisioning and live-check procedure.
-
+There are no user-facing setup options at present. The supported filetypes
+and automatic closer behaviour are part of the current implementation
+contract, not user configuration defaults. The plugin does not override
+buffer-local indentation policy; `expandtab`, `tabstop`, `softtabstop`,
+and `shiftwidth` remain owned by the user's Neovim configuration.
 
 ## 10. Continuous integration
 
-CI validates the independent layers in the test contract: scanner and buffer behaviour, installer output, shell-delivered payload bytes, formatter effects, and pinned LazyVim/plugin coexistence. The current workflow has five jobs:
+CI validates the independent layers in the test contract: scanner and buffer
+behaviour, shell-delivered payload bytes, formatter effects, and pinned
+LazyVim/plugin coexistence. The current workflow has five jobs:
 
-- **Core scanner:** Lua scanner tests, parser-oracle fixtures, installer syntax and isolated repeat-execution tests.
+- **Core scanner:** Lua scanner tests and parser-oracle fixtures.
 - **Neovim buffer integration:** headless buffer-level editing tests.
 - **Shell delivery:** payload-byte comparisons across Bash, Dash, and Zsh.
-- **Formatter:** payload preservation under the configured `shfmt` invocation for Bash and POSIX-shell fixtures.
-- **LazyVim integration:** a pinned container fixture exercising the generated per-filetype entrypoint shape and selected plugin coexistence.
+- **Formatter:** payload preservation under the configured `shfmt`
+  invocation for Bash and POSIX-shell fixtures.
+- **LazyVim integration:** a pinned container fixture loading the plugin
+  through lazy.nvim's local plugin specification and exercising selected
+  plugin coexistence.
 
-The first four jobs do not require the pinned LazyVim container. The container job is an integration fixture, not a runtime dependency and not evidence of behaviour in the user's full workstation configuration.
+The first four jobs do not require the pinned LazyVim container. The container
+job is an integration fixture, not a runtime dependency and not evidence of
+behaviour in the user's full workstation configuration.
 
-See [the CI design](ci.md) for job boundaries, dependency policy, container role, and test-command prerequisites. CI invokes the same local test commands. Hosted success is recorded in [run 43205842260](https://github.com/incus-skills/nvim-heredoc/actions/runs/43205842260); this establishes the repository fixture results only. Live workstation verification remains outstanding.
+See [the CI design](ci.md) for job boundaries, dependency policy, container
+role, and test-command prerequisites. CI invokes the same local test
+commands. Hosted success establishes the repository fixture results only;
+live workstation verification remains separate.
