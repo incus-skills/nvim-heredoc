@@ -27,16 +27,14 @@ local function active_cursor_row(buf)
   return vim.api.nvim_win_get_cursor(win)[1] - 1
 end
 
-local function advance_insert_cursor(buf, row, byte_count)
+local function position_insert_cursor(buf, row, col)
   if active_cursor_row(buf) ~= row or vim.api.nvim_get_mode().mode ~= "i" then
     return
   end
 
-  -- Buffer API insertion does not move Neovim's Insert-mode insertion point
-  -- past the inserted TAB prefix. Queue one Right key per inserted TAB at the
-  -- front of typeahead so they are consumed before the next user key.
-  local right = vim.api.nvim_replace_termcodes("<Right>", true, false, true)
-  vim.api.nvim_feedkeys(string.rep(right, byte_count or 1), "ni", false)
+  -- Buffer API edits do not reliably advance Neovim's Insert-mode insertion
+  -- point across a newly inserted TAB prefix. Set the byte column explicitly.
+  vim.api.nvim_win_set_cursor(0, { row + 1, col })
 end
 
 local function prefix_region_range(buf, region, changed_range)
@@ -71,14 +69,18 @@ local function prefix_region_range(buf, region, changed_range)
         if structural_prefix ~= "" and lines[index]:sub(1, #structural_prefix) == structural_prefix then
           insert_col, insert_text = #structural_prefix, "\t"
         end
+        local cursor_col = row == cursor_row and vim.api.nvim_win_get_cursor(0)[2] or nil
         vim.api.nvim_buf_set_text(buf, row, insert_col, row, insert_col, { insert_text })
         if row == cursor_row then
           cursor_line_prefixed = true
+          local target_col = cursor_col >= insert_col and (cursor_col + #insert_text) or cursor_col
+          position_insert_cursor(buf, row, target_col)
         end
       end
     end
+    -- Cursor positioning is handled at the exact insertion point above.
     if cursor_line_prefixed then
-      advance_insert_cursor(buf, cursor_row)
+      -- Keep this branch explicit: the cursor row was part of the changed range.
     end
   end
 
@@ -109,7 +111,7 @@ local function ensure_body_prefix(buf, region, body_row)
     local prefixed = editing.prefix_lines(region, { line }, { normalize_autoindent = true })
     if prefixed and prefixed[1] then
       vim.api.nvim_buf_set_text(buf, body_row, 0, body_row, #line, { prefixed[1] })
-      advance_insert_cursor(buf, body_row, #prefix)
+      position_insert_cursor(buf, body_row, #prefix)
     end
   end
 end
