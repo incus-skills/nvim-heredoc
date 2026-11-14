@@ -27,7 +27,7 @@ local function active_cursor_row(buf)
   return vim.api.nvim_win_get_cursor(win)[1] - 1
 end
 
-local function advance_insert_cursor(buf, row)
+local function advance_insert_cursor(buf, row, byte_count)
   if active_cursor_row(buf) ~= row or vim.api.nvim_get_mode().mode ~= "i" then
     return
   end
@@ -36,7 +36,7 @@ local function advance_insert_cursor(buf, row)
   -- insertion point past the newly inserted TAB. Queue a literal Right key
   -- at the front of typeahead so it is consumed before the next user key.
   local right = vim.api.nvim_replace_termcodes("<Right>", true, false, true)
-  vim.api.nvim_feedkeys(right, "ni", false)
+  vim.api.nvim_feedkeys(string.rep(right, byte_count or 1), "ni", false)
 end
 
 local function prefix_region_range(buf, region, changed_range)
@@ -109,7 +109,7 @@ local function ensure_body_prefix(buf, region, body_row)
     local prefixed = editing.prefix_lines(region, { line }, { normalize_autoindent = true })
     if prefixed and prefixed[1] then
       vim.api.nvim_buf_set_text(buf, body_row, 0, body_row, #line, { prefixed[1] })
-      advance_insert_cursor(buf, body_row)
+      advance_insert_cursor(buf, body_row, #prefix)
     end
   end
 end
