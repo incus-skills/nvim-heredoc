@@ -27,7 +27,7 @@ do
   local actual = lines(buf)
   assert(actual[2] == "\t\t  already", "existing structural prefix must not duplicate")
   assert(actual[3] == "\t\t  pasted", "body spaces must remain after structural TAB; lines=" .. vim.inspect(actual))
-  assert(actual[4] == "\t")
+  assert(actual[4] == "\t\t", "empty body line must receive the deeper body prefix")
   assert(actual[5] == "\tEOF")
 end
 
