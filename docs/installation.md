@@ -26,13 +26,13 @@ There are currently no user-facing setup options. The supported filetypes are
 Bash (`bash`), POSIX shell (`sh`), and Zsh (`zsh`); they are part of the
 plugin's current support contract.
 
-No special buffer indentation settings are required. In particular, do not
-set `expandtab`, `tabstop`, `softtabstop`, or `shiftwidth` for this plugin. Those
-options were previously forced by the development provisioner as a workaround
-for an older implementation that needed to position the opener at column zero;
-that workaround is obsolete. The current implementation preserves the
-opener's position without requiring those settings. It uses literal TAB bytes
-where shell `<<-` semantics require them.
+No special buffer indentation settings are required. The plugin leaves the
+buffer's existing `expandtab`, `tabstop`, `softtabstop`, and `shiftwidth` values
+unchanged. Those options were previously forced by the development provisioner
+as a workaround for an older implementation that needed to position the opener
+at column zero; that workaround is obsolete. The current implementation
+preserves the opener's position without requiring those settings. It uses
+literal TAB bytes where shell `<<-` semantics require them.
 
 ## Verify
 
