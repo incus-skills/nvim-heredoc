@@ -367,8 +367,7 @@ function M.setup_buffer(buf)
   return attached[buf] == true
 end
 
-function M.setup(opts)
-  opts = opts or {}
+function M.setup()
   local group = vim.api.nvim_create_augroup(group_name, { clear = true })
   vim.api.nvim_create_autocmd("FileType", {
     group = group,
