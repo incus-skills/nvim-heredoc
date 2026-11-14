@@ -71,13 +71,13 @@ defer(function()
 
     -- A second Enter creates a genuinely new body line. Wait for the
     -- deferred changed-range processor before typing; this regression guard
-    -- checks the existing structural-prefix behaviour without claiming that
+    -- checks the existing body-prefix behaviour without claiming that
     -- the live Insert-mode timing problem is solved.
     vim.api.nvim_input("\n")
     defer(function()
       wait_for(function()
         return lines(buf)[3] == "\t\t"
-      end, "a subsequent body line must receive its structural TAB")
+      end, "a subsequent body line must receive its body TAB prefix")
       assert_insert_mode("indentation after Enter must remain in Insert mode")
 
       vim.api.nvim_input("second")
