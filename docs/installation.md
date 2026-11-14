@@ -26,11 +26,13 @@ There are currently no user-facing setup options. The supported filetypes are
 Bash (`bash`), POSIX shell (`sh`), and Zsh (`zsh`); they are part of the
 plugin's current support contract.
 
-The plugin does not set or override buffer indentation options. In particular,
-it leaves `expandtab`, `tabstop`, `softtabstop`, and `shiftwidth` under the
-control of the user's Neovim configuration. The heredoc implementation uses
-literal TAB bytes where required by shell `<<-` semantics, independently of
-how the user's editor displays or normally inserts indentation.
+No special buffer indentation settings are required. In particular, do not
+set `expandtab`, `tabstop`, `softtabstop`, or `shiftwidth` for this plugin. Those
+options were previously forced by the development provisioner as a workaround
+for an older implementation that needed to position the opener at column zero;
+that workaround is obsolete. The current implementation preserves the
+opener's position without requiring those settings. It uses literal TAB bytes
+where shell `<<-` semantics require them.
 
 ## Verify
 
