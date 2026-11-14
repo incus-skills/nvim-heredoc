@@ -105,7 +105,7 @@ end
 do
   local _, r = one("  cat <<-EOF\nbody\nEOF\n")
   assert(r.opener_prefix == "  ", "the opener's original spaces must be recorded unchanged")
-  assert(r.structural_prefix == "\t" and r.structural_column == 2)
+  assert(r.structural_prefix == "\t" and r.body_prefix == "\t\t" and r.structural_column == 2)
   assert(r.structural_tabs_only and r.editable and r.opener_safe)
   assert(editing.closer_line(r) == "\tEOF")
   local normalized = editing.prefix_lines(r, { "  ", "payload", "    nested" }, { normalize_autoindent = true })
