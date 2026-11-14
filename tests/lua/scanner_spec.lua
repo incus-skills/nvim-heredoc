@@ -19,7 +19,7 @@ do
   assert(r.operator == "<<-")
   assert(r.delimiter == "END" and r.delimiter_quoted)
   assert(r.opener_line == 2 and r.body_start_line == 3 and r.terminator_line == 4)
-  assert(r.structural_prefix == "\t" and r.editable and r.opener_safe)
+  assert(r.structural_prefix == "\t" and r.body_prefix == "\t\t" and r.editable and r.opener_safe)
   assert(editing.closer_line(r) == "\tEND")
 end
 
