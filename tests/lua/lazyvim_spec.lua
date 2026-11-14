@@ -1,7 +1,4 @@
-package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
-
 local function run_tests()
-local plugin = require("nvim-heredoc")
 local function lines(buf)
   return vim.api.nvim_buf_get_lines(buf, 0, -1, false)
 end
@@ -9,10 +6,12 @@ end
 local function set_buffer(source, filetype)
   local buf = vim.api.nvim_create_buf(true, false)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(source, "\n", { plain = true }))
-  vim.bo[buf].filetype = filetype
   vim.api.nvim_set_current_buf(buf)
-  dofile("tests/fixtures/provisioned/after/ftplugin/" .. filetype .. ".lua")
-  assert(vim.b[buf].nvim_heredoc_attached == true, filetype .. " provisioned ftplugin did not attach")
+  vim.bo[buf].filetype = filetype
+  assert(package.loaded["nvim-heredoc"] ~= nil,
+    "lazy.nvim did not load nvim-heredoc for filetype " .. filetype)
+  assert(vim.b[buf].nvim_heredoc_attached == true,
+    filetype .. " FileType event did not attach nvim-heredoc")
   return buf
 end
 
@@ -22,8 +21,13 @@ local function shell_output(source)
   return output
 end
 
+-- The first supported FileType event must cause lazy.nvim to load the local
+-- checkout and invoke setup() through the plugin spec's opts field.
+local bash = set_buffer("echo ok", "bash")
+local plugin = require("nvim-heredoc")
+
 -- These options mirror the relevant mini.pairs defaults supplied by the observed
--- LazyVim coding.lua revision. The legacy after/ftplugin files are not loaded.
+-- LazyVim coding.lua revision.
 require("mini.pairs").setup({
   modes = { insert = true, command = true, terminal = false },
   skip_ts = { "string" },
@@ -61,13 +65,10 @@ conform.setup({
     },
   },
 })
-local bash = set_buffer("echo ok", "bash")
 assert(conform.list_formatters_for_buffer(bash)[1] == "shfmt", "Bash should resolve to shfmt")
 local zsh = set_buffer("print -r -- ok", "zsh")
 assert(#conform.list_formatters_for_buffer(zsh) == 0, "Zsh must not resolve to shfmt")
 vim.api.nvim_set_current_buf(bash)
-
-assert(plugin.setup_buffer(bash), "provisioned Bash ftplugin did not attach the buffer")
 
 -- Trigger Blink's real buffer-source completion menu while the cursor is
 -- inside a managed heredoc body. Enabled-state alone is not sufficient evidence.
@@ -166,7 +167,7 @@ vim.wait(300, function() return false end, 10)
 local payload_after = shell_output(table.concat(lines(format_buf), "\n"))
 assert(payload_before == payload_after, "Conform/shfmt changed the delivered heredoc payload")
 
-print("LazyVim/plugin coexistence tests: PASS")
+print("LazyVim/lazy.nvim plugin-loading tests: PASS")
 
 end
 
