@@ -30,7 +30,7 @@ A completed region currently contains:
 | `body_end_line` | Physical line immediately before the terminator |
 | `terminator_line` | 1-based terminator line |
 | `opener_prefix` | Original leading whitespace bytes before the opener command; never rewritten by the editor |
-| `structural_prefix` | Literal TAB bytes representing the opener's visual indentation column; used for the closing delimiter 
+| `structural_prefix` | Literal TAB bytes representing the opener's visual indentation column; used for the closing delimiter |
 | `body_prefix` | `structural_prefix` plus one additional literal TAB; used for every body line |
 | `structural_column` | Visual column occupied by the opener's original leading whitespace |
 | `tabstop` | Buffer tabstop used to calculate visual columns |
