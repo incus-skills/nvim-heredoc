@@ -44,7 +44,7 @@ The implementation distinguishes:
 - **Structural indentation:** leading TAB bytes used to nest the opener and delimiter in shell code and removed by `<<-`.
 - **Content indentation:** payload whitespace, especially leading spaces, which must remain unchanged.
 
-Leading TAB bytes in the body are also stripped by the shell. The editor therefore cannot promise to preserve them as payload indentation. The plugin must work with the buffer's existing indentation settings; it must not silently change `expandtab`, `tabstop`, `softtabstop`, or `shiftwidth`.
+Leading TAB bytes in the body are also stripped by the shell. The editor therefore cannot promise to preserve them as payload indentation. No special values for `expandtab`, `tabstop`, `softtabstop`, or `shiftwidth` are required to position the opener: the earlier need to force those options was a workaround for an older column-zero opener implementation, and is obsolete. The plugin does not set these options.
 
 Ordinary `<<` heredocs and `<<<` here-strings are outside the managed scope and must remain untouched.
 
