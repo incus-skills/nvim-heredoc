@@ -60,7 +60,6 @@ local function prefix_region_range(buf, region, changed_range)
 
   if changed then
     local cursor_row = active_cursor_row(buf)
-    local cursor_line_prefixed = false
     for index = #lines, 1, -1 do
       if prefixed[index] ~= lines[index] then
         local row = first_row + index - 1
@@ -72,15 +71,10 @@ local function prefix_region_range(buf, region, changed_range)
         local cursor_col = row == cursor_row and vim.api.nvim_win_get_cursor(0)[2] or nil
         vim.api.nvim_buf_set_text(buf, row, insert_col, row, insert_col, { insert_text })
         if row == cursor_row then
-          cursor_line_prefixed = true
           local target_col = cursor_col >= insert_col and (cursor_col + #insert_text) or cursor_col
           position_insert_cursor(buf, row, target_col)
         end
       end
-    end
-    -- Cursor positioning is handled at the exact insertion point above.
-    if cursor_line_prefixed then
-      -- Keep this branch explicit: the cursor row was part of the changed range.
     end
   end
 
