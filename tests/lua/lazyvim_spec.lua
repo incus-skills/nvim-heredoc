@@ -75,8 +75,8 @@ local blink = require("blink.cmp")
 local completion_buf = set_buffer(table.concat({
   "if true; then",
   "\tcat <<-EOF",
-  "\tpayloadcandidate",
-  "\tpay",
+  "\t\tpayloadcandidate",
+  "\t\tpay",
   "\tEOF",
   "fi",
 }, "\n"), "bash")
@@ -95,7 +95,7 @@ assert(vim.b.completion == nil, "Blink completion must remain buffer-enabled in 
 local managed_source = table.concat({
   "if true; then",
   "\tcat <<-EOF",
-  "\t  payload with two leading spaces",
+  "\t\t  payload with two leading spaces",
   "\tEOF",
   "fi",
 }, "\n")
@@ -127,15 +127,15 @@ assert(type_quote(code_pair, 0) == 'printf ok""',
 local body_pair = set_buffer(table.concat({
   "if true; then",
   "\tcat <<-EOF",
-  "\tpayload",
+  "\t\tpayload",
   "\tEOF",
   "fi",
 }, "\n"), "bash")
 local body_line = type_quote(body_pair, 2)
-assert(body_line == '\tpayload""',
-  "mini.pairs changed the heredoc body's structural prefix or payload")
+assert(body_line == '\t\tpayload""',
+  "mini.pairs changed the heredoc body's deeper body indentation or payload")
 vim.wait(100, function() return false end, 10)
-assert(vim.api.nvim_buf_get_lines(body_pair, 2, 3, false)[1] == '\tpayload""',
+assert(vim.api.nvim_buf_get_lines(body_pair, 2, 3, false)[1] == '\t\tpayload""',
   "heredoc changed-range processing corrupted mini.pairs' inserted pair")
 
 -- Ordinary heredoc is a non-managed control and must remain byte-for-byte intact.
