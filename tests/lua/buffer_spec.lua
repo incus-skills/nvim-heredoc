@@ -231,6 +231,15 @@ do
 end
 
 do
+  local buf = set_buffer({ "\tcat <<-EOF", "\t  existing", "\tEOF" })
+  assert(plugin.process_buffer(buf))
+  local actual = lines(buf)
+  assert(actual[2] == "\t\t  existing",
+    "an existing opener-aligned body prefix must gain exactly one additional TAB")
+  assert(actual[3] == "\tEOF", "the closing delimiter must retain only opener alignment")
+end
+
+do
   local buf = set_buffer({ "   cat <<-EOF", "body" })
   vim.bo[buf].tabstop = 2
   assert(not plugin.process_buffer(buf), "unrepresentable visual columns must not be silently shifted")
