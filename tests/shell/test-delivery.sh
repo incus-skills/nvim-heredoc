@@ -24,9 +24,9 @@ if [ -f "$tmp/zsh.out" ]; then
 fi
 
 # A naturally space-indented opener remains in its surrounding code flow.
-# At tabstop=2, the editor's one-TAB body/terminator prefix is visually
-# aligned with the two-space opener and is stripped by <<- at runtime.
-printf 'conf_print_test() {\n  cat <<-EOF\n\talpha\n\t  beta\n\tEOF\n}\nconf_print_test\n' > "$tmp/nested.sh"
+# At tabstop=2, the body has one additional TAB beyond opener alignment;
+# the closer has only the opener-aligned TAB. <<- strips both at runtime.
+printf 'conf_print_test() {\n  cat <<-EOF\n\t\talpha\n\t\t  beta\n\tEOF\n}\nconf_print_test\n' > "$tmp/nested.sh"
 bash "$tmp/nested.sh" > "$tmp/nested.out"
 printf 'alpha\n  beta\n' > "$tmp/nested.expected"
 cmp "$tmp/nested.expected" "$tmp/nested.out"
