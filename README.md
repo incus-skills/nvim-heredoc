@@ -17,7 +17,24 @@ Provide predictable editing support for shell `<<-` (tab-stripping) heredocs:
 
 ## Installation
 
-See [installation and replacement](docs/installation.md) for the provisioning-script installation, replacement semantics, live verification, and removal procedure.
+Install with lazy.nvim using the normal plugin specification:
+
+```lua
+{
+  "incus-skills/nvim-heredoc",
+  ft = { "bash", "sh", "zsh" },
+  opts = {},
+}
+```
+
+lazy.nvim loads the plugin on the first supported filetype event and calls
+`require("nvim-heredoc").setup({})`. The plugin then attaches to supported
+buffers without requiring generated user ftplugins or copied Lua modules.
+
+The existing [provisioning instructions](docs/installation.md) are retained
+temporarily while the development harness and installation transition are
+updated. They describe the legacy provisioning path and are not the recommended
+installation method.
 
 ## Semantics that constrain the implementation
 
@@ -28,7 +45,7 @@ The implementation distinguishes:
 - **Structural indentation:** leading TAB bytes used to nest the opener and delimiter in shell code and removed by `<<-`.
 - **Content indentation:** payload whitespace, especially leading spaces, which must remain unchanged.
 
-Leading TAB bytes in the body are also stripped by the shell. The editor therefore cannot promise to preserve them as payload indentation. The provisioned filetype entrypoints set `expandtab = false`, `tabstop = 2`, `softtabstop = 0`, and `shiftwidth = 2` for Bash, POSIX `sh`, and Zsh. This is required for the intended literal-TAB editing model; the two-column tab display is only cosmetic.
+Leading TAB bytes in the body are also stripped by the shell. The editor therefore cannot promise to preserve them as payload indentation. The plugin must work with the buffer's existing indentation settings; it must not silently change `expandtab`, `tabstop`, `softtabstop`, or `shiftwidth`.
 
 Ordinary `<<` heredocs and `<<<` here-strings are outside the managed scope and must remain untouched.
 
@@ -44,8 +61,8 @@ Formatting is separate from interactive editing. `shfmt` is for Bash and POSIX `
 
 - Repository initialisation complete.
 - Architecture and indentation invariants recorded in [the design contract](docs/design.md).
-- A conservative Lua scanner, pure structural closer/paste helpers, and Neovim buffer integration with changed-range tracking are present under `lua/` and `tests/`. The plugin reserves the closer after the opener and applies structural TAB prefixes through its changed-range and InsertLeave processing. The current headless tests cover closer insertion, body prefixing, cursor placement, and multi-line paste. Live indentation timing in an interactive LazyVim session remains unresolved; a recent `TextChangedI` experiment passed headless CI but regressed closer insertion in the user's local configuration, so that autocmd change has been reverted. Interfaces and current limits are documented in [scanner.md](docs/scanner.md).
-- [The CI workflow](.github/workflows/test.yml) runs core, headless buffer integration, shell-delivery, formatter, and pinned LazyVim/plugin coexistence jobs. The first five-job run passed in [run 43175124220](https://github.com/incus-skills/nvim-heredoc/actions/runs/43175124220). The LazyVim fixture uses the observed Neovim 0.12.4 and pinned LazyVim, mini.pairs, blink.cmp, conform.nvim, and lazy.nvim revisions; see [the CI design](docs/ci.md) and [plugin compatibility inventory](docs/plugin-compatibility.md).
+- A conservative Lua scanner, pure structural closer/paste helpers, and Neovim buffer integration with changed-range tracking are present under `lua/` and `tests/`.
+- [The CI workflow](.github/workflows/test.yml) runs core, headless buffer integration, shell-delivery, formatter, and pinned LazyVim/plugin coexistence jobs.
+- The LazyVim integration harness now loads the repository as a local lazy.nvim plugin using `dir`, `ft`, and `opts`, exercising the same setup lifecycle as the documented installation spec. See [the CI design](docs/ci.md).
 - [Task 001](tasks/active/001-core-design-and-prototype.md) remains active: expand and validate shell grammar coverage, stress-test editing/paste behaviour, extend plugin interaction coverage, and complete deliberate-failure regression checks.
-- The pinned LazyVim fixture validates the selected plugin revisions in a controlled headless environment; it is not the user's full LazyVim configuration. The repository now has a provisioning-script installation path that installs the tested Lua modules and generates per-filetype entrypoints. Live operation in the user's configuration remains to be verified.
 
