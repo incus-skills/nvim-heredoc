@@ -24,6 +24,13 @@ do
   assert(vim.bo[buf].tabstop == 8, "setup must not change the buffer tabstop")
   assert(vim.bo[buf].softtabstop == 6, "setup must not change the buffer softtabstop")
   assert(vim.bo[buf].shiftwidth == 4, "setup must not change the buffer shiftwidth")
+
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "cat <<-EOF", "payload" })
+  assert(plugin.process_buffer(buf))
+  local actual = lines(buf)
+  assert(actual[1] == "cat <<-EOF", "the opener must remain at column zero without a leading TAB")
+  assert(actual[2] == "\tpayload", "the body must receive its structural TAB without option changes")
+  assert(actual[3] == "EOF", "the closer must align with the opener at column zero")
 end
 
 do
