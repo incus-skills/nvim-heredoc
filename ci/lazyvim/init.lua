@@ -33,7 +33,7 @@ require("lazy").setup({
     },
   },
   root = vim.fn.stdpath("data") .. "/lazy",
-  lockfile = false,
+  lockfile = vim.fn.stdpath("config") .. "/lazy-lock.json",
   install = { missing = false },
   checker = { enabled = false },
   change_detection = { enabled = false },
