@@ -393,6 +393,7 @@ function M.scan(source, opts)
         item.opener_prefix = prefix
         item.structural_prefix, item.structural_column = structural_tab_prefix(prefix, tabstop)
         item.structural_tabs_only = item.structural_prefix ~= nil
+        item.body_prefix = item.structural_tabs_only and (item.structural_prefix .. "\t") or nil
       end
 
       local body_start, terminator = i, nil
@@ -425,6 +426,7 @@ function M.scan(source, opts)
             body_end_line = nil,
             terminator_line = nil,
             structural_prefix = item.structural_prefix or "",
+            body_prefix = item.body_prefix,
             opener_prefix = item.opener_prefix,
             structural_column = item.structural_column,
             tabstop = tabstop,
@@ -451,6 +453,7 @@ function M.scan(source, opts)
           body_end_line = terminator - 1,
           terminator_line = terminator,
           structural_prefix = item.structural_prefix or "",
+          body_prefix = item.body_prefix,
           opener_prefix = item.opener_prefix,
           structural_column = item.structural_column,
           tabstop = tabstop,
