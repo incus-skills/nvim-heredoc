@@ -20,10 +20,10 @@ do
   vim.bo[buf].shiftwidth = 4
   vim.api.nvim_set_current_buf(buf)
   plugin.setup()
-  assert(vim.bo[buf].expandtab == true, "setup must preserve expandtab")
-  assert(vim.bo[buf].tabstop == 8, "setup must preserve tabstop")
-  assert(vim.bo[buf].softtabstop == 6, "setup must preserve softtabstop")
-  assert(vim.bo[buf].shiftwidth == 4, "setup must preserve shiftwidth")
+  assert(vim.bo[buf].expandtab == true, "setup must not apply the obsolete opener-positioning workaround")
+  assert(vim.bo[buf].tabstop == 8, "setup must not change the buffer tabstop")
+  assert(vim.bo[buf].softtabstop == 6, "setup must not change the buffer softtabstop")
+  assert(vim.bo[buf].shiftwidth == 4, "setup must not change the buffer shiftwidth")
 end
 
 do
