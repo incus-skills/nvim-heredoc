@@ -59,7 +59,8 @@ The scanner should expose a buffer-independent result with, at minimum:
 - queue position for multiple heredocs on the same command;
 - body start and end lines, when known;
 - terminator line and matched delimiter, when present;
-- opener-aligned structural prefix and its byte representation (used by the closing delimiter);\n- body prefix, consisting of the structural prefix plus one additional literal TAB;
+- opener-aligned structural prefix and its byte representation (used by the closing delimiter);
+- body prefix, consisting of the structural prefix plus one additional literal TAB;
 - confidence/ambiguity status and a reason when the region cannot safely be resolved.
 
 The scanner processes shell source in lexical order. It recognises pending heredocs on a command, waits until that command's complete logical line ends, then consumes bodies in declaration order. A completed earlier heredoc must not be mistaken for the active region when later nested shell constructs contain another opener.
