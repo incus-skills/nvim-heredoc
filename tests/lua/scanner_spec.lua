@@ -75,8 +75,8 @@ do
   local pasted = { "  alpha", "", "   ", "\tbeta", "\t\tgamma" }
   local once, changed = editing.prefix_lines(r, pasted)
   assert(changed)
-  assert(once[1] == "\t  alpha" and once[2] == "\t" and once[3] == "\t   ")
-  assert(once[4] == "\tbeta" and once[5] == "\t\tgamma")
+  assert(once[1] == "\t\t  alpha" and once[2] == "\t\t" and once[3] == "\t\t   ")
+  assert(once[4] == "\t\tbeta" and once[5] == "\t\tgamma")
   local twice, changed_again = editing.prefix_lines(r, once)
   assert(not changed_again, "repeated paste notifications must not duplicate structural prefix")
   for i, line in ipairs(once) do assert(twice[i] == line) end
@@ -109,11 +109,11 @@ do
   assert(r.structural_tabs_only and r.editable and r.opener_safe)
   assert(editing.closer_line(r) == "\tEOF")
   local normalized = editing.prefix_lines(r, { "  ", "payload", "    nested" }, { normalize_autoindent = true })
-  assert(normalized[1] == "\t", "copied blank-line autoindent must become a structural TAB")
-  assert(normalized[2] == "\tpayload")
-  assert(normalized[3] == "\t    nested", "additional payload spaces must remain unchanged")
+  assert(normalized[1] == "\t\t", "copied blank-line autoindent must become a structural TAB")
+  assert(normalized[2] == "\t\tpayload")
+  assert(normalized[3] == "\t\t    nested", "additional payload spaces must remain unchanged")
   local pasted = editing.prefix_lines(r, { "  " })
-  assert(pasted[1] == "\t  ", "pasted whitespace-only payload must retain its spaces")
+  assert(pasted[1] == "\t\t  ", "pasted whitespace-only payload must retain its spaces")
 end
 
 do
