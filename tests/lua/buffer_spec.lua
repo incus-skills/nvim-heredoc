@@ -13,6 +13,20 @@ local function lines(buf)
 end
 
 do
+  local buf = set_buffer({ "echo ok" })
+  vim.bo[buf].expandtab = true
+  vim.bo[buf].tabstop = 8
+  vim.bo[buf].softtabstop = 6
+  vim.bo[buf].shiftwidth = 4
+  vim.api.nvim_set_current_buf(buf)
+  plugin.setup()
+  assert(vim.bo[buf].expandtab == true, "setup must preserve expandtab")
+  assert(vim.bo[buf].tabstop == 8, "setup must preserve tabstop")
+  assert(vim.bo[buf].softtabstop == 6, "setup must preserve softtabstop")
+  assert(vim.bo[buf].shiftwidth == 4, "setup must preserve shiftwidth")
+end
+
+do
   local buf = set_buffer({ "\tcat <<-EOF", "" })
   assert(plugin.process_buffer(buf))
   local actual = lines(buf)
