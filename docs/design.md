@@ -30,12 +30,12 @@ For example, the structural TABs below are literal TAB bytes; the spaces inside 
 some_function() {
 	if some_condition; then
 		cat <<-'EOF'
-		This content remains indented.
-		Pasted content retains its indentation.
+			This content is visually indented one TAB beyond the opener.
+			Pasted content retains its relative indentation.
 
-		Nested-looking content:
-		  level two
-		  level two
+			Nested-looking content:
+			  level two
+			  level two
 		EOF
 	fi
 }
@@ -74,7 +74,8 @@ The scanner is conservative, not a claim to implement every shell grammar produc
 - Track multiple pending heredocs on a command in declaration order.
 - Recognise delimiter lines according to shell tab-stripping semantics.
 - Insert a matching closer automatically without placing it at hard column zero when the opener has structural TAB indentation.
-- The closer uses the opener-aligned structural TAB prefix and occupies the same visual column as the opener.\n- Each body line uses that same prefix plus one additional literal TAB, so the body is visually indented one TAB beyond the opener and closer. The opener's original indentation bytes are not rewritten; a space-indented opener is supported only when its visual column is exactly representable by TABs at the buffer's tabstop. Leading spaces are not a valid substitute for TABs on the closer.
+- The closer uses the opener-aligned structural TAB prefix and occupies the same visual column as the opener.
+- Each body line uses that same prefix plus one additional literal TAB, so the body is visually indented one TAB beyond the opener and closer. The opener's original indentation bytes are not rewritten; a space-indented opener is supported only when its visual column is exactly representable by TABs at the buffer's tabstop. Leading spaces are not a valid substitute for TABs on the closer.
 - Preserve all existing body whitespace when indenting or pasting. Never implement paste handling by removing all leading whitespace and prefixing a replacement.
 - Any structural prefix added to a body line must be a TAB byte if the resulting script is expected to rely on `<<-` tab stripping.
 - If the opener's indentation uses spaces in a way that cannot be represented by structural tabs without changing alignment, do not silently rewrite it. Report or document the limitation and leave the source intact.
