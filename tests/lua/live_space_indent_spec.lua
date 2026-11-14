@@ -44,30 +44,30 @@ vim.api.nvim_input("A\n")
 defer(function()
   wait_for(function()
     local actual = lines()
-    return actual[2] == "\t" and actual[3] == "\tLIVE"
+    return actual[2] == "\t\t" and actual[3] == "\tLIVE"
   end, "first Return must replace copied two-space autoindent with a structural TAB")
   assert(vim.api.nvim_get_mode().mode == "i", "first Return must remain in Insert mode")
 
   vim.api.nvim_input("typed")
   defer(function()
     local actual = lines()
-    assert(actual[2] == "\ttyped",
+    assert(actual[2] == "\t\ttyped",
       "typed payload must follow the structural TAB without leaked opener spaces")
     vim.api.nvim_input("\n")
     defer(function()
       wait_for(function()
-        return lines()[3] == "\t"
+        return lines()[3] == "\t\t"
       end, "subsequent body line must retain the structural TAB")
       vim.api.nvim_input("second")
       defer(function()
-        assert(lines()[3] == "\tsecond",
+        assert(lines()[3] == "\t\tsecond",
           "second payload must follow the structural TAB")
         vim.api.nvim_input(vim.api.nvim_replace_termcodes("<Esc>", true, false, true))
         defer(function()
           local actual = lines()
           assert(actual[1] == "  cat <<-LIVE")
           assert(actual[2] == "\ttyped")
-          assert(actual[3] == "\tsecond")
+          assert(actual[3] == "\t\tsecond")
           assert(actual[4] == "\tLIVE")
           print("space-indented live Insert-mode tests: PASS")
           vim.cmd("qa!")
