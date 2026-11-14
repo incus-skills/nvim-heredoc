@@ -31,10 +31,9 @@ lazy.nvim loads the plugin on the first supported filetype event and calls
 `require("nvim-heredoc").setup({})`. The plugin then attaches to supported
 buffers without requiring generated user ftplugins or copied Lua modules.
 
-The existing [provisioning instructions](docs/installation.md) are retained
-temporarily while the development harness and installation transition are
-updated. They describe the legacy provisioning path and are not the recommended
-installation method.
+The plugin has no user-facing setup options at present. The empty `opts = {}`
+field is retained as the conventional lazy.nvim setup entrypoint; the plugin
+uses its fixed supported-filetype set and attaches to matching buffers.
 
 ## Semantics that constrain the implementation
 
