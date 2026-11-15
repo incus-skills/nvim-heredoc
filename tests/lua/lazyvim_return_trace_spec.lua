@@ -127,26 +127,27 @@ local function run()
   api.nvim_win_set_cursor(0, { 3, #opener - 1 })
   snapshot("before first Return")
 
+  local return_key = native_cr and api.nvim_replace_termcodes("<CR>", true, false, true) or "\n"
   local steps = {
-    { "after first Return", "\n", function(lines)
+    { "after first Return", return_key, function(lines)
         assert(#lines >= 4, "first Return did not create a body line")
       end },
     { "after first payload", "hello1", function(lines)
         assert((lines[4] or ""):find("hello1", 1, true), "hello1 missing")
       end },
-    { "after second Return", "\n", function(lines)
+    { "after second Return", return_key, function(lines)
         assert(#lines >= 5, "second Return did not create a body line")
       end },
     { "after second payload", "hello2", function(lines)
         assert((lines[5] or ""):find("hello2", 1, true), "hello2 missing")
       end },
-    { "after third Return", "\n", function(lines)
+    { "after third Return", return_key, function(lines)
         assert(#lines >= 6, "third Return did not create a body line")
       end },
     { "after third payload", "hello3", function(lines)
         assert((lines[6] or ""):find("hello3", 1, true), "hello3 missing")
       end },
-    { "after fourth Return", "\n", function(lines)
+    { "after fourth Return", return_key, function(lines)
         assert(#lines >= 7, "fourth Return did not create a body line")
       end },
     { "after fourth payload", "hello4", function(lines)
