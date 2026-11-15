@@ -284,15 +284,11 @@ local function add_changed_range(ranges, firstline, lastline, new_lastline)
 end
 
 local function process_pending_ranges(buf, close_incomplete)
-  local pending = pending_ranges[buf]
+  -- The scanner already traverses the complete buffer. Reconcile the whole
+  -- heredoc body after each edit as well: Neovim's on_lines range can omit
+  -- autoindent bytes added as part of the same Return transition.
   pending_ranges[buf] = nil
-  if not pending then
-    M.process_buffer(buf, nil, close_incomplete)
-    return
-  end
-  for _, range in ipairs(pending.ranges) do
-    M.process_buffer(buf, range, close_incomplete)
-  end
+  M.process_buffer(buf, nil, close_incomplete)
 end
 
 local function schedule_changed_range(buf, firstline, lastline, new_lastline)
@@ -317,7 +313,8 @@ local function schedule_changed_range(buf, firstline, lastline, new_lastline)
     end
     if vim.api.nvim_buf_is_valid(buf) and vim.api.nvim_buf_is_loaded(buf)
       and supported(vim.bo[buf].filetype) then
-      process_pending_ranges(buf, false)
+      pending_ranges[buf] = nil
+      M.process_buffer(buf, nil, false)
     else
       pending_ranges[buf] = nil
     end
