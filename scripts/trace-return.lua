@@ -34,7 +34,7 @@ local function snapshot(stage, buf)
 end
 
 local function feed(keys)
-  api.nvim_feedkeys(fn.replace_termcodes(keys, true, false, true), "mtx", false)
+  api.nvim_feedkeys(api.nvim_replace_termcodes(keys, true, false, true), "mtx", false)
   vim.wait(40)
 end
 
