@@ -39,12 +39,25 @@ function M.prefix_lines(region, lines, opts)
     end
     return column
   end
+  local body_width = visual_width(body_prefix)
   for index, line in ipairs(lines) do
     if type(line) ~= "string" then
       return nil, "every changed line must be a string"
     end
 
-    if line:sub(1, #body_prefix) == body_prefix then
+    if line:match("^[ \t]*$") and opts.normalize_autoindent then
+      local width = visual_width(line)
+      if width == region.structural_column or width == body_width then
+        output[index] = body_prefix
+        changed = changed or output[index] ~= line
+      elseif line:sub(1, #body_prefix) == body_prefix then
+        output[index] = body_prefix
+        changed = changed or output[index] ~= line
+      else
+        output[index] = body_prefix .. line
+        changed = true
+      end
+    elseif line:sub(1, #body_prefix) == body_prefix then
       local payload = line:sub(#body_prefix + 1)
       if opts.normalize_autoindent and payload:match("^[ \t]*$") then
         -- Native autoindent may expand the structural TAB into spaces after
@@ -62,14 +75,7 @@ function M.prefix_lines(region, lines, opts)
       output[index] = body_prefix .. line:sub(#structural_prefix + 1)
       changed = true
     else
-      local width = opts.normalize_autoindent and line:match("^[ \t]*$") and visual_width(line) or nil
-      if width ~= nil and width == region.structural_column then
-        -- Neovim may copy the opener's indentation onto a newly-created
-        -- blank line. Replace it with the deeper body prefix.
-        output[index] = body_prefix
-      else
-        output[index] = body_prefix .. line
-      end
+      output[index] = body_prefix .. line
       changed = true
     end
   end
