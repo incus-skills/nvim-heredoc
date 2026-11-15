@@ -13,6 +13,7 @@ The scanner is buffer-independent and does not mutate its input. It normalises C
 
 - `complete`: whether the source was scanned without a lexical ambiguity or unresolved heredoc;
 - `regions`: managed `<<-` heredoc regions only;
+- `heredocs`: all recognised heredoc regions, including ordinary `<<`, used to detect operator transitions;
 - `diagnostics`: line-associated reasons why the scan is incomplete or uncertain.
 
 A completed region currently contains:
@@ -73,7 +74,8 @@ The current integration:
 - tracks changed line ranges with `nvim_buf_attach(on_lines)`;
 - retains disjoint notifications as separate ranges, rebases earlier pending ranges when edits insert/delete lines, and merges only overlapping or adjacent ranges;
 - prefixes only changed lines that intersect a scanner-confirmed body range;
-- avoids duplicating an already-present body prefix.
+- avoids duplicating an already-present body prefix;
+- reverses its structural body and closer indentation when an existing managed opener changes from `<<-` to `<<`, while leaving ordinary heredocs that were never managed untouched.
 
 The integration is headlessly tested, but this does not establish compatibility with LazyVim, `mini.pairs`, `blink.cmp`, or `conform.nvim`. Plugin-specific controls remain deliberately untouched pending inspection of the actual installed revisions and configuration.
 
