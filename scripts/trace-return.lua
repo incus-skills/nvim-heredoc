@@ -93,7 +93,7 @@ local function run()
   vim.bo[scratch].filetype = "sh"
   vim.defer_fn(function()
     local ok, err = xpcall(function()
-      report[#report + 1] = "nvim-heredoc Return trace (indentexpr disabled control)"
+      report[#report + 1] = "nvim-heredoc Return trace (" .. (fn.getenv("NVIM_HEREDOC_KEEP_INDENTEXPR") == "1" and "active indentexpr" or "indentexpr disabled control") .. ")"
       add("timestamp", os.date("%Y-%m-%d %H:%M:%S %z"))
       add("nvim_version", inspect(vim.version()))
       add("scratch_filetype", vim.bo[scratch].filetype)
@@ -119,13 +119,16 @@ local function run()
       end
       add("Insert Return mappings", inspect(maps))
 
-      -- Controlled A/B perturbation: preserve autoindent and the active Return
-      -- mapping, but disable the shell indent expression in this scratch buffer.
-      -- Compare this trace with the baseline to determine whether GetShIndent()
-      -- contributes the accumulating indentation. The user buffer is untouched.
+      -- By default, disable the shell indent expression as a control. Set
+      -- NVIM_HEREDOC_KEEP_INDENTEXPR=1 to retain the active filetype indentexpr
+      -- and test the complete ftplugin/plugin interaction. The user buffer is
+      -- untouched in either mode.
       local original_indentexpr = vim.bo[scratch].indentexpr
-      vim.bo[scratch].indentexpr = ""
-      add("indentexpr_control", "disabled in scratch buffer; original=" .. inspect(original_indentexpr))
+      local keep_indentexpr = fn.getenv("NVIM_HEREDOC_KEEP_INDENTEXPR") == "1"
+      if not keep_indentexpr then vim.bo[scratch].indentexpr = "" end
+      add("indentexpr_control", keep_indentexpr
+        and ("active in scratch buffer; value=" .. inspect(original_indentexpr))
+        or ("disabled in scratch buffer; original=" .. inspect(original_indentexpr)))
 
       -- The cursor cannot sit one byte beyond EOL in Normal mode. startinsert!
       -- explicitly enters at EOL, after the closing delimiter quote.
