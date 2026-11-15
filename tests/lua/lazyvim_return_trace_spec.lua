@@ -83,6 +83,7 @@ local function run()
   if control then vim.bo[buf].indentexpr = "" end
 
   local native_cr = vim.env.NVIM_HEREDOC_NATIVE_CR == "1"
+  local sync_feedkeys = vim.env.NVIM_HEREDOC_SYNC_FEEDKEYS == "1"
   if native_cr then
     -- A buffer-local, nonrecursive <CR> mapping whose RHS is the native
     -- <CR> keycode. This shadows MiniPairs without disabling autoindent or
@@ -97,6 +98,7 @@ local function run()
   local cr_mapping = vim.fn.maparg("<CR>", "i", false, true)
   add("scenario", (column_zero and "column-zero opener; " or "")
     .. (native_cr and "native Return; MiniPairs bypassed; " or "")
+    .. (sync_feedkeys and "synchronous feedkeys; " or "queued nvim_input; ")
     .. (provisioned_expandtab and "provisioning expandtab=false" or "expandtab=true")
     .. (control and "; indentexpr disabled" or "; shell indentexpr enabled"))
   add("nvim_version", vim.inspect(vim.version()))
@@ -159,7 +161,13 @@ local function run()
     end
     local step = steps[index]
     assert_insert("before " .. step[1])
-    api.nvim_input(step[2])
+    if sync_feedkeys then
+      -- Process typed input synchronously before the deferred snapshot. This
+      -- separates input-drain timing from the ordinary nvim_input path.
+      api.nvim_feedkeys(step[2], "tx", false)
+    else
+      api.nvim_input(step[2])
+    end
     vim.defer_fn(function()
       local ok, err = xpcall(function()
         assert_insert("after " .. step[1])
