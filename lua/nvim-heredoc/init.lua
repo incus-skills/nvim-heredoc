@@ -54,12 +54,6 @@ local function prefix_region_range(buf, region, changed_range)
 
   local lines = vim.api.nvim_buf_get_lines(buf, first_row, last_row, false)
   local prefixed, changed = editing.prefix_lines(region, lines, { normalize_autoindent = true })
-  if vim.env.NVIM_HEREDOC_DEBUG == "1" then
-    vim.api.nvim_err_writeln("nvim-heredoc range=" .. vim.inspect(changed_range)
-      .. " rows=" .. first_row .. ":" .. last_row
-      .. " lines=" .. vim.inspect(lines)
-      .. " prefixed=" .. vim.inspect(prefixed))
-  end
   if not prefixed then
     return false
   end
@@ -76,10 +70,9 @@ local function prefix_region_range(buf, region, changed_range)
         end
         local cursor_col = row == cursor_row and vim.api.nvim_win_get_cursor(0)[2] or nil
         local body_prefix = region.body_prefix or (structural_prefix .. "\t")
-        if lines[index]:sub(1, #body_prefix) == body_prefix then
-          -- This is already structurally prefixed; normalization is a
-          -- replacement of generated blank-line indentation, not insertion
-          -- of another prefix.
+        if lines[index]:match("^[ \t]*$") and prefixed[index] == body_prefix then
+          -- Blank-line autoindent is replaced as a whole; inserting a prefix
+          -- would leave the generated spaces behind it.
           vim.api.nvim_buf_set_lines(buf, row, row + 1, false, { prefixed[index] })
           if row == cursor_row then
             position_insert_cursor(buf, row, #prefixed[index])
