@@ -123,10 +123,9 @@ end
 
 local function is_function_header(line)
   line = line or ""
-  return line:match("^[ \\t]*[%w_][%w_]*[ \\t]*%([ \\t]*%)[ \\t]*{[ \\t]*$")
-    or line:match("^[ \\t]*function[ \\t]+[%w_][%w_]*[ \\t]*{[ \\t]*$")
+  return line:match("^[ \t]*[A-Za-z_][A-Za-z0-9_]*%(%)[ \t]*{[ \t]*$")
+    or line:match("^[ \t]*function[ \t]+[A-Za-z_][A-Za-z0-9_]*[ \t]*{[ \t]*$")
 end
-
 local function function_header_before(lines, opener_line)
   for row = opener_line - 1, 1, -1 do
     if is_function_header(lines[row]) then
