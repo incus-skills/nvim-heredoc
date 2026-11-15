@@ -45,7 +45,17 @@ function M.prefix_lines(region, lines, opts)
     end
 
     if line:sub(1, #body_prefix) == body_prefix then
-      output[index] = line
+      local payload = line:sub(#body_prefix + 1)
+      if opts.normalize_autoindent and payload:match("^[ \t]*$") then
+        -- Native autoindent may expand the structural TAB into spaces after
+        -- the plugin-owned prefix. On a blank line those bytes are generated
+        -- indentation, not payload; restore the exact structural prefix.
+        output[index] = body_prefix
+        changed = changed or output[index] ~= line
+      else
+        -- Never rewrite whitespace that precedes actual payload.
+        output[index] = line
+      end
     elseif structural_prefix ~= "" and line:sub(1, #structural_prefix) == structural_prefix then
       -- Existing opener-aligned indentation needs exactly one additional
       -- literal TAB to become body indentation.
