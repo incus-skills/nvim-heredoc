@@ -25,6 +25,10 @@ echo "===== LazyVim Return regression: indented opener with MiniPairs and indent
 NVIM_HEREDOC_DISABLE_INDENTEXPR=1 NVIM_HEREDOC_ASSERT_INDENTED=1 nvim --headless -u ci/lazyvim/init.lua \
   -c 'lua local ok, err = pcall(dofile, "tests/lua/lazyvim_return_trace_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
 
+echo "===== LazyVim Return regression: synchronous feedkeys with native Return ====="
+NVIM_HEREDOC_ASSERT_INDENTED=1 NVIM_HEREDOC_DISABLE_INDENTEXPR=1 NVIM_HEREDOC_NATIVE_CR=1 NVIM_HEREDOC_SYNC_FEEDKEYS=1 nvim --headless -u ci/lazyvim/init.lua \
+  -c 'lua local ok, err = pcall(dofile, "tests/lua/lazyvim_return_trace_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
+
 echo "===== LazyVim Return trace: native Return, MiniPairs bypassed ====="
 NVIM_HEREDOC_DISABLE_INDENTEXPR=1 NVIM_HEREDOC_NATIVE_CR=1 nvim --headless -u ci/lazyvim/init.lua \
   -c 'lua local ok, err = pcall(dofile, "tests/lua/lazyvim_return_trace_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
