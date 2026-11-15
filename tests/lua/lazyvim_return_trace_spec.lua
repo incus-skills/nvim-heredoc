@@ -165,8 +165,11 @@ local function run()
         assert_insert("after " .. step[1])
         local current = api.nvim_buf_get_lines(buf, 0, -1, false)
         step[3](current)
+        local expected
+        local scenario
         if vim.env.NVIM_HEREDOC_ASSERT_COLUMN_ZERO == "1" then
-          local expected = {
+          scenario = "column-zero"
+          expected = {
             ["after first Return"] = { 4, "\t" },
             ["after first payload"] = { 4, "\thello1" },
             ["after second Return"] = { 5, "\t" },
@@ -176,13 +179,32 @@ local function run()
             ["after fourth Return"] = { 7, "\t" },
             ["after fourth payload"] = { 7, "\thello4" },
           }
-          local assertion = expected[step[1]]
-          if assertion then
-            assert(current[assertion[1]] == assertion[2],
-              step[1] .. ": expected exact column-zero body bytes "
-                .. vim.inspect(assertion[2]) .. ", got "
-                .. vim.inspect(current[assertion[1]]))
-          end
+        elseif vim.env.NVIM_HEREDOC_ASSERT_INDENTED == "1" then
+          scenario = "indented-opener"
+          expected = {
+            ["after first Return"] = { 4, "\t\t" },
+            ["after first payload"] = { 4, "\t\thello1" },
+            ["after second Return"] = { 5, "\t\t" },
+            ["after second payload"] = { 5, "\t\thello2" },
+            ["after third Return"] = { 6, "\t\t" },
+            ["after third payload"] = { 6, "\t\thello3" },
+            ["after fourth Return"] = { 7, "\t\t" },
+            ["after fourth payload"] = { 7, "\t\thello4" },
+          }
+          assert(current[3] == "  cat <<-'TRACE'",
+            "indented-opener regression: original opener bytes were changed")
+        end
+        local assertion = expected and expected[step[1]]
+        if assertion then
+          assert(current[assertion[1]] == assertion[2],
+            step[1] .. ": " .. scenario .. " expected exact body bytes "
+              .. vim.inspect(assertion[2]) .. ", got "
+              .. vim.inspect(current[assertion[1]]))
+        end
+        if step[1] == "after fourth payload" and scenario == "indented-opener" then
+          assert(current[8] == "\tTRACE",
+            "indented-opener regression: closer must use one structural TAB, got "
+              .. vim.inspect(current[8]))
         end
         snapshot(step[1])
       end, debug.traceback)
