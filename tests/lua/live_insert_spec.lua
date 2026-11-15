@@ -171,25 +171,23 @@ if vim.env.NVIM_HEREDOC_FUNCTION_BOUNDARY == "1" or vim.env.NVIM_HEREDOC_FUNCTIO
               "the heredoc opener should retain the function body's indentation; lines="
                 .. vim.inspect(after_opener))
 
-            -- The old completed heredoc is now lexically inside the new
-            -- opener. The live on_lines/scheduled path must recognise the
-            -- still-present function brace and reserve the new closer before
-            -- it, without consuming or rewriting the old function.
-            wait_for(function()
-              actual = lines(buf)
-              return actual[3] == "\tEOF" and actual[4] == "}"
-            end, "live processing should insert the new closer before the MiniPairs brace")
-            actual = snapshot("after scheduled processing of the new opener")
-            assert_original(actual, 5)
-
+            -- Do not wait for processing of the opener as a standalone edit.
+            -- The regression is specifically the first Return after typing
+            -- the opener: the scheduled on_lines work must observe the new
+            -- line break and reserve the closer before the function brace.
             api.nvim_input(api.nvim_replace_termcodes("<CR>", true, false, true))
             defer(function()
-              local after_body_return = snapshot("after Return into the heredoc body")
+              wait_for(function()
+                actual = lines(buf)
+                return actual[4] == "\tEOF" and actual[5] == "}"
+              end, "the first Return after the new opener should reserve its closer before the MiniPairs brace")
+              local after_body_return = snapshot("immediately after the first Return following the new opener")
               assert_insert_mode("Return after the heredoc opener must remain in Insert mode")
-              assert(after_body_return[3] == "\t\t"
+              assert(after_body_return[1] == "conf_print_test2() {"
+                and after_body_return[2] == "  cat <<-'EOF'"
                 and after_body_return[4] == "\tEOF"
                 and after_body_return[5] == "}",
-                "the body prefix and closer must be inserted before the function brace; lines="
+                "the first Return must close the new heredoc inside the function; lines="
                   .. vim.inspect(after_body_return))
               assert_original(after_body_return, 6)
 
