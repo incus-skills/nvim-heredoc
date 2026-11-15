@@ -105,7 +105,8 @@ if vim.env.NVIM_HEREDOC_FUNCTION_BOUNDARY == "1" then
 
   local function run()
     api.nvim_win_set_cursor(0, { 1, 0 })
-    api.nvim_input("i")
+    -- Open a fresh line above the existing function, as in the user's edit.
+    api.nvim_input("O")
     defer(function()
       assert_insert_mode("entering Insert mode before typing the function header")
       api.nvim_input("conf_print_test2() {")
