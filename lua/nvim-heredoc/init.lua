@@ -147,10 +147,15 @@ local function reconcile_managed_transition(buf, previous, current)
         local closer_row = replacement.terminator_line
         if not closer_row then
           local expected = (old.structural_prefix or "") .. old.delimiter
-          for row = replacement.body_start_line, #lines do
-            if lines[row] == expected or lines[row] == old.delimiter then
-              closer_row = row
-              break
+          local prior_row = old.terminator_line
+          if prior_row and (lines[prior_row] == expected or lines[prior_row] == old.delimiter) then
+            closer_row = prior_row
+          else
+            for row = replacement.body_start_line, #lines do
+              if lines[row] == expected or lines[row] == old.delimiter then
+                closer_row = row
+                break
+              end
             end
           end
         end
