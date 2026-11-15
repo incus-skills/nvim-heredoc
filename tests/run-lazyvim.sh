@@ -25,6 +25,10 @@ echo "===== LazyVim Return trace: native Return, MiniPairs bypassed ====="
 NVIM_HEREDOC_DISABLE_INDENTEXPR=1 NVIM_HEREDOC_NATIVE_CR=1 nvim --headless -u ci/lazyvim/init.lua \
   -c 'lua local ok, err = pcall(dofile, "tests/lua/lazyvim_return_trace_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
 
+echo "===== LazyVim Return trace: native Return with provisioning expandtab=false ====="
+NVIM_HEREDOC_DISABLE_INDENTEXPR=1 NVIM_HEREDOC_NATIVE_CR=1 NVIM_HEREDOC_PROVISIONED_EXPANDTAB=1 nvim --headless -u ci/lazyvim/init.lua \
+  -c 'lua local ok, err = pcall(dofile, "tests/lua/lazyvim_return_trace_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
+
 bash tests/expect-failure.sh "LazyVim integration negative control" \
   "NEGATIVE_CONTROL: ordinary heredoc was unexpectedly left unchanged" \
   nvim --headless -u ci/lazyvim/init.lua \
