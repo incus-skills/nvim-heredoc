@@ -56,6 +56,10 @@ Paste handling must operate on the complete changed range and preserve existing 
 
 Formatting is separate from interactive editing. `shfmt` is for Bash and POSIX `sh` only, not Zsh. Its effect on heredoc payload bytes must be tested rather than assumed.
 
+## Future development context
+
+The next-stage design concern around embedded heredoc payloads—including language identification, region-aware editor tooling, diagnostics/completion, and formatter isolation—is recorded in [future development context](docs/future-development-context.md). This is exploratory context, not a current implementation commitment.
+
 ## Current status
 
 - Repository initialisation complete.
