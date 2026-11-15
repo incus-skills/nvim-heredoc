@@ -33,6 +33,7 @@ end
 
 if vim.env.NVIM_HEREDOC_FUNCTION_BOUNDARY == "1" then
   local api = vim.api
+  local actual
   local original = {
     "conf_print_test1() {",
     "  cat <<'EOF'",
