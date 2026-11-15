@@ -17,6 +17,10 @@ echo "===== LazyVim Return trace: shell indentexpr enabled ====="
 nvim --headless -u ci/lazyvim/init.lua \
   -c 'lua local ok, err = pcall(dofile, "tests/lua/lazyvim_return_trace_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
 
+echo "===== LazyVim Return regression: indented opener with MiniPairs and shell indentexpr ====="
+NVIM_HEREDOC_ASSERT_INDENTED=1 nvim --headless -u ci/lazyvim/init.lua \
+  -c 'lua local ok, err = pcall(dofile, "tests/lua/lazyvim_return_trace_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
+
 echo "===== LazyVim Return trace: shell indentexpr disabled control ====="
 NVIM_HEREDOC_DISABLE_INDENTEXPR=1 nvim --headless -u ci/lazyvim/init.lua \
   -c 'lua local ok, err = pcall(dofile, "tests/lua/lazyvim_return_trace_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
