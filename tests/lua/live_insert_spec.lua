@@ -135,7 +135,7 @@ if vim.env.NVIM_HEREDOC_FUNCTION_BOUNDARY == "1" or vim.env.NVIM_HEREDOC_FUNCTIO
             -- Insert-mode input loop. Ctrl-O executes one Normal-mode command
             -- without leaving Insert mode; jdd deletes MiniPairs' brace before
             -- the scheduled on_lines processor handles the opener edit.
-            api.nvim_input(api.nvim_replace_termcodes("cat <lt><lt>-'EOF'<C-o>jdd", true, false, true))
+            api.nvim_input(api.nvim_replace_termcodes("cat <lt><lt>-'EOF'<C-o>j<C-o>dd", true, false, true))
             defer(function()
               assert_insert_mode("withdrawing the function brace must remain in Insert mode")
               vim.wait(200, function() return false end, 10)
