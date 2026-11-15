@@ -130,7 +130,7 @@ if vim.env.NVIM_HEREDOC_FUNCTION_BOUNDARY == "1" then
             "MiniPairs Return should place the autoclose brace on its own line; lines="
               .. vim.inspect(after_pair_return))
 
-          api.nvim_input("cat <<-'EOF'")
+          api.nvim_input(api.nvim_replace_termcodes("cat <lt><lt>-'EOF'", true, false, true))
           defer(function()
             local after_opener = snapshot("after typing the new heredoc opener")
             assert_insert_mode("typing the heredoc opener must remain in Insert mode")
