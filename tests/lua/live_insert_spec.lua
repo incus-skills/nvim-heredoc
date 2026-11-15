@@ -148,7 +148,7 @@ if vim.env.NVIM_HEREDOC_FUNCTION_BOUNDARY == "1" then
               assert(#actual == #original + 2,
                 "the plugin must not recreate a function boundary or insert a closer after the user deletes it; lines="
                   .. vim.inspect(actual))
-              assert(not vim.tbl_contains(actual, "\\tEOF"),
+              assert(not vim.tbl_contains(actual, "\tEOF"),
                 "the plugin must not insert a managed closer after the boundary is withdrawn; lines="
                   .. vim.inspect(actual))
               print("live function-boundary withdrawal test: PASS")
