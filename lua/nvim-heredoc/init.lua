@@ -69,10 +69,21 @@ local function prefix_region_range(buf, region, changed_range)
           insert_col, insert_text = #structural_prefix, "\t"
         end
         local cursor_col = row == cursor_row and vim.api.nvim_win_get_cursor(0)[2] or nil
-        vim.api.nvim_buf_set_text(buf, row, insert_col, row, insert_col, { insert_text })
-        if row == cursor_row then
-          local target_col = cursor_col >= insert_col and (cursor_col + #insert_text) or cursor_col
-          position_insert_cursor(buf, row, target_col)
+        local body_prefix = region.body_prefix or (structural_prefix .. "\t")
+        if lines[index]:sub(1, #body_prefix) == body_prefix then
+          -- This is already structurally prefixed; normalization is a
+          -- replacement of generated blank-line indentation, not insertion
+          -- of another prefix.
+          vim.api.nvim_buf_set_lines(buf, row, row + 1, false, { prefixed[index] })
+          if row == cursor_row then
+            position_insert_cursor(buf, row, #prefixed[index])
+          end
+        else
+          vim.api.nvim_buf_set_text(buf, row, insert_col, row, insert_col, { insert_text })
+          if row == cursor_row then
+            local target_col = cursor_col >= insert_col and (cursor_col + #insert_text) or cursor_col
+            position_insert_cursor(buf, row, target_col)
+          end
         end
       end
     end
