@@ -75,7 +75,7 @@ The current integration:
 - retains disjoint notifications as separate ranges, rebases earlier pending ranges when edits insert/delete lines, and merges only overlapping or adjacent ranges;
 - prefixes only changed lines that intersect a scanner-confirmed body range;
 - avoids duplicating an already-present body prefix;
-- reverses its structural body and closer indentation when an existing managed opener changes from `<<-` to `<<`, while leaving ordinary heredocs that were never managed untouched.
+- reconciles body and closer indentation in both directions when an opener changes between `<<-` and `<<`; ordinary heredocs that were never managed remain untouched.
 
 The integration is headlessly tested, but this does not establish compatibility with LazyVim, `mini.pairs`, `blink.cmp`, or `conform.nvim`. Plugin-specific controls remain deliberately untouched pending inspection of the actual installed revisions and configuration.
 
