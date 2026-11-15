@@ -163,25 +163,16 @@ if vim.env.NVIM_HEREDOC_FUNCTION_BOUNDARY == "1" or vim.env.NVIM_HEREDOC_FUNCTIO
             end)
             return
           end
-          api.nvim_input(api.nvim_replace_termcodes("cat <lt><lt>-'EOF'", true, false, true))
+          -- Queue the opener and its first Return together. nvim_input()
+          -- does not run the scheduled on_lines callback until Neovim returns
+          -- to its event loop, so this preserves the real keystroke ordering
+          -- without allowing a standalone opener-processing interval.
+          api.nvim_input(api.nvim_replace_termcodes("cat <lt><lt>-'EOF'<CR>", true, false, true))
           defer(function()
-            local after_opener = snapshot("after typing the new heredoc opener")
-            assert_insert_mode("typing the heredoc opener must remain in Insert mode")
-            assert(after_opener[2] == "  cat <<-'EOF'",
+            local after_body_return = snapshot("immediately after the first Return following the new opener")
+            assert(after_body_return[2] == "  cat <<-'EOF'",
               "the heredoc opener should retain the function body's indentation; lines="
-                .. vim.inspect(after_opener))
-
-            -- Do not wait for processing of the opener as a standalone edit.
-            -- The regression is specifically the first Return after typing
-            -- the opener: the scheduled on_lines work must observe the new
-            -- line break and reserve the closer before the function brace.
-            api.nvim_input(api.nvim_replace_termcodes("<CR>", true, false, true))
-            defer(function()
-              wait_for(function()
-                actual = lines(buf)
-                return actual[4] == "\tEOF" and actual[5] == "}"
-              end, "the first Return after the new opener should reserve its closer before the MiniPairs brace")
-              local after_body_return = snapshot("immediately after the first Return following the new opener")
+                .. vim.inspect(after_body_return))
               assert_insert_mode("Return after the heredoc opener must remain in Insert mode")
               assert(after_body_return[1] == "conf_print_test2() {"
                 and after_body_return[2] == "  cat <<-'EOF'"
