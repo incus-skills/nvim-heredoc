@@ -35,6 +35,27 @@ This is a precedent to study, not a design to copy wholesale. In particular:
 - The supplied excerpt is TOML-specific. Do not infer from it that the same configuration already handles every mise file format.
 - A heredoc delimiter usually does not identify the payload language as directly as a mise `run` field's shebang can. Language identification may need a separate mechanism or may remain unknown.
 
+## Observed payload conventions in the user's scripts
+
+The user's predominant heredoc use is provisioning files for installations and sending messages to the terminal. In these workflows, payload language is generally indicated by one of two contextual signals:
+
+1. **Explicit signal — a shebang in the payload.** Provisioning heredocs may contain scripts with a shebang, which can identify the intended interpreter/language. This is analogous to the shebang-based language selection in the mise configuration.
+2. **Implicit signal — the receiving command in the shell command/pipeline.** A heredoc may be supplied to a consumer that establishes how its input is interpreted or rendered. For example:
+
+   ```sh
+   cat <<'EOF' | glow -
+   # Installation notes
+
+   This is **Markdown** rendered in the terminal.
+   EOF
+   ```
+
+   Here, `glow -` is the downstream consumer of standard input and provides evidence that the heredoc payload is Markdown.
+
+These are complementary signals: a shebang describes the intended script interpreter, while a downstream consumer can describe the payload's input format or presentation. Language classification should therefore consider the complete shell command relationship, including the command receiving the heredoc and its pipeline/redirection context, rather than inspecting only the opener, delimiter, or body.
+
+The consumer signal needs semantic knowledge of the command and its input convention. A generic command such as `cat` does not, by itself, identify a language; in the example, the useful signal is `glow -`. If the consumer is unknown, ambiguous, or does not imply a specific format, classification should remain unknown rather than guess. This is an observed usage pattern and a promising source of classification evidence, not yet an implemented rule or a complete command-to-language mapping.
+
 ## Architectural distinction to preserve
 
 The existing project decision is that the shared lexical scanner is the authority for structural heredoc regions. Future embedded-language work should preserve that authority while keeping these questions separate:
@@ -73,7 +94,7 @@ The scanner should continue to report structural regions and confidence. Languag
 These are deliberately unresolved:
 
 - Should editor-tool isolation apply to every managed `<<-` body, or only to a subset? The working recommendation raised in discussion was to treat all managed bodies as payload regions regardless of delimiter quoting: delimiter quoting controls shell expansion at execution time, not whether the editor should assume the body is shell code. This has not yet been confirmed as a project decision.
-- What language-identification signals are appropriate for heredoc bodies: explicit user configuration, delimiter conventions, shebangs or content inspection, filetype conventions, or a combination? What confidence threshold is required?
+- How should the two observed contextual signals be resolved: an explicit shebang in the payload, and an implicit language/format indication from the downstream command consuming the heredoc (including pipeline and redirection context)? What command-to-language knowledge is needed, how should conflicting signals be handled, and what confidence threshold is required?
 - How should unknown or ambiguous payloads behave? Is opaque treatment the default, and how should users opt into a language?
 - Which Neovim/Tree-sitter APIs can consume scanner-derived ranges robustly as the buffer changes?
 - Which diagnostics, completion, LSP, lint, and formatter integrations can actually scope behaviour to a region rather than a whole buffer?
