@@ -269,6 +269,36 @@ do
 end
 
 do
+  local buf = set_buffer({
+    "\tcat <<-'EOF'",
+    "\t\tpayload",
+    "\t\t  nested",
+    "\t\t",
+    "\tEOF",
+  })
+  vim.api.nvim_set_current_buf(buf)
+  plugin.setup()
+
+  vim.api.nvim_buf_set_lines(buf, 0, 1, false, { "\tcat <<'EOF'" })
+  assert(vim.wait(1000, function()
+    local actual = lines(buf)
+    return actual[2] == "payload"
+      and actual[3] == "  nested"
+      and actual[4] == ""
+      and actual[5] == "EOF"
+  end, 10), "removing <<- should remove the structural body and closer TABs")
+
+  vim.api.nvim_buf_set_lines(buf, 0, 1, false, { "\tcat <<-'EOF'" })
+  assert(vim.wait(1000, function()
+    local actual = lines(buf)
+    return actual[2] == "\t\tpayload"
+      and actual[3] == "\t\t  nested"
+      and actual[4] == "\t\t"
+      and actual[5] == "\tEOF"
+  end, 10), "restoring <<- should reapply the structural body and closer TABs")
+end
+
+do
   local buf = set_buffer({ "cat <<EOF", "body" })
   assert(not plugin.process_buffer(buf))
   local actual = lines(buf)
