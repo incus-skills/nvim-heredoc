@@ -66,7 +66,8 @@ local function run()
   })
 
   -- Match the user's reported Neovim indentation options.
-  vim.bo[buf].expandtab = true
+  local provisioned_expandtab = vim.env.NVIM_HEREDOC_PROVISIONED_EXPANDTAB == "1"
+  vim.bo[buf].expandtab = not provisioned_expandtab
   vim.bo[buf].tabstop = 2
   vim.bo[buf].softtabstop = 0
   vim.bo[buf].shiftwidth = 2
@@ -92,8 +93,9 @@ local function run()
   end
 
   local cr_mapping = vim.fn.maparg("<CR>", "i", false, true)
-  add("scenario", native_cr and "native Return; MiniPairs bypassed"
-    or (control and "indentexpr disabled control" or "normal shell indentexpr"))
+  add("scenario", (native_cr and "native Return; MiniPairs bypassed; " or "")
+    .. (provisioned_expandtab and "provisioning expandtab=false" or "expandtab=true")
+    .. (control and "; indentexpr disabled" or "; shell indentexpr enabled"))
   add("nvim_version", vim.inspect(vim.version()))
   add("filetype", vim.bo[buf].filetype)
   add("plugin_attached", vim.inspect(vim.b[buf].nvim_heredoc_attached))
