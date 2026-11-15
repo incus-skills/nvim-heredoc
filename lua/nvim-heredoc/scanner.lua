@@ -409,6 +409,7 @@ function M.scan(source, opts)
       local region = {
         operator = item.operator,
         opener_line = item.opener_line,
+        opener_text = opener,
         command_end_line = item.command_end_line,
         queue_position = q,
         delimiter_original = item.delimiter_original,
