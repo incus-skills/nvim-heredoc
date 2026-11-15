@@ -79,8 +79,21 @@ local function run()
   local control = vim.env.NVIM_HEREDOC_DISABLE_INDENTEXPR == "1"
   if control then vim.bo[buf].indentexpr = "" end
 
+  local native_cr = vim.env.NVIM_HEREDOC_NATIVE_CR == "1"
+  if native_cr then
+    -- A buffer-local, nonrecursive <CR> mapping whose RHS is the native
+    -- <CR> keycode. This shadows MiniPairs without disabling autoindent or
+    -- the plugin's buffer callbacks.
+    vim.keymap.set("i", "<CR>", "<CR>", {
+      buffer = buf,
+      noremap = true,
+      desc = "Diagnostic native <CR> (MiniPairs bypass)",
+    })
+  end
+
   local cr_mapping = vim.fn.maparg("<CR>", "i", false, true)
-  add("scenario", control and "indentexpr disabled control" or "normal shell indentexpr")
+  add("scenario", native_cr and "native Return; MiniPairs bypassed"
+    or (control and "indentexpr disabled control" or "normal shell indentexpr"))
   add("nvim_version", vim.inspect(vim.version()))
   add("filetype", vim.bo[buf].filetype)
   add("plugin_attached", vim.inspect(vim.b[buf].nvim_heredoc_attached))
@@ -93,8 +106,16 @@ local function run()
   add("shiftwidth", vim.inspect(vim.bo[buf].shiftwidth))
   add("formatoptions", vim.inspect(vim.bo[buf].formatoptions))
   add("Insert Return mapping", vim.inspect(cr_mapping))
-  assert(cr_mapping.rhs == "v:lua.MiniPairs.cr()",
-    "MiniPairs' real <CR> mapping is not active: " .. vim.inspect(cr_mapping))
+  if native_cr then
+    assert(cr_mapping.buffer == 1 and cr_mapping.noremap == 1,
+      "native <CR> buffer-local nonrecursive mapping is not active: "
+        .. vim.inspect(cr_mapping))
+    assert(cr_mapping.rhs ~= "v:lua.MiniPairs.cr()",
+      "MiniPairs <CR> mapping is still active: " .. vim.inspect(cr_mapping))
+  else
+    assert(cr_mapping.rhs == "v:lua.MiniPairs.cr()",
+      "MiniPairs' real <CR> mapping is not active: " .. vim.inspect(cr_mapping))
+  end
 
   local opener = "  cat <<-'TRACE'"
   api.nvim_win_set_cursor(0, { 3, #opener - 1 })
