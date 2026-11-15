@@ -49,10 +49,12 @@ local function run()
 
   buf = api.nvim_create_buf(true, false)
   api.nvim_set_current_buf(buf)
+  local column_zero = vim.env.NVIM_HEREDOC_COLUMN_ZERO == "1"
+  local opener = column_zero and "cat <<-'TRACE'" or "  cat <<-'TRACE'"
   api.nvim_buf_set_lines(buf, 0, -1, false, {
     "# nvim-heredoc CI Return trace",
     "conf_print_test() {",
-    "  cat <<-'TRACE'",
+    opener,
   })
   vim.bo[buf].filetype = "sh"
 
@@ -93,7 +95,8 @@ local function run()
   end
 
   local cr_mapping = vim.fn.maparg("<CR>", "i", false, true)
-  add("scenario", (native_cr and "native Return; MiniPairs bypassed; " or "")
+  add("scenario", (column_zero and "column-zero opener; " or "")
+    .. (native_cr and "native Return; MiniPairs bypassed; " or "")
     .. (provisioned_expandtab and "provisioning expandtab=false" or "expandtab=true")
     .. (control and "; indentexpr disabled" or "; shell indentexpr enabled"))
   add("nvim_version", vim.inspect(vim.version()))
@@ -119,7 +122,6 @@ local function run()
       "MiniPairs' real <CR> mapping is not active: " .. vim.inspect(cr_mapping))
   end
 
-  local opener = "  cat <<-'TRACE'"
   api.nvim_win_set_cursor(0, { 3, #opener - 1 })
   snapshot("before first Return")
 
