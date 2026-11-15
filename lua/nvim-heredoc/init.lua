@@ -54,6 +54,12 @@ local function prefix_region_range(buf, region, changed_range)
 
   local lines = vim.api.nvim_buf_get_lines(buf, first_row, last_row, false)
   local prefixed, changed = editing.prefix_lines(region, lines, { normalize_autoindent = true })
+  if vim.env.NVIM_HEREDOC_DEBUG == "1" then
+    vim.api.nvim_err_writeln("nvim-heredoc range=" .. vim.inspect(changed_range)
+      .. " rows=" .. first_row .. ":" .. last_row
+      .. " lines=" .. vim.inspect(lines)
+      .. " prefixed=" .. vim.inspect(prefixed))
+  end
   if not prefixed then
     return false
   end
@@ -284,11 +290,15 @@ local function add_changed_range(ranges, firstline, lastline, new_lastline)
 end
 
 local function process_pending_ranges(buf, close_incomplete)
-  -- The scanner already traverses the complete buffer. Reconcile the whole
-  -- heredoc body after each edit as well: Neovim's on_lines range can omit
-  -- autoindent bytes added as part of the same Return transition.
+  local pending = pending_ranges[buf]
   pending_ranges[buf] = nil
-  M.process_buffer(buf, nil, close_incomplete)
+  if not pending then
+    M.process_buffer(buf, nil, close_incomplete)
+    return
+  end
+  for _, range in ipairs(pending.ranges) do
+    M.process_buffer(buf, range, close_incomplete)
+  end
 end
 
 local function schedule_changed_range(buf, firstline, lastline, new_lastline)
@@ -313,8 +323,7 @@ local function schedule_changed_range(buf, firstline, lastline, new_lastline)
     end
     if vim.api.nvim_buf_is_valid(buf) and vim.api.nvim_buf_is_loaded(buf)
       and supported(vim.bo[buf].filetype) then
-      pending_ranges[buf] = nil
-      M.process_buffer(buf, nil, false)
+      process_pending_ranges(buf, false)
     else
       pending_ranges[buf] = nil
     end
