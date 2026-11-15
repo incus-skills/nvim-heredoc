@@ -52,7 +52,8 @@ end
 
 local function input(keys, stage)
   assert_insert("before " .. stage)
-  local accepted = api.nvim_input(keys)
+  local encoded = api.nvim_replace_termcodes(keys, true, false, true)
+  local accepted = api.nvim_input(encoded)
   add("nvim_input bytes (" .. stage .. ")", accepted)
   settle(stage)
 end
