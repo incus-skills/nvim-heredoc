@@ -6,6 +6,7 @@ local group_name = "NvimHeredoc"
 local processing = {}
 local attached = {}
 local pending_ranges = {}
+local scan_snapshots = {}
 
 local function supported(ft)
   return ft == "bash" or ft == "sh" or ft == "zsh"
@@ -120,6 +121,66 @@ local function ensure_body_prefix(buf, region, body_row)
   end
 end
 
+local function reverse_managed_transition(buf, previous, current)
+  if not previous or not previous.heredocs or not current.heredocs then
+    return false
+  end
+
+  local lines = get_lines(buf)
+  local changed = false
+  for _, old in ipairs(previous.heredocs) do
+    if old.operator == "<<-" and old.terminator_line and old.body_prefix then
+      local replacement
+      for _, new in ipairs(current.heredocs) do
+        if new.operator == "<<"
+          and new.opener_line == old.opener_line
+          and new.queue_position == old.queue_position
+          and new.delimiter == old.delimiter
+          and new.delimiter_original == old.delimiter_original then
+          replacement = new
+          break
+        end
+      end
+
+      if replacement then
+        local closer_row
+        local expected_closer = (old.structural_prefix or "") .. old.delimiter
+        for row = replacement.body_start_line, #lines do
+          if lines[row] == expected_closer or lines[row] == old.delimiter then
+            closer_row = row
+            break
+          end
+        end
+        if closer_row then
+          local first = replacement.body_start_line - 1
+          local body = {}
+          for row = first + 1, closer_row - 1 do
+            local line = lines[row]
+            if line:sub(1, #old.body_prefix) == old.body_prefix then
+              line = line:sub(#old.body_prefix + 1)
+              changed = true
+            end
+            body[#body + 1] = line
+          end
+          if #body > 0 then
+            vim.api.nvim_buf_set_lines(buf, first, closer_row - 1, false, body)
+          end
+
+          local closer = lines[closer_row]
+          local structural = old.structural_prefix or ""
+          if structural ~= "" and closer:sub(1, #structural) == structural then
+            vim.api.nvim_buf_set_lines(buf, closer_row - 1, closer_row, false, {
+              closer:sub(#structural + 1),
+            })
+            changed = true
+          end
+        end
+      end
+    end
+  end
+  return changed
+end
+
 function M.process_buffer(buf, changed_range, close_incomplete)
   buf = buf or vim.api.nvim_get_current_buf()
   if not vim.api.nvim_buf_is_valid(buf) or not vim.api.nvim_buf_is_loaded(buf) then
@@ -134,12 +195,18 @@ function M.process_buffer(buf, changed_range, close_incomplete)
 
   processing[buf] = true
   local changed = false
+  local previous_scan = scan_snapshots[buf]
   local success, err = pcall(function()
     -- Each pass can close one pending heredoc. Re-scan so multiple queued
     -- heredocs are resolved in declaration order rather than guessed.
     for _ = 1, 32 do
       local lines = get_lines(buf)
       local result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
+      if reverse_managed_transition(buf, previous_scan, result) then
+        changed = true
+        lines = get_lines(buf)
+        result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
+      end
       if not result.complete then
         local pending
         for _, region in ipairs(result.regions) do
@@ -194,6 +261,10 @@ function M.process_buffer(buf, changed_range, close_incomplete)
   end)
 
   processing[buf] = nil
+  if success then
+    local snapshot_lines = get_lines(buf)
+    scan_snapshots[buf] = scanner.scan(get_source(snapshot_lines), { tabstop = vim.bo[buf].tabstop })
+  end
   if not success then
     vim.notify("nvim-heredoc: " .. tostring(err), vim.log.levels.WARN)
     return false
@@ -337,6 +408,7 @@ local function attach(buf)
 
   attached[buf] = true
   vim.b[buf].nvim_heredoc_attached = true
+  scan_snapshots[buf] = scanner.scan(get_source(get_lines(buf)), { tabstop = vim.bo[buf].tabstop })
   vim.api.nvim_buf_attach(buf, false, {
     on_lines = function(_, changed_buf, _, firstline, lastline, new_lastline)
       schedule_changed_range(changed_buf, firstline, lastline, new_lastline)
@@ -344,6 +416,7 @@ local function attach(buf)
     on_detach = function(_, detached_buf)
       attached[detached_buf] = nil
       pending_ranges[detached_buf] = nil
+      scan_snapshots[detached_buf] = nil
     end,
   })
 
