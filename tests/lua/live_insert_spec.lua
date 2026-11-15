@@ -31,7 +31,7 @@ local function wait_for(predicate, message)
   assert(vim.wait(1000, predicate, 10), message .. "; lines=" .. vim.inspect(lines(buf)))
 end
 
-if vim.env.NVIM_HEREDOC_FUNCTION_BOUNDARY == "1" then
+if vim.env.NVIM_HEREDOC_FUNCTION_BOUNDARY == "1" or vim.env.NVIM_HEREDOC_FUNCTION_BOUNDARY_DELETE == "1" then
   local api = vim.api
   local actual
   local original = {
