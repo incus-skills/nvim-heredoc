@@ -165,6 +165,25 @@ local function run()
         assert_insert("after " .. step[1])
         local current = api.nvim_buf_get_lines(buf, 0, -1, false)
         step[3](current)
+        if vim.env.NVIM_HEREDOC_ASSERT_COLUMN_ZERO == "1" then
+          local expected = {
+            ["after first Return"] = { 4, "\\t" },
+            ["after first payload"] = { 4, "\\thello1" },
+            ["after second Return"] = { 5, "\\t" },
+            ["after second payload"] = { 5, "\\thello2" },
+            ["after third Return"] = { 6, "\\t" },
+            ["after third payload"] = { 6, "\\thello3" },
+            ["after fourth Return"] = { 7, "\\t" },
+            ["after fourth payload"] = { 7, "\\thello4" },
+          }
+          local assertion = expected[step[1]]
+          if assertion then
+            assert(current[assertion[1]] == assertion[2],
+              step[1] .. ": expected exact column-zero body bytes "
+                .. vim.inspect(assertion[2]) .. ", got "
+                .. vim.inspect(current[assertion[1]]))
+          end
+        end
         snapshot(step[1])
       end, debug.traceback)
       if not ok then finish(false, err); return end
