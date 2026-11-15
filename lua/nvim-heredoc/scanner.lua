@@ -351,7 +351,7 @@ function M.scan(source, opts)
   local tabstop = tonumber(opts.tabstop) or 2
   if tabstop < 1 then tabstop = 2 end
   local lines = split_lines(source or "")
-  local result = { regions = {}, diagnostics = {}, complete = true }
+  local result = { regions = {}, heredocs = {}, diagnostics = {}, complete = true }
   local i = 1
 
   while i <= #lines do
@@ -376,7 +376,7 @@ function M.scan(source, opts)
       end
       -- Once lexical state is uncertain, later physical lines may still be
       -- heredoc payload. Do not continue scanning them as shell source.
-      for _, region in ipairs(result.regions) do
+      for _, region in ipairs(result.heredocs) do
         region.editable = false
         region.opener_safe = false
         region.confidence = "uncertain"
@@ -387,14 +387,12 @@ function M.scan(source, opts)
     for q, item in ipairs(queue) do
       item.queue_position = q
       item.command_end_line = i - 1
-      if item.operator == "<<-" then
-        local opener = lines[item.opener_line] or ""
-        local prefix = opener:match("^([ \t]*)") or ""
-        item.opener_prefix = prefix
-        item.structural_prefix, item.structural_column = structural_tab_prefix(prefix, tabstop)
-        item.structural_tabs_only = item.structural_prefix ~= nil
-        item.body_prefix = item.structural_tabs_only and (item.structural_prefix .. "\t") or nil
-      end
+      local opener = lines[item.opener_line] or ""
+      local prefix = opener:match("^([ \t]*)") or ""
+      item.opener_prefix = prefix
+      item.structural_prefix, item.structural_column = structural_tab_prefix(prefix, tabstop)
+      item.structural_tabs_only = item.structural_prefix ~= nil
+      item.body_prefix = item.structural_tabs_only and (item.structural_prefix .. "\t") or nil
 
       local body_start, terminator = i, nil
       while i <= #lines do
@@ -407,68 +405,47 @@ function M.scan(source, opts)
         i = i + 1
       end
 
+      local safe = item.structural_tabs_only
+      local region = {
+        operator = item.operator,
+        opener_line = item.opener_line,
+        command_end_line = item.command_end_line,
+        queue_position = q,
+        delimiter_original = item.delimiter_original,
+        delimiter = item.delimiter,
+        delimiter_quoted = item.delimiter_quoted,
+        body_start_line = body_start,
+        body_end_line = terminator and (terminator - 1) or nil,
+        terminator_line = terminator,
+        structural_prefix = item.structural_prefix or "",
+        body_prefix = item.body_prefix,
+        opener_prefix = item.opener_prefix,
+        structural_column = item.structural_column,
+        tabstop = tabstop,
+        structural_tabs_only = safe,
+        opener_safe = safe,
+        confidence = terminator and (safe and "lexical" or "unsupported-indent") or "incomplete",
+        editable = terminator ~= nil and safe and #diagnostics == 0,
+      }
+      result.heredocs[#result.heredocs + 1] = region
+      if item.operator == "<<-" then
+        result.regions[#result.regions + 1] = region
+      end
+
       if not terminator then
         result.complete = false
         result.diagnostics[#result.diagnostics + 1] = {
           line = item.opener_line,
           message = "heredoc terminator not found for " .. item.delimiter_original,
         }
-        if item.operator == "<<-" then
-          result.regions[#result.regions + 1] = {
-            operator = item.operator,
-            opener_line = item.opener_line,
-            command_end_line = item.command_end_line,
-            queue_position = q,
-            delimiter_original = item.delimiter_original,
-            delimiter = item.delimiter,
-            delimiter_quoted = item.delimiter_quoted,
-            body_start_line = body_start,
-            body_end_line = nil,
-            terminator_line = nil,
-            structural_prefix = item.structural_prefix or "",
-            body_prefix = item.body_prefix,
-            opener_prefix = item.opener_prefix,
-            structural_column = item.structural_column,
-            tabstop = tabstop,
-            structural_tabs_only = item.structural_tabs_only,
-            opener_safe = item.structural_tabs_only,
-            confidence = "incomplete",
-            editable = false,
-          }
-        end
         break
-      end
-
-      if item.operator == "<<-" then
-        local safe = item.structural_tabs_only
-        result.regions[#result.regions + 1] = {
-          operator = item.operator,
-          opener_line = item.opener_line,
-          command_end_line = item.command_end_line,
-          queue_position = q,
-          delimiter_original = item.delimiter_original,
-          delimiter = item.delimiter,
-          delimiter_quoted = item.delimiter_quoted,
-          body_start_line = body_start,
-          body_end_line = terminator - 1,
-          terminator_line = terminator,
-          structural_prefix = item.structural_prefix or "",
-          body_prefix = item.body_prefix,
-          opener_prefix = item.opener_prefix,
-          structural_column = item.structural_column,
-          tabstop = tabstop,
-          structural_tabs_only = safe,
-          opener_safe = safe,
-          confidence = safe and "lexical" or "unsupported-indent",
-          editable = safe and #diagnostics == 0,
-        }
       end
       i = terminator + 1
     end
   end
 
   if not result.complete then
-    for _, region in ipairs(result.regions) do
+    for _, region in ipairs(result.heredocs) do
       region.editable = false
       if region.confidence ~= "incomplete" then
         region.opener_safe = false
