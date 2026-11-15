@@ -133,9 +133,9 @@ if vim.env.NVIM_HEREDOC_FUNCTION_BOUNDARY == "1" or vim.env.NVIM_HEREDOC_FUNCTIO
           if vim.env.NVIM_HEREDOC_FUNCTION_BOUNDARY_DELETE == "1" then
             -- Withdraw the pending function boundary through Neovim's real
             -- Insert-mode input loop. Ctrl-O executes one Normal-mode command
-            -- without leaving Insert mode; jdd deletes MiniPairs' brace before
-            -- the scheduled on_lines processor handles the opener edit.
-            api.nvim_input(api.nvim_replace_termcodes("cat <lt><lt>-'EOF'<C-o>j<C-o>dd", true, false, true))
+            -- without leaving Insert mode; move to the brace line and delete
+            -- its only character before scheduled on_lines processing.
+            api.nvim_input(api.nvim_replace_termcodes("cat <lt><lt>-'EOF'<C-o>j<C-o>x", true, false, true))
             defer(function()
               assert_insert_mode("withdrawing the function brace must remain in Insert mode")
               vim.wait(200, function() return false end, 10)
@@ -143,8 +143,10 @@ if vim.env.NVIM_HEREDOC_FUNCTION_BOUNDARY == "1" or vim.env.NVIM_HEREDOC_FUNCTIO
               assert(actual[1] == "conf_print_test2() {"
                 and actual[2] == "  cat <<-'EOF'",
                 "the new function and heredoc opener should remain; lines=" .. vim.inspect(actual))
-              assert_original(actual, 3)
-              assert(#actual == #original + 2,
+              assert(actual[3] == "",
+                "the deliberate brace deletion should leave the line empty; lines=" .. vim.inspect(actual))
+              assert_original(actual, 4)
+              assert(#actual == #original + 3,
                 "the plugin must not recreate a function boundary or insert a closer after the user deletes it; lines="
                   .. vim.inspect(actual))
               assert(not vim.tbl_contains(actual, "\tEOF"),
