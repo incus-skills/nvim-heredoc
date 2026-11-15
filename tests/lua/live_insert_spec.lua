@@ -209,7 +209,6 @@ if vim.env.NVIM_HEREDOC_FUNCTION_BOUNDARY == "1" or vim.env.NVIM_HEREDOC_FUNCTIO
           end)
         end)
       end)
-    end)
   end
 
   run()
