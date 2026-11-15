@@ -167,14 +167,14 @@ local function run()
         step[3](current)
         if vim.env.NVIM_HEREDOC_ASSERT_COLUMN_ZERO == "1" then
           local expected = {
-            ["after first Return"] = { 4, "\\t" },
-            ["after first payload"] = { 4, "\\thello1" },
-            ["after second Return"] = { 5, "\\t" },
-            ["after second payload"] = { 5, "\\thello2" },
-            ["after third Return"] = { 6, "\\t" },
-            ["after third payload"] = { 6, "\\thello3" },
-            ["after fourth Return"] = { 7, "\\t" },
-            ["after fourth payload"] = { 7, "\\thello4" },
+            ["after first Return"] = { 4, "\t" },
+            ["after first payload"] = { 4, "\thello1" },
+            ["after second Return"] = { 5, "\t" },
+            ["after second payload"] = { 5, "\thello2" },
+            ["after third Return"] = { 6, "\t" },
+            ["after third payload"] = { 6, "\thello3" },
+            ["after fourth Return"] = { 7, "\t" },
+            ["after fourth payload"] = { 7, "\thello4" },
           }
           local assertion = expected[step[1]]
           if assertion then
