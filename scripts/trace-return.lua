@@ -81,32 +81,14 @@ local function cleanup(ok, err)
   end
 end
 
-local function stage(label, keys, verify)
-  -- Queue input only after the previous stage's inspection has completed.
-  if keys then
-    assert_insert("before " .. label)
-    local encoded = api.nvim_replace_termcodes(keys, true, false, true)
-    local accepted = api.nvim_feedkeys(encoded, "mt", false)
-    add("queued input (" .. label .. ")", accepted)
-  end
-
-  vim.defer_fn(function()
-    local ok, err = xpcall(function()
-      assert_insert("after " .. label)
-      if verify then verify() end
-      snapshot(label)
-    end, debug.traceback)
-    if not ok then cleanup(false, err) end
-  end, 100)
-end
-
 local function run()
   scratch = api.nvim_create_buf(false, true)
   api.nvim_win_set_buf(original_win, scratch)
+  local opener = "  cat <<-'TRACE'"
   api.nvim_buf_set_lines(scratch, 0, -1, false, {
     "# nvim-heredoc Return trace",
     "conf_print_test() {",
-    "  cat <<-'TRACE'",
+    opener,
   })
   vim.bo[scratch].filetype = "sh"
   vim.defer_fn(function()
@@ -121,7 +103,11 @@ local function run()
         "smartindent", "cindent", "indentexpr", "indentkeys", "formatoptions",
       }) do
         local got, value = pcall(api.nvim_get_option_value, name, { buf = scratch })
-        add(name, inspect(got and value or ("<unavailable: " .. tostring(value) .. ">")))
+        if got then
+          add(name, inspect(value))
+        else
+          add(name, "<unavailable: " .. tostring(value) .. ">")
+        end
       end
 
       local maps = {}
@@ -133,8 +119,10 @@ local function run()
       end
       add("Insert Return mappings", inspect(maps))
 
-      api.nvim_win_set_cursor(original_win, { 3, #"  cat <<-'TRACE'" })
-      vim.cmd("startinsert")
+      -- The cursor cannot sit one byte beyond EOL in Normal mode. startinsert!
+      -- explicitly enters at EOL, after the closing delimiter quote.
+      api.nvim_win_set_cursor(original_win, { 3, #opener - 1 })
+      vim.cmd("startinsert!")
     end, debug.traceback)
     if not ok then cleanup(false, err); return end
 
@@ -142,6 +130,9 @@ local function run()
     vim.defer_fn(function()
       local started, start_err = xpcall(function()
         assert_insert("initial Insert-mode entry")
+        local actual_opener = api.nvim_buf_get_lines(scratch, 2, 3, false)[1]
+        assert(actual_opener == opener,
+          "opener changed before first Return: " .. inspect(actual_opener))
         snapshot("before first Return")
       end, debug.traceback)
       if not started then cleanup(false, start_err); return end
