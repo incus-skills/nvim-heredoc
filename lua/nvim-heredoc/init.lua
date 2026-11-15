@@ -53,7 +53,7 @@ local function prefix_region_range(buf, region, changed_range)
   end
 
   local lines = vim.api.nvim_buf_get_lines(buf, first_row, last_row, false)
-  local prefixed, changed = editing.prefix_lines(region, lines)
+  local prefixed, changed = editing.prefix_lines(region, lines, { normalize_autoindent = true })
   if not prefixed then
     return false
   end
