@@ -121,7 +121,7 @@ local function ensure_body_prefix(buf, region, body_row)
   end
 end
 
-local function reverse_managed_transition(buf, previous, current)
+local function reconcile_managed_transition(buf, previous, current)
   if not previous or not previous.heredocs or not current.heredocs then
     return false
   end
@@ -129,10 +129,11 @@ local function reverse_managed_transition(buf, previous, current)
   local lines = get_lines(buf)
   local changed = false
   for _, old in ipairs(previous.heredocs) do
-    if old.operator == "<<-" and old.terminator_line and old.body_prefix then
+    local target_operator = old.operator == "<<-" and "<<" or old.operator == "<<" and "<<-" or nil
+    if target_operator then
       local replacement
       for _, new in ipairs(current.heredocs) do
-        if new.operator == "<<"
+        if new.operator == target_operator
           and new.opener_line == old.opener_line
           and new.queue_position == old.queue_position
           and new.delimiter == old.delimiter
@@ -143,22 +144,34 @@ local function reverse_managed_transition(buf, previous, current)
       end
 
       if replacement then
-        local closer_row
-        local expected_closer = (old.structural_prefix or "") .. old.delimiter
-        for row = replacement.body_start_line, #lines do
-          if lines[row] == expected_closer or lines[row] == old.delimiter then
-            closer_row = row
-            break
+        local closer_row = replacement.terminator_line
+        if not closer_row then
+          local expected = (old.structural_prefix or "") .. old.delimiter
+          for row = replacement.body_start_line, #lines do
+            if lines[row] == expected or lines[row] == old.delimiter then
+              closer_row = row
+              break
+            end
           end
         end
+
         if closer_row then
           local first = replacement.body_start_line - 1
           local body = {}
           for row = first + 1, closer_row - 1 do
             local line = lines[row]
-            if line:sub(1, #old.body_prefix) == old.body_prefix then
-              line = line:sub(#old.body_prefix + 1)
-              changed = true
+            if old.operator == "<<-" then
+              local prefix = old.body_prefix or ""
+              if prefix ~= "" and line:sub(1, #prefix) == prefix then
+                line = line:sub(#prefix + 1)
+                changed = true
+              end
+            else
+              local prefixed = editing.prefix_lines(replacement, { line })
+              if prefixed and prefixed[1] ~= line then
+                line = prefixed[1]
+                changed = true
+              end
             end
             body[#body + 1] = line
           end
@@ -167,12 +180,21 @@ local function reverse_managed_transition(buf, previous, current)
           end
 
           local closer = lines[closer_row]
-          local structural = old.structural_prefix or ""
-          if structural ~= "" and closer:sub(1, #structural) == structural then
-            vim.api.nvim_buf_set_lines(buf, closer_row - 1, closer_row, false, {
-              closer:sub(#structural + 1),
-            })
-            changed = true
+          if old.operator == "<<-" then
+            local structural = old.structural_prefix or ""
+            if structural ~= "" and closer:sub(1, #structural) == structural then
+              closer = closer:sub(#structural + 1)
+              changed = true
+            end
+          else
+            local structural = replacement.structural_prefix or ""
+            if structural ~= "" and closer:sub(1, #structural) ~= structural then
+              closer = structural .. closer
+              changed = true
+            end
+          end
+          if closer ~= lines[closer_row] then
+            vim.api.nvim_buf_set_lines(buf, closer_row - 1, closer_row, false, { closer })
           end
         end
       end
@@ -202,7 +224,7 @@ function M.process_buffer(buf, changed_range, close_incomplete)
     for _ = 1, 32 do
       local lines = get_lines(buf)
       local result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
-      if reverse_managed_transition(buf, previous_scan, result) then
+      if reconcile_managed_transition(buf, previous_scan, result) then
         changed = true
         lines = get_lines(buf)
         result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
