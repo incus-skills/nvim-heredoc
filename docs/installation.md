@@ -26,13 +26,15 @@ There are currently no user-facing setup options. The supported filetypes are
 Bash (`bash`), POSIX shell (`sh`), and Zsh (`zsh`); they are part of the
 plugin's current support contract.
 
-No special buffer indentation settings are required. The plugin leaves the
-buffer's existing `expandtab`, `tabstop`, `softtabstop`, and `shiftwidth` values
-unchanged. Those options were previously forced by the development provisioner
-as a workaround for an older implementation that needed to position the opener
-at column zero; that workaround is obsolete. The current implementation
-preserves the opener's position without requiring those settings. It uses
-literal TAB bytes where shell `<<-` semantics require them.
+The plugin does not set or override the buffer's existing `expandtab`,
+`tabstop`, `softtabstop`, or `shiftwidth` values. They remain under the
+control of the user's Neovim configuration. A previous working local
+`after/ftplugin` arrangement explicitly set `expandtab=false`, `tabstop=2`,
+`softtabstop=0`, and `shiftwidth=2` for supported shell buffers. Those
+settings are not imposed by the plugin, but users may retain them in their own
+filetype configuration. The implementation uses literal TAB bytes where
+shell `<<-` semantics require them, independently of the editor's normal Tab
+key insertion policy.
 
 ## Verify
 
