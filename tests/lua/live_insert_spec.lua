@@ -141,7 +141,7 @@ if vim.env.NVIM_HEREDOC_FUNCTION_BOUNDARY == "1" or vim.env.NVIM_HEREDOC_FUNCTIO
               assert(actual[3] == "",
                 "the deliberate brace deletion should leave the line empty; lines=" .. vim.inspect(actual))
 
-              api.nvim_input(api.nvim_replace_termcodes("cat <lt><lt>-'EOF'", true, false, true))
+              api.nvim_input(api.nvim_replace_termcodes("  cat <lt><lt>-'EOF'", true, false, true))
               defer(function()
                 vim.wait(200, function() return false end, 10)
                 actual = snapshot("after processing the opener with the brace withdrawn")
