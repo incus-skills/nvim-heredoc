@@ -121,6 +121,38 @@ local function ensure_body_prefix(buf, region, body_row)
   end
 end
 
+local function preserve_function_heredoc_boundary(previous, current, lines)
+  if not previous or not previous.heredocs then
+    return false
+  end
+
+  for _, new in ipairs(current.regions) do
+    local terminator = new.terminator_line
+    local following = terminator and lines[terminator + 1]
+    if terminator and following and following:match("^[ \t]*}$") then
+      for _, old in ipairs(previous.heredocs) do
+        if old.terminator_line and old.delimiter == new.delimiter and old.opener_text then
+          for row = new.body_start_line, terminator - 1 do
+            if lines[row] == old.opener_text then
+              -- The current opener has captured a previously complete
+              -- function-wrapped heredoc. Treat the new region as pending so
+              -- the interactive path reserves its closer before the
+              -- function's autoclose brace instead of adopting the old EOF.
+              new.terminator_line = nil
+              new.body_end_line = nil
+              new.editable = false
+              new.confidence = "incomplete"
+              current.complete = false
+              return true
+            end
+          end
+        end
+      end
+    end
+  end
+  return false
+end
+
 local function reconcile_managed_transition(buf, previous, current)
   if not previous or not previous.heredocs or not current.heredocs then
     return false
@@ -234,6 +266,7 @@ function M.process_buffer(buf, changed_range, close_incomplete)
         lines = get_lines(buf)
         result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
       end
+      preserve_function_heredoc_boundary(previous_scan, result, lines)
       if not result.complete then
         local pending
         for _, region in ipairs(result.regions) do
