@@ -93,7 +93,7 @@ local function run()
   vim.bo[scratch].filetype = "sh"
   vim.defer_fn(function()
     local ok, err = xpcall(function()
-      report[#report + 1] = "nvim-heredoc configured Return trace"
+      report[#report + 1] = "nvim-heredoc Return trace (indentexpr disabled control)"
       add("timestamp", os.date("%Y-%m-%d %H:%M:%S %z"))
       add("nvim_version", inspect(vim.version()))
       add("scratch_filetype", vim.bo[scratch].filetype)
@@ -118,6 +118,14 @@ local function run()
         if map.lhs == "<CR>" or map.lhs == "<Enter>" then maps[#maps + 1] = map end
       end
       add("Insert Return mappings", inspect(maps))
+
+      -- Controlled A/B perturbation: preserve autoindent and the active Return
+      -- mapping, but disable the shell indent expression in this scratch buffer.
+      -- Compare this trace with the baseline to determine whether GetShIndent()
+      -- contributes the accumulating indentation. The user buffer is untouched.
+      local original_indentexpr = vim.bo[scratch].indentexpr
+      vim.bo[scratch].indentexpr = ""
+      add("indentexpr_control", "disabled in scratch buffer; original=" .. inspect(original_indentexpr))
 
       -- The cursor cannot sit one byte beyond EOL in Normal mode. startinsert!
       -- explicitly enters at EOL, after the closing delimiter quote.
