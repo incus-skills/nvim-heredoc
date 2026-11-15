@@ -34,6 +34,7 @@ The scanner is the common authority for later editing mechanisms. Automatic clos
 - Quoted delimiters are matched correctly while preserving source spelling.
 - Nested constructs and command continuations do not cause nearest-opener misclassification.
 - Structural indentation is represented by TAB bytes; body spaces and relative indentation are preserved.
+- Changing an existing managed opener between `<<-` and `<<` reconciles the body and terminator indentation in both directions; an ordinary heredoc that was never managed remains untouched.
 - Tests prove that leading body tabs are stripped by the shell and leading spaces are retained.
 - Paste tests operate on complete changed ranges and demonstrate byte preservation, including empty and whitespace-only lines.
 - The tests demonstrate what Bash, a POSIX shell, and Zsh actually receive where those shells are available.
@@ -65,6 +66,8 @@ The scanner is the common authority for later editing mechanisms. Automatic clos
 ## Implementation progress
 
 ### Present
+
+- The scanner now exposes `heredocs` for all lexically recognised heredoc operators while retaining `regions` as the managed `<<-` subset. Buffer snapshots use this distinction to recognise an operator change on an already managed heredoc: `<<-` to `<<` removes the plugin’s body prefix and opener-aligned TABs from the terminator; `<<` to `<<-` reapplies them. The transition is matched by opener line, queue position, and delimiter identity. A headless regression exercises both directions, including a blank body line and nested space indentation.
 
 - `lua/nvim-heredoc/scanner.lua` provides an initial buffer-independent lexical scan and a shared region record for completed or incomplete managed heredocs. The record distinguishes `opener_safe` from full-region `editable` so a lexically certain incomplete opener can support closer construction without authorising body edits.
 - `lua/nvim-heredoc/editing.lua` provides pure helpers for constructing the structural closer line and idempotently prefixing a caller-supplied line range.
