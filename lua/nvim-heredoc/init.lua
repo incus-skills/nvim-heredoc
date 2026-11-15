@@ -121,6 +121,21 @@ local function ensure_body_prefix(buf, region, body_row)
   end
 end
 
+local function is_function_header(line)
+  line = line or ""
+  return line:match("^[ \\t]*[%w_][%w_]*[ \\t]*%([ \\t]*%)[ \\t]*{[ \\t]*$")
+    or line:match("^[ \\t]*function[ \\t]+[%w_][%w_]*[ \\t]*{[ \\t]*$")
+end
+
+local function function_header_before(lines, opener_line)
+  for row = opener_line - 1, 1, -1 do
+    if is_function_header(lines[row]) then
+      return row
+    end
+  end
+  return nil
+end
+
 local function preserve_function_heredoc_boundary(previous, current, lines)
   if not previous or not previous.heredocs then
     return false
@@ -128,22 +143,31 @@ local function preserve_function_heredoc_boundary(previous, current, lines)
 
   for _, new in ipairs(current.regions) do
     local terminator = new.terminator_line
-    local following = terminator and lines[terminator + 1]
-    if terminator and following and following:match("^[ \t]*}$") then
-      for _, old in ipairs(previous.heredocs) do
-        if old.terminator_line and old.delimiter == new.delimiter and old.opener_text then
-          for row = new.body_start_line, terminator - 1 do
-            if lines[row] == old.opener_text then
-              -- The current opener has captured a previously complete
-              -- function-wrapped heredoc. Treat the new region as pending so
-              -- the interactive path reserves its closer before the
-              -- function's autoclose brace instead of adopting the old EOF.
-              new.terminator_line = nil
-              new.body_end_line = nil
-              new.editable = false
-              new.confidence = "incomplete"
-              current.complete = false
-              return true
+    if terminator then
+      local header = function_header_before(lines, new.opener_line)
+      if header then
+        for _, old in ipairs(previous.heredocs) do
+          if old.terminator_line and old.delimiter == new.delimiter and old.opener_text then
+            for old_opener = new.body_start_line, terminator - 1 do
+              if lines[old_opener] == old.opener_text then
+                -- The old completed heredoc is now lexically inside the new
+                -- region. A standalone brace between the new body and that
+                -- old opener is the containing function's still-present
+                -- autoclose boundary. Preserve both facts: the old heredoc
+                -- is known from the previous scan, and the brace determines
+                -- where the new heredoc must close.
+                for boundary = new.body_start_line, old_opener - 1 do
+                  if lines[boundary] and lines[boundary]:match("^[ \\t]*}$") then
+                    new.terminator_line = nil
+                    new.body_end_line = nil
+                    new.boundary_line = boundary
+                    new.editable = false
+                    new.confidence = "incomplete"
+                    current.complete = false
+                    return true
+                  end
+                end
+              end
             end
           end
         end
@@ -287,7 +311,12 @@ function M.process_buffer(buf, changed_range, close_incomplete)
 
         -- Enter after the opener creates the first body line. Insert directly
         -- below it so the closer is reserved before an enclosing brace.
-        if cursor_row == body_row and changed_body_line then
+        if pending.boundary_line then
+          -- Keep the function's existing autoclose brace outside the
+          -- heredoc. Scanner line numbers are 1-based; buffer insertion rows
+          -- are 0-based.
+          inserted = insert_closer(buf, pending, pending.boundary_line - 1)
+        elseif cursor_row == body_row and changed_body_line then
           inserted = insert_closer(buf, pending, body_row + 1)
           if inserted then
             -- Complete the Enter transition synchronously: Neovim may have
