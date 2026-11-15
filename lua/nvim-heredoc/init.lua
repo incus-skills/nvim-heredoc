@@ -166,6 +166,12 @@ local function preserve_function_heredoc_boundary(previous, current, lines)
                     return true
                   end
                 end
+                -- The old opener is inside the apparent new body even when
+                -- its function brace has been removed. In that case the old
+                -- EOF is intentionally available as the new heredoc's
+                -- terminator, but this must not be mistaken for an operator
+                -- transition on the old opener's former line.
+                return true
               end
             end
           end
@@ -284,12 +290,13 @@ function M.process_buffer(buf, changed_range, close_incomplete)
     for _ = 1, 32 do
       local lines = get_lines(buf)
       local result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
-      if reconcile_managed_transition(buf, previous_scan, result) then
+      local preserved_existing_heredoc =
+        preserve_function_heredoc_boundary(previous_scan, result, lines)
+      if not preserved_existing_heredoc and reconcile_managed_transition(buf, previous_scan, result) then
         changed = true
         lines = get_lines(buf)
         result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
       end
-      preserve_function_heredoc_boundary(previous_scan, result, lines)
       if not result.complete then
         local pending
         for _, region in ipairs(result.regions) do
