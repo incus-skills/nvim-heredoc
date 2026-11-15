@@ -313,4 +313,42 @@ do
   assert(actual[6] == "\tB")
 end
 
+do
+  local original = {
+    "conf_print_test1() {",
+    "  cat <<'EOF'",
+    "hello1",
+    " hello2",
+    "EOF",
+    "}",
+  }
+  local buf = set_buffer(original)
+  vim.bo[buf].tabstop = 2
+  vim.api.nvim_set_current_buf(buf)
+  plugin.setup()
+
+  -- Model creating a new function above the existing function. The new
+  -- function's autoclose brace is already present; Enter after the heredoc
+  -- opener has created its first blank body line.
+  vim.api.nvim_buf_set_lines(buf, 0, 0, false, {
+    "conf_print_test2() {",
+    "  cat <<-'EOF'",
+    "  ",
+    "  }",
+  })
+  vim.api.nvim_win_set_cursor(0, { 3, 2 })
+  assert(plugin.process_buffer(buf, { start_row = 2, end_row = 3 }, false),
+    "the new function heredoc should reserve its closer before the autoclose brace")
+
+  local actual = lines(buf)
+  assert(actual[2] == "  cat <<-'EOF'", "the new opener must remain unchanged")
+  assert(actual[3] == "\t\t", "the first body line must receive the structural body prefix")
+  assert(actual[4] == "\tEOF", "the new closer must be inserted before the new function's brace")
+  assert(actual[5] == "  }", "the new function autoclose brace must remain outside the heredoc")
+  for index, line in ipairs(original) do
+    assert(actual[index + 5] == line,
+      "the existing function-wrapped heredoc must remain byte-identical at original line " .. index)
+  end
+end
+
 print("buffer integration tests: PASS")
