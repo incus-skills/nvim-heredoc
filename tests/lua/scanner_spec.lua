@@ -59,6 +59,14 @@ do
 end
 
 do
+  local result = scanner.scan("cat <<'EOF'\nbody\nEOF\n")
+  assert(#result.regions == 0, "ordinary heredocs remain outside the managed region list")
+  assert(#result.heredocs == 1 and result.heredocs[1].operator == "<<",
+    "the scanner should expose ordinary heredoc structure for transition detection")
+  assert(result.heredocs[1].terminator_line == 3)
+end
+
+do
   local result = scanner.scan("cat <<-EOF\nbody\n")
   assert(not result.complete)
   assert(#result.regions == 1 and not result.regions[1].editable)
