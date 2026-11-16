@@ -19,7 +19,7 @@ nvim --headless -u NONE \
 
 echo "===== Completed-opener boundary characterization ====="
 nvim --headless -u NONE \
-  -c 'lua local ok, err = pcall(dofile, "tests/lua/completed_opener_boundary_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
+  -c 'lua local ok, err = pcall(dofile, "tests/lua/completed_opener_boundary_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") else vim.cmd("qa!") end'
 
 echo "===== Live function-boundary insertion with MiniPairs ====="
 NVIM_HEREDOC_FUNCTION_BOUNDARY=1 nvim --headless -u ci/lazyvim/init.lua \
