@@ -91,7 +91,7 @@ do
   })
   local lines = {
     "outer() {",
-    "  cat <<-'NEW'",
+    "  cat <<-'OLD'",
     "  cat <<'OLD'",
     "old payload",
     "OLD",
@@ -99,13 +99,14 @@ do
     "NEW",
   }
   local current = scan(lines)
-  assert(current.complete and current.regions[1].terminator_line == 7)
+  assert(current.complete and current.regions[1].terminator_line == 5,
+    "the new OLD obligation consumes the intervening OLD terminator")
   assert(preserve_boundary(baseline, current, lines),
-    "the previous old-heredoc identity should be recognised")
+    "the previous same-delimiter old-heredoc identity should be recognised")
   assert(current.regions[1].boundary_line == nil,
     "current helper does not select the intervening opener as a boundary")
-  assert(current.regions[1].terminator_line == 7,
-    "current helper leaves the later NEW terminator assigned across the old opener")
+  assert(current.regions[1].terminator_line == 5,
+    "current helper leaves the old OLD terminator assigned across the intervening opener")
 end
 
 -- Case 4: queue identity is source order, not delimiter uniqueness. Different
