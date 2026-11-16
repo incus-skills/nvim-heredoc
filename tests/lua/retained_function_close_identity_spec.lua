@@ -97,6 +97,11 @@ do
     "OLD",
     "}",
   }
+  local baseline_scan = scanner.scan(table.concat(lines, "\n"))
+  assert(#baseline_scan.heredocs == 1, "baseline scanner should recognise the old heredoc")
+  assert(baseline_scan.heredocs[1].body_start_line == 6
+    and baseline_scan.heredocs[1].terminator_line == 7,
+    "existing heredoc body and terminator should be opaque")
   local actual, reason = capture_unique_function_close(lines, 1)
   assert_close(actual, 2, "unique function close")
   assert(reason == nil)
