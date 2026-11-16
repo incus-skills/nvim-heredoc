@@ -98,26 +98,26 @@ end
 -- while the current edit has moved to E.
 replace_buffer(buf, table.concat({
   "command <<-'EOF'",
-  "\\tpayload",
-  "\\tEOF",
-}, "\\n"))
+  "\tpayload",
+  "\tEOF",
+}, "\n"))
 plugin.process_buffer(buf, nil, false)
 local last_complete = stores[buf]
 assert(last_complete.complete and last_complete.heredocs[1].delimiter == "EOF")
 
 replace_buffer(buf, table.concat({
   "command <<-'E'",
-  "\\tpayload",
-}, "\\n"))
+  "\tpayload",
+}, "\n"))
 local _, transition_pending = process_and_capture(buf, "operator transition: incomplete managed E")
 assert(not transition_pending.complete and transition_pending.heredocs[1].delimiter == "E"
   and transition_pending.heredocs[1].terminator_line == nil)
 
 replace_buffer(buf, table.concat({
   "command <<'E'",
-  "\\tpayload",
+  "\tpayload",
   "E",
-}, "\\n"))
+}, "\n"))
 local transition_previous, transition_saved =
   process_and_capture(buf, "operator transition: managed E to ordinary E")
 assert(transition_previous == transition_pending,
