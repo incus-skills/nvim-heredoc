@@ -124,8 +124,8 @@ assert(processed[4] == "\tcat <<'EOF'",
   "current processing prefixes the intervening old opener as new-heredoc payload")
 assert(processed[5] == "\told payload",
   "current processing also prefixes the old heredoc's payload")
-assert(processed[6] == "\tEOF",
-  "current processing treats the old terminator as the new heredoc's terminator")
+assert(processed[6] == "EOF",
+  "the old terminator is consumed as the new heredoc's terminator, not prefixed as payload")
 vim.cmd("bwipeout! " .. buf)
 
 print("completed-opener boundary characterization: PASS")
