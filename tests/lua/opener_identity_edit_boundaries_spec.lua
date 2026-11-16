@@ -52,15 +52,19 @@ do
   vim.api.nvim_buf_delete(buf, { force = true })
 end
 
--- A range that overlaps the opener invalidates it, even if replacement text
--- happens to be byte-for-byte identical.
+-- An identical-content set is a semantic no-op: it should not fabricate a
+-- source edit or invalidate an otherwise unchanged opener identity.
 do
   local buf = make_buffer({ "head", "cat <<'C'", "body", "C" })
   local records = { { row = 1, valid = true, text = "cat <<'C'" } }
   track(buf, records)
   vim.api.nvim_buf_set_lines(buf, 1, 2, false, { "cat <<'C'" })
+  assert_row(buf, records[1], 1, "identical-content no-op")
+
+  -- A genuine replacement of the tracked line must invalidate it.
+  vim.api.nvim_buf_set_lines(buf, 1, 2, false, { "printf replacement" })
   assert(not records[1].valid,
-    "replacing an opener with identical text must invalidate historical identity")
+    "replacing the opener with different source text must invalidate its identity")
   vim.api.nvim_buf_set_lines(buf, 0, 0, false, { "later insertion" })
   assert(not records[1].valid,
     "later edits must not resurrect an invalidated opener identity")
