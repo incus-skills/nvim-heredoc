@@ -17,6 +17,10 @@ echo "===== Incremental heredoc snapshot state characterization ====="
 nvim --headless -u NONE \
   -c 'lua local ok, err = pcall(dofile, "tests/lua/snapshot_state_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
 
+echo "===== Completed-opener boundary characterization ====="
+nvim --headless -u NONE \
+  -c 'lua local ok, err = pcall(dofile, "tests/lua/completed_opener_boundary_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
+
 echo "===== Live function-boundary insertion with MiniPairs ====="
 NVIM_HEREDOC_FUNCTION_BOUNDARY=1 nvim --headless -u ci/lazyvim/init.lua \
   -c 'lua local ok, err = pcall(dofile, "tests/lua/live_insert_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
