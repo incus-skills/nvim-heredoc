@@ -40,7 +40,7 @@ do
 end
 
 do
-  local _, r = one("cat \\\n<<-E\\OF\nbody\nEOF\n")
+  local _, r = one("cat \\n<<-E\\OF\nbody\nEOF\n")
   assert(r.opener_line == 2 and r.delimiter == "EOF")
   assert(r.terminator_line == 4)
   assert(editing.closer_line(r) == "EOF")
@@ -168,7 +168,7 @@ print("scanner tests: PASS")
 -- delimiter text alone must not identify or merge obligations.
 do
   local result = scanner.scan(
-    "command <<-'EOF' <<-'EOF'\\nfirst body\\nEOF\\nsecond body\\nEOF\\n"
+    "command <<-'EOF' <<-'EOF'\nfirst body\nEOF\nsecond body\nEOF\n"
   )
   if not result.complete then
     local details = {}
@@ -198,8 +198,8 @@ end
 -- opener. This holds both at top level and inside an enclosing function.
 do
   local fixtures = {
-    { source = "command <<-'OUTER'\\ninner() {\\n  command <<-'INNER'\\n}\\nOUTER\\n", opener_line = 1 },
-    { source = "function wrapped() {\\n  command <<-'OUTER'\\n  inner() {\\n    command <<-'INNER'\\n  }\\nOUTER\\n}\\n", opener_line = 2 },
+    { source = "command <<-'OUTER'\ninner() {\n  command <<-'INNER'\n}\nOUTER\n", opener_line = 1 },
+    { source = "function wrapped() {\n  command <<-'OUTER'\n  inner() {\n    command <<-'INNER'\n  }\nOUTER\n}\n", opener_line = 2 },
   }
   for _, fixture in ipairs(fixtures) do
     local result = scanner.scan(fixture.source)
@@ -224,10 +224,10 @@ do
   }
   for _, context in ipairs({
     { prefix = "", opener_line = 1 },
-    { prefix = "function wrapped() {\\n  ", opener_line = 2 },
+    { prefix = "function wrapped() {\n  ", opener_line = 2 },
   }) do
     for _, step in ipairs(progressions) do
-      local result = scanner.scan(context.prefix .. "command " .. step.suffix .. "\\n")
+      local result = scanner.scan(context.prefix .. "command " .. step.suffix .. "\n")
       assert(result.complete == step.complete,
         "unexpected completeness for delimiter progression " .. step.suffix)
       assert(#result.heredocs == step.count,
@@ -247,7 +247,7 @@ end
 -- Empty delimiter is a syntactically complete opener with a real, distinct
 -- terminator obligation; its empty delimiter must not be treated as absence.
 do
-  local result = scanner.scan("command <<-''\\n")
+  local result = scanner.scan("command <<-''\n")
   assert(not result.complete and #result.heredocs == 1)
   assert(result.heredocs[1].delimiter == "")
   assert(result.heredocs[1].delimiter_original == "''")
