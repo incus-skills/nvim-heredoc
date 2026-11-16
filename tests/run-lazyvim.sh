@@ -37,6 +37,10 @@ echo "===== Opener identity edit-boundary characterization ====="
 nvim --headless -u NONE \
   -c 'lua local ok, err = pcall(dofile, "tests/lua/opener_identity_edit_boundaries_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") else vim.cmd("qa!") end'
 
+echo "===== Retained-scan source-order sufficiency composition ====="
+nvim --headless -u NONE \
+  -c 'lua local ok, err = pcall(dofile, "tests/lua/retained_scan_source_order_sufficiency_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") else vim.cmd("qa!") end'
+
 echo "===== Source-order selector reference model ====="
 nvim --headless -u NONE \
   -c 'lua local ok, err = pcall(dofile, "tests/lua/source_order_selector_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") else vim.cmd("qa!") end'
