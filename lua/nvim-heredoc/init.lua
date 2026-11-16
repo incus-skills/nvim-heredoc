@@ -15,6 +15,19 @@ local function trace(label, value)
   end
 end
 
+local function trace_scanner_state(stage, lines, result)
+  trace("scanner output", {
+    stage = stage,
+    function_scope_tracking = false,
+    scanner_result_fields = vim.tbl_keys(result),
+    complete = result.complete,
+    diagnostics = result.diagnostics,
+    heredocs = result.heredocs,
+    managed_regions = result.regions,
+    lines = lines,
+  })
+end
+
 local function supported(ft)
   return ft == "bash" or ft == "sh" or ft == "zsh"
 end
@@ -332,6 +345,7 @@ function M.process_buffer(buf, changed_range, close_incomplete)
     for _ = 1, 32 do
       local lines = get_lines(buf)
       local result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
+      trace_scanner_state("process_buffer pass", lines, result)
       local preserved_existing_heredoc =
         preserve_function_heredoc_boundary(previous_scan, result, lines)
       trace("boundary-check outcome", preserved_existing_heredoc)
@@ -402,6 +416,7 @@ function M.process_buffer(buf, changed_range, close_incomplete)
   if success then
     local snapshot_lines = get_lines(buf)
     scan_snapshots[buf] = scanner.scan(get_source(snapshot_lines), { tabstop = vim.bo[buf].tabstop })
+    trace_scanner_state("saved scan snapshot", snapshot_lines, scan_snapshots[buf])
   end
   if not success then
     vim.notify("nvim-heredoc: " .. tostring(err), vim.log.levels.WARN)
