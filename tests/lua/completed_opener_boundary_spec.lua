@@ -102,6 +102,7 @@ vim.bo[buf].shiftwidth = 2
 vim.bo[buf].expandtab = false
 
 replace_buffer(buf, {
+  "sentinel",
   "cat <<'EOF'",
   "old payload",
   "EOF",
@@ -111,6 +112,7 @@ assert(plugin.setup_buffer(buf), "plugin failed to attach for standalone Return 
 replace_buffer(buf, {
   "cat <<-'EOF'",
   "",
+  "sentinel",
   "cat <<'EOF'",
   "old payload",
   "EOF",
@@ -118,11 +120,11 @@ replace_buffer(buf, {
 vim.api.nvim_win_set_cursor(0, { 2, 0 })
 plugin.process_buffer(buf, nil, false)
 local processed = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
-assert(processed[2] == "\tcat <<'EOF'",
+assert(processed[4] == "\tcat <<'EOF'",
   "current processing prefixes the intervening old opener as new-heredoc payload")
-assert(processed[3] == "\told payload",
+assert(processed[5] == "\told payload",
   "current processing also prefixes the old heredoc's payload")
-assert(processed[4] == "\tEOF",
+assert(processed[6] == "\tEOF",
   "current processing treats the old terminator as the new heredoc's terminator")
 vim.cmd("bwipeout! " .. buf)
 
