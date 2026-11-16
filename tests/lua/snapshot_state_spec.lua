@@ -195,8 +195,9 @@ assert(boundary_helper(baseline, baseline_probe, final_lines),
 assert(baseline_probe.regions[1].boundary_line == 4
   and baseline_probe.regions[1].terminator_line == nil,
   "the baseline should recover the new function's closing-brace boundary")
+local latest_incomplete = stores[buf]
 local latest_probe = scanner.scan(table.concat(final_lines, "\n"), { tabstop = vim.bo[buf].tabstop })
-assert(not boundary_helper(before_eof, latest_probe, final_lines),
+assert(not boundary_helper(latest_incomplete, latest_probe, final_lines),
   "the latest incomplete EO snapshot cannot recover the old EOF heredoc boundary")
 
 local before_eof, after_eof = process_and_capture(buf, "wrapped delimiter EOF")
