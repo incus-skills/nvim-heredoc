@@ -189,13 +189,13 @@ assert(#after_eo.heredocs == 1 and after_eo.heredocs[1].delimiter == "EO"
 replace_buffer(buf, wrapped_source("EOF"))
 local final_lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
 local boundary_helper = private_upvalue("preserve_function_heredoc_boundary")
-local baseline_probe = scanner.scan(table.concat(final_lines, "\\n"), { tabstop = vim.bo[buf].tabstop })
+local baseline_probe = scanner.scan(table.concat(final_lines, "\n"), { tabstop = vim.bo[buf].tabstop })
 assert(boundary_helper(baseline, baseline_probe, final_lines),
   "the retained completed baseline should let boundary recovery recognise the old heredoc")
 assert(baseline_probe.regions[1].boundary_line == 4
   and baseline_probe.regions[1].terminator_line == nil,
   "the baseline should recover the new function's closing-brace boundary")
-local latest_probe = scanner.scan(table.concat(final_lines, "\\n"), { tabstop = vim.bo[buf].tabstop })
+local latest_probe = scanner.scan(table.concat(final_lines, "\n"), { tabstop = vim.bo[buf].tabstop })
 assert(not boundary_helper(before_eof, latest_probe, final_lines),
   "the latest incomplete EO snapshot cannot recover the old EOF heredoc boundary")
 
