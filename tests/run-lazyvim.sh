@@ -41,6 +41,10 @@ echo "===== Retained-scan source-order sufficiency composition ====="
 nvim --headless -u NONE \
   -c 'lua local ok, err = pcall(dofile, "tests/lua/retained_scan_source_order_sufficiency_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") else vim.cmd("qa!") end'
 
+echo "===== Post-heredoc structural-close characterization ====="
+nvim --headless -u NONE \
+  -c 'lua local ok, err = pcall(dofile, "tests/lua/post_heredoc_structural_close_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") else vim.cmd("qa!") end'
+
 echo "===== Source-order selector reference model ====="
 nvim --headless -u NONE \
   -c 'lua local ok, err = pcall(dofile, "tests/lua/source_order_selector_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") else vim.cmd("qa!") end'
