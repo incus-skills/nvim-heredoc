@@ -170,7 +170,20 @@ do
   local result = scanner.scan(
     "command <<-'EOF' <<-'EOF'\\nfirst body\\nEOF\\nsecond body\\nEOF\\n"
   )
-  assert(result.complete, "two same-delimiter heredocs should both close")
+  if not result.complete then
+    local details = {}
+    for _, item in ipairs(result.heredocs) do
+      details[#details + 1] = string.format(
+        "opener=%s queue=%s delimiter=%q terminator=%s",
+        tostring(item.opener_line), tostring(item.queue_position), item.delimiter,
+        tostring(item.terminator_line)
+      )
+    end
+    for _, diagnostic in ipairs(result.diagnostics) do
+      details[#details + 1] = diagnostic.message
+    end
+    error("same-delimiter scan incomplete: " .. table.concat(details, " | "))
+  end
   assert(#result.heredocs == 2, "same delimiter text must not collapse distinct heredoc obligations")
   local first, second = result.heredocs[1], result.heredocs[2]
   assert(first.delimiter == second.delimiter and first.delimiter == "EOF")
