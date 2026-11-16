@@ -1,3 +1,5 @@
+package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
+
 -- Characterize retaining a function-close source identity before a new
 -- heredoc makes that line opaque. This is a test-side reference model only.
 
