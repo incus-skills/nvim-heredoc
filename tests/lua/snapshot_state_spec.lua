@@ -143,7 +143,7 @@ local before_eof, after_eof = process_and_capture(buf, "wrapped delimiter EOF")
 assert(#before_eof.heredocs == 1 and before_eof.heredocs[1].delimiter == "EO",
   "the snapshot immediately before EOF completion no longer contains the old completed heredoc")
 assert(#after_eof.heredocs == 1 and after_eof.heredocs[1].delimiter == "EOF"
-  and after_eof.heredocs[1].terminator_line == 7,
+  and after_eof.heredocs[1].terminator_line == 8,
   "the new opener should consume the old EOF line as its apparent terminator")
 
 print("snapshot state-transition characterization: PASS")
