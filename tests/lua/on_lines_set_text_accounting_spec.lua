@@ -28,11 +28,12 @@ local buf = make_buffer({
   "after",
 })
 vim.api.nvim_set_current_buf(buf)
-assert(plugin.setup_buffer(buf), "plugin failed to attach")
 
 local processing = private_upvalue("processing")
 local tracked = { row = 3, valid = true, events = {} }
 
+-- Attach the observer before plugin.setup_buffer() so its synchronous
+-- accounting runs before the plugin callback reaches its processing guard.
 vim.api.nvim_buf_attach(buf, false, {
   on_lines = function(_, changed_buf, changedtick, firstline, lastline, new_lastline)
     local event = {
@@ -56,6 +57,8 @@ vim.api.nvim_buf_attach(buf, false, {
   end,
 })
 
+assert(plugin.setup_buffer(buf), "plugin failed to attach")
+
 -- The complete standalone <<- heredoc is already present. Processing its
 -- body takes prefix_region_range(), whose ordinary nonblank-line path uses
 -- nvim_buf_set_text() to insert the managed TAB prefix.
@@ -68,17 +71,14 @@ assert(actual[4] == "after", "the following source line must remain unchanged")
 assert(tracked.valid and tracked.row == 3,
   "same-line text insertion must preserve the following source-row identity")
 
-local plugin_events = {}
-for _, event in ipairs(tracked.events) do
-  if event.processing then
-    plugin_events[#plugin_events + 1] = event
-  end
-end
-assert(#plugin_events >= 1,
-  "the plugin-generated nvim_buf_set_text mutation must reach on_lines while processing")
-assert(plugin_events[1].firstline == 1
-  and plugin_events[1].lastline == 2
-  and plugin_events[1].new_lastline == 2,
+assert(#tracked.events == 1,
+  "the accounting callback must not trigger a recursive scan or second plugin mutation")
+local event = tracked.events[1]
+assert(event.processing,
+  "the observer must update the retained row synchronously while processing is active")
+assert(event.firstline == 1
+  and event.lastline == 2
+  and event.new_lastline == 2,
   "same-line prefix insertion should report the expected zero-based on_lines range")
 
 vim.api.nvim_buf_delete(buf, { force = true })
