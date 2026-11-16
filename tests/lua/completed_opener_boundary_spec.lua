@@ -86,4 +86,44 @@ assert(opaque.heredocs[1].delimiter == "OUTER")
 assert(opaque.heredocs[1].terminator_line == 3,
   "payload that resembles an opener must not create another closer obligation")
 
+
+-- Exercise the standalone collision through process_buffer at the Return-time
+-- buffer shape: the new opener has a blank first body line, followed by the
+-- previously recognised heredoc command and its payload/terminator.
+local function replace_buffer(buf, lines)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+end
+
+local buf = vim.api.nvim_create_buf(true, false)
+vim.api.nvim_set_current_buf(buf)
+vim.bo[buf].filetype = "sh"
+vim.bo[buf].tabstop = 2
+vim.bo[buf].shiftwidth = 2
+vim.bo[buf].expandtab = false
+
+replace_buffer(buf, {
+  "cat <<'EOF'",
+  "old payload",
+  "EOF",
+})
+assert(plugin.setup_buffer(buf), "plugin failed to attach for standalone Return fixture")
+
+replace_buffer(buf, {
+  "cat <<-'EOF'",
+  "",
+  "cat <<'EOF'",
+  "old payload",
+  "EOF",
+})
+vim.api.nvim_win_set_cursor(0, { 2, 0 })
+plugin.process_buffer(buf, nil, false)
+local processed = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+assert(processed[2] == "\tcat <<'EOF'",
+  "current processing prefixes the intervening old opener as new-heredoc payload")
+assert(processed[3] == "\told payload",
+  "current processing also prefixes the old heredoc's payload")
+assert(processed[4] == "\tEOF",
+  "current processing treats the old terminator as the new heredoc's terminator")
+vim.cmd("bwipeout! " .. buf)
+
 print("completed-opener boundary characterization: PASS")
