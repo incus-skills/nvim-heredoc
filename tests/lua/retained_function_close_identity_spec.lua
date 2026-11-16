@@ -4,12 +4,12 @@
 local scanner = require("nvim-heredoc.scanner")
 
 local function is_function_header(line)
-  return line:match("^[ \\t]*[A-Za-z_][A-Za-z0-9_]*%(%)[ \\t]*{[ \\t]*$")
-    or line:match("^[ \\t]*function[ \\t]+[A-Za-z_][A-Za-z0-9_]*[ \\t]*{[ \\t]*$")
+  return line:match("^[ \t]*[A-Za-z_][A-Za-z0-9_]*%(%)[ \t]*{[ \t]*$")
+    or line:match("^[ \t]*function[ \t]+[A-Za-z_][A-Za-z0-9_]*[ \t]*{[ \t]*$")
 end
 
 local function capture_unique_function_close(lines, header_row)
-  local result = scanner.scan(table.concat(lines, "\\n"))
+  local result = scanner.scan(table.concat(lines, "\n"))
   if not result.complete then
     return nil, "baseline scan is incomplete"
   end
@@ -39,7 +39,7 @@ local function capture_unique_function_close(lines, header_row)
 
   local candidates = {}
   for row = header_row + 1, limit - 1 do
-    if not opaque[row] and lines[row]:match("^[ \\t]*}$") then
+    if not opaque[row] and lines[row]:match("^[ \t]*}$") then
       candidates[#candidates + 1] = row
     end
   end
