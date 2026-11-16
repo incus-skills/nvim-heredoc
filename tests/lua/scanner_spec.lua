@@ -161,3 +161,82 @@ for _, path in ipairs({
 end
 
 print("scanner tests: PASS")
+
+
+-- Cycle 6: characterize heredoc closing obligations without changing the
+-- production scanner. An opener is represented as an individual record;
+-- delimiter text alone must not identify or merge obligations.
+do
+  local result = scanner.scan(
+    "command <<-'EOF' <<-'EOF'\\nfirst body\\nEOF\\nsecond body\\nEOF\\n"
+  )
+  assert(result.complete, "two same-delimiter heredocs should both close")
+  assert(#result.heredocs == 2, "same delimiter text must not collapse distinct heredoc obligations")
+  local first, second = result.heredocs[1], result.heredocs[2]
+  assert(first.delimiter == second.delimiter and first.delimiter == "EOF")
+  assert(first.opener_line == 1 and second.opener_line == 1)
+  assert(first.queue_position == 1 and second.queue_position == 2,
+    "same-command heredocs must retain independent queue identities")
+  assert(first.terminator_line == 3 and second.terminator_line == 5,
+    "each same-delimiter obligation must consume its own terminator in queue order")
+end
+
+-- Heredoc-looking syntax inside an active body is payload, not a new shell
+-- opener. This holds both at top level and inside an enclosing function.
+do
+  local fixtures = {
+    { source = "command <<-'OUTER'\\ninner() {\\n  command <<-'INNER'\\n}\\nOUTER\\n", opener_line = 1 },
+    { source = "function wrapped() {\\n  command <<-'OUTER'\\n  inner() {\\n    command <<-'INNER'\\n  }\\nOUTER\\n}\\n", opener_line = 2 },
+  }
+  for _, fixture in ipairs(fixtures) do
+    local result = scanner.scan(fixture.source)
+    assert(result.complete, "outer heredoc with nested-looking payload should scan completely")
+    assert(#result.heredocs == 1 and result.heredocs[1].delimiter == "OUTER",
+      "a heredoc opener inside an active heredoc body must remain opaque payload")
+    assert(result.heredocs[1].opener_line == fixture.opener_line)
+  end
+end
+
+-- Record what the current scanner can see during delimiter entry. The same
+-- lexical progression is exercised standalone and within a function; scope
+-- does not alter opener recognition. The unterminated quote is deliberately
+-- a candidate opener, not yet a parsed heredoc record.
+do
+  local progressions = {
+    { suffix = "<<-", count = 0, complete = false },
+    { suffix = "<<-'", count = 0, complete = false },
+    { suffix = "<<-'E'", count = 1, delimiter = "E", complete = false },
+    { suffix = "<<-'EO'", count = 1, delimiter = "EO", complete = false },
+    { suffix = "<<-'EOF'", count = 1, delimiter = "EOF", complete = false },
+  }
+  for _, context in ipairs({
+    { prefix = "", opener_line = 1 },
+    { prefix = "function wrapped() {\\n  ", opener_line = 2 },
+  }) do
+    for _, step in ipairs(progressions) do
+      local result = scanner.scan(context.prefix .. "command " .. step.suffix .. "\\n")
+      assert(result.complete == step.complete,
+        "unexpected completeness for delimiter progression " .. step.suffix)
+      assert(#result.heredocs == step.count,
+        "unexpected record count for delimiter progression " .. step.suffix)
+      if step.count == 1 then
+        local record = result.heredocs[1]
+        assert(record.opener_line == context.opener_line)
+        assert(record.delimiter == step.delimiter)
+        assert(record.terminator_line == nil,
+          "a recognised opener without body terminator must retain an outstanding closer obligation")
+        assert(record.confidence == "incomplete" and not record.editable)
+      end
+    end
+  end
+end
+
+-- Empty delimiter is a syntactically complete opener with a real, distinct
+-- terminator obligation; its empty delimiter must not be treated as absence.
+do
+  local result = scanner.scan("command <<-''\\n")
+  assert(not result.complete and #result.heredocs == 1)
+  assert(result.heredocs[1].delimiter == "")
+  assert(result.heredocs[1].delimiter_original == "''")
+  assert(result.heredocs[1].terminator_line == nil)
+end
