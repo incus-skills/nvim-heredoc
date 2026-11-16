@@ -93,6 +93,45 @@ for _, delimiter in ipairs({ "E", "EO", "EOF" }) do
   assert(#previous.heredocs == 1, "standalone prior snapshot should retain its preceding opener record")
 end
 
+-- The latest incomplete scan is also needed by operator-transition
+-- reconciliation. A last-complete-only baseline would still describe EOF,
+-- while the current edit has moved to E.
+replace_buffer(buf, table.concat({
+  "command <<-'EOF'",
+  "\\tpayload",
+  "\\tEOF",
+}, "\\n"))
+plugin.process_buffer(buf, nil, false)
+local last_complete = stores[buf]
+assert(last_complete.complete and last_complete.heredocs[1].delimiter == "EOF")
+
+replace_buffer(buf, table.concat({
+  "command <<-'E'",
+  "\\tpayload",
+}, "\\n"))
+local _, transition_pending = process_and_capture(buf, "operator transition: incomplete managed E")
+assert(not transition_pending.complete and transition_pending.heredocs[1].delimiter == "E"
+  and transition_pending.heredocs[1].terminator_line == nil)
+
+replace_buffer(buf, table.concat({
+  "command <<'E'",
+  "\\tpayload",
+  "E",
+}, "\\n"))
+local transition_previous, transition_saved =
+  process_and_capture(buf, "operator transition: managed E to ordinary E")
+assert(transition_previous == transition_pending,
+  "reconciliation must receive the latest incomplete snapshot, not the older complete baseline")
+assert(transition_previous.heredocs[1].operator == "<<-"
+  and transition_previous.heredocs[1].delimiter == "E")
+local transitioned_lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+assert(transitioned_lines[2] == "payload" and transitioned_lines[3] == "E",
+  "operator transition should withdraw only the managed TAB prefix from body and closer")
+assert(transition_saved.heredocs[1].operator == "<<"
+  and transition_saved.heredocs[1].delimiter == "E")
+assert(last_complete.heredocs[1].delimiter == "EOF",
+  "the last-complete baseline is insufficient for this operator transition")
+
 -- Case B: a new function-wrapped opener is inserted before a previously
 -- completed function-wrapped heredoc. The new opener's partial delimiter
 -- changes whether the old completed heredoc remains visible to the scanner.
