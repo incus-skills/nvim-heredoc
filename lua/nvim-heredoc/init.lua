@@ -8,6 +8,13 @@ local attached = {}
 local pending_ranges = {}
 local scan_snapshots = {}
 
+local function trace(label, value)
+  if vim.env.NVIM_HEREDOC_TRACE == "1" then
+    local suffix = value == nil and "" or (" " .. vim.inspect(value))
+    print("[nvim-heredoc trace] " .. label .. suffix)
+  end
+end
+
 local function supported(ft)
   return ft == "bash" or ft == "sh" or ft == "zsh"
 end
@@ -136,7 +143,13 @@ local function function_header_before(lines, opener_line)
 end
 
 local function preserve_function_heredoc_boundary(previous, current, lines)
+  trace("boundary-check entry", {
+    previous_heredocs = previous and previous.heredocs or nil,
+    current_regions = current.regions,
+    line_count = #lines,
+  })
   if not previous or not previous.heredocs then
+    trace("boundary-check skipped: no previous heredoc snapshot")
     return false
   end
 
@@ -144,19 +157,37 @@ local function preserve_function_heredoc_boundary(previous, current, lines)
     local terminator = new.terminator_line
     if terminator then
       local header = function_header_before(lines, new.opener_line)
+      trace("new managed region", {
+        opener_line = new.opener_line,
+        opener_text = new.opener_text,
+        delimiter = new.delimiter,
+        terminator_line = terminator,
+        function_header_line = header,
+      })
       if header then
         for _, old in ipairs(previous.heredocs) do
+          trace("compare previous heredoc", {
+            opener_line = old.opener_line,
+            opener_text = old.opener_text,
+            delimiter = old.delimiter,
+            terminator_line = old.terminator_line,
+          })
           if old.terminator_line and old.delimiter == new.delimiter and old.opener_text then
             for old_opener = new.body_start_line, terminator - 1 do
               if lines[old_opener] == old.opener_text then
-                -- The old completed heredoc is now lexically inside the new
-                -- region. A standalone brace between the new body and that
-                -- old opener is the containing function's still-present
-                -- autoclose boundary. Preserve both facts: the old heredoc
-                -- is known from the previous scan, and the brace determines
-                -- where the new heredoc must close.
+                trace("previous opener matched current line", {
+                  row = old_opener,
+                  text = lines[old_opener],
+                })
                 for boundary = new.body_start_line, old_opener - 1 do
-                  if lines[boundary] and lines[boundary]:match("^[ \\t]*}$") then
+                  local is_boundary = lines[boundary] and lines[boundary]:match("^[ \\t]*}$")
+                  trace("function boundary candidate", {
+                    row = boundary,
+                    text = lines[boundary],
+                    matched = not not is_boundary,
+                  })
+                  if is_boundary then
+                    trace("function boundary preserved", { row = boundary })
                     new.terminator_line = nil
                     new.body_end_line = nil
                     new.boundary_line = boundary
@@ -166,19 +197,23 @@ local function preserve_function_heredoc_boundary(previous, current, lines)
                     return true
                   end
                 end
-                -- The old opener is inside the apparent new body even when
-                -- its function brace has been removed. In that case the old
-                -- EOF is intentionally available as the new heredoc's
-                -- terminator, but this must not be mistaken for an operator
-                -- transition on the old opener's former line.
+                trace("previous opener matched but no function brace found")
                 return true
               end
             end
+            trace("previous opener text not found in current body", {
+              expected = old.opener_text,
+              search_start = new.body_start_line,
+              search_end = terminator - 1,
+            })
           end
         end
+      else
+        trace("no function header found above new opener", { opener_line = new.opener_line })
       end
     end
   end
+  trace("boundary-check result: no preservation")
   return false
 end
 
@@ -284,6 +319,13 @@ function M.process_buffer(buf, changed_range, close_incomplete)
   processing[buf] = true
   local changed = false
   local previous_scan = scan_snapshots[buf]
+  trace("process_buffer start", {
+    buffer = buf,
+    changed_range = changed_range,
+    close_incomplete = close_incomplete,
+    previous_heredocs = previous_scan and previous_scan.heredocs or nil,
+    lines = get_lines(buf),
+  })
   local success, err = pcall(function()
     -- Each pass can close one pending heredoc. Re-scan so multiple queued
     -- heredocs are resolved in declaration order rather than guessed.
@@ -292,6 +334,7 @@ function M.process_buffer(buf, changed_range, close_incomplete)
       local result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
       local preserved_existing_heredoc =
         preserve_function_heredoc_boundary(previous_scan, result, lines)
+      trace("boundary-check outcome", preserved_existing_heredoc)
       if not preserved_existing_heredoc and reconcile_managed_transition(buf, previous_scan, result) then
         changed = true
         lines = get_lines(buf)
@@ -506,6 +549,13 @@ local function attach(buf)
   scan_snapshots[buf] = scanner.scan(get_source(get_lines(buf)), { tabstop = vim.bo[buf].tabstop })
   vim.api.nvim_buf_attach(buf, false, {
     on_lines = function(_, changed_buf, _, firstline, lastline, new_lastline)
+      trace("on_lines", {
+        buffer = changed_buf,
+        firstline = firstline,
+        lastline = lastline,
+        new_lastline = new_lastline,
+        lines = get_lines(changed_buf),
+      })
       schedule_changed_range(changed_buf, firstline, lastline, new_lastline)
     end,
     on_detach = function(_, detached_buf)
