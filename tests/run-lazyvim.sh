@@ -49,6 +49,10 @@ echo "===== on_lines plugin-mutation accounting characterization ====="
 nvim --headless -u NONE \
   -c 'lua local ok, err = pcall(dofile, "tests/lua/on_lines_plugin_mutation_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") else vim.cmd("qa!") end'
 
+echo "===== on_lines nvim_buf_set_text accounting characterization ====="
+nvim --headless -u NONE \
+  -c 'lua local ok, err = pcall(dofile, "tests/lua/on_lines_set_text_accounting_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") else vim.cmd("qa!") end'
+
 echo "===== Live function-boundary insertion with MiniPairs ====="
 NVIM_HEREDOC_FUNCTION_BOUNDARY=1 nvim --headless -u ci/lazyvim/init.lua \
   -c 'lua local ok, err = pcall(dofile, "tests/lua/live_insert_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
