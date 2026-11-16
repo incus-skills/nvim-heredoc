@@ -41,6 +41,10 @@ echo "===== Source-order selector reference model ====="
 nvim --headless -u NONE \
   -c 'lua local ok, err = pcall(dofile, "tests/lua/source_order_selector_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") else vim.cmd("qa!") end'
 
+echo "===== Retained function-close identity characterization ====="
+nvim --headless -u NONE \
+  -c 'lua local ok, err = pcall(dofile, "tests/lua/retained_function_close_identity_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") else vim.cmd("qa!") end'
+
 echo "===== Live function-boundary insertion with MiniPairs ====="
 NVIM_HEREDOC_FUNCTION_BOUNDARY=1 nvim --headless -u ci/lazyvim/init.lua \
   -c 'lua local ok, err = pcall(dofile, "tests/lua/live_insert_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
