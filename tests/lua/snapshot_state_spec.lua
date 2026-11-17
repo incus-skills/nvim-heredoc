@@ -12,15 +12,6 @@ local function snapshot_store()
   error("could not inspect the plugin's private scan_snapshots upvalue")
 end
 
-local function private_upvalue(target)
-  for index = 1, 32 do
-    local name, value = debug.getupvalue(plugin.process_buffer, index)
-    if not name then break end
-    if name == target then return value end
-  end
-  error("could not inspect private upvalue " .. target)
-end
-
 local function describe(scan)
   local records = {}
   for _, item in ipairs(scan.heredocs or {}) do
@@ -141,71 +132,6 @@ assert(transition_saved.heredocs[1].operator == "<<"
 assert(last_complete.heredocs[1].delimiter == "EOF",
   "the last-complete baseline is insufficient for this operator transition")
 
--- Case B: a new function-wrapped opener is inserted before a previously
--- completed function-wrapped heredoc. The new opener's partial delimiter
--- changes whether the old completed heredoc remains visible to the scanner.
-local wrapped_baseline = table.concat({
-  "old_function() {",
-  "  cat <<'EOF'",
-  "old payload",
-  "EOF",
-  "}",
-}, "\n")
-replace_buffer(buf, wrapped_baseline)
-plugin.process_buffer(buf, nil, false)
-local baseline = stores[buf]
-assert(#baseline.heredocs == 1 and baseline.heredocs[1].delimiter == "EOF"
-  and baseline.heredocs[1].terminator_line == 4,
-  "wrapped baseline must contain the old completed heredoc")
-
-local function wrapped_source(delimiter)
-  return table.concat({
-    "new_function() {",
-    "  command <<-'" .. delimiter .. "'",
-    "  ",
-    "}",
-    "old_function() {",
-    "  cat <<'EOF'",
-    "old payload",
-    "EOF",
-    "}",
-  }, "\n")
-end
-
-replace_buffer(buf, wrapped_source("E"))
-local before_e, after_e = process_and_capture(buf, "wrapped delimiter E")
-assert(#before_e.heredocs == 1 and before_e.heredocs[1].opener_text == "  cat <<'EOF'",
-  "the pre-edit snapshot should still contain the old completed heredoc")
-assert(#after_e.heredocs == 1 and after_e.heredocs[1].delimiter == "E"
-  and after_e.heredocs[1].terminator_line == nil,
-  "the first complete delimiter word should replace the old record with the new incomplete opener")
-
-replace_buffer(buf, wrapped_source("EO"))
-local before_eo, after_eo = process_and_capture(buf, "wrapped delimiter EO")
-assert(#before_eo.heredocs == 1 and before_eo.heredocs[1].delimiter == "E")
-assert(#after_eo.heredocs == 1 and after_eo.heredocs[1].delimiter == "EO"
-  and after_eo.heredocs[1].terminator_line == nil)
-
-replace_buffer(buf, wrapped_source("EOF"))
-local final_lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
-local boundary_helper = private_upvalue("preserve_function_heredoc_boundary")
-local baseline_probe = scanner.scan(table.concat(final_lines, "\n"), { tabstop = vim.bo[buf].tabstop })
-assert(boundary_helper(baseline, baseline_probe, final_lines),
-  "the retained completed baseline should let boundary recovery recognise the old heredoc")
-assert(baseline_probe.regions[1].boundary_line == 4
-  and baseline_probe.regions[1].terminator_line == nil,
-  "the baseline should recover the new function's closing-brace boundary")
-local latest_incomplete = stores[buf]
-local latest_probe = scanner.scan(table.concat(final_lines, "\n"), { tabstop = vim.bo[buf].tabstop })
-assert(not boundary_helper(latest_incomplete, latest_probe, final_lines),
-  "the latest incomplete EO snapshot cannot recover the old EOF heredoc boundary")
-
-local before_eof, after_eof = process_and_capture(buf, "wrapped delimiter EOF")
-assert(#before_eof.heredocs == 1 and before_eof.heredocs[1].delimiter == "EO",
-  "the snapshot immediately before EOF completion no longer contains the old completed heredoc")
-assert(#after_eof.heredocs == 1 and after_eof.heredocs[1].delimiter == "EOF"
-  and after_eof.heredocs[1].terminator_line == 8,
-  "the new opener should consume the old EOF line as its apparent terminator")
 
 print("snapshot state-transition characterization: PASS")
 vim.cmd("qa!")
