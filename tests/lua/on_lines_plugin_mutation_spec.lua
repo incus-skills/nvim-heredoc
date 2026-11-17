@@ -85,6 +85,7 @@ do
 
   -- Invoke the real Return-local production path on the first body row.
   -- The closer insertion uses nvim_buf_set_lines() inside process_buffer().
+  vim.api.nvim_set_current_buf(buf)
   vim.api.nvim_win_set_cursor(0, { 3, 0 })
   plugin.process_buffer(buf, { start_row = 1, end_row = 3 }, false)
 
