@@ -117,17 +117,18 @@ do
     "EOF",
   }
   local current = scan(lines)
-  assert(not current.complete and #current.heredocs == 2
+  assert(current.complete and #current.heredocs == 2
     and current.heredocs[1].terminator_line == 5
-    and current.heredocs[2].terminator_line == nil,
-    "control: the first old terminator should satisfy only the first queued obligation")
+    and current.heredocs[2].terminator_line == 7,
+    "control: the two new queued obligations should consume the old command's two terminators")
   assert(apply_return_local_closer(lines, current, 1),
     "candidate should reserve the first queued obligation")
   local result = scan(lines)
-  assert(not result.complete and #result.heredocs == 2
+  assert(result.complete and #result.heredocs == 2
     and result.heredocs[1].terminator_line == 3
-    and result.heredocs[2].terminator_line == 6,
-    "one closer protects the first obligation but the second still claims an old terminator")
+    and result.heredocs[2].terminator_line == 6
+    and result.heredocs[2].opener_line == 1,
+    "one closer reserves the first new obligation, but the second still absorbs the old command as payload")
 end
 
 print("Return-local closer candidate reference model: PASS")
