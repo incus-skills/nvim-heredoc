@@ -41,9 +41,6 @@ echo "===== Source-order boundary matrix characterization ====="
 nvim --headless -u NONE \
   -c 'lua local ok, err = pcall(dofile, "tests/lua/source_order_boundary_matrix_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") else vim.cmd("qa!") end'
 
-echo "===== Prior opener identity characterization ====="
-nvim --headless -u NONE \
-
 echo "===== Edit-mapped prior opener identity characterization ====="
 nvim --headless -u NONE \
   -c 'lua local ok, err = pcall(dofile, "tests/lua/edit_mapped_opener_identity_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") else vim.cmd("qa!") end'
