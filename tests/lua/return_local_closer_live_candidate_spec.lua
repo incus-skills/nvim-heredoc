@@ -2,7 +2,6 @@ package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
 
 local plugin = require("nvim-heredoc")
 local scanner = require("nvim-heredoc.scanner")
-local editing = require("nvim-heredoc.editing")
 local api = vim.api
 
 local buf
@@ -35,48 +34,20 @@ api.nvim_set_current_buf(buf)
 vim.bo[buf].filetype = "sh"
 assert(plugin.setup_buffer(buf), "plugin should attach to the shell buffer")
 
--- Test-only integration seam: emulate candidate E at the exact deferred
--- process_buffer call reached from the plugin's real on_lines callback.
--- Record callback ranges and use only the range/cursor relationship as the
--- trigger; there is no one-shot guard or production change.
+-- Observe the real on_lines-driven process call; do not simulate insertion.
 local original_process_buffer = plugin.process_buffer
-local candidate_applied = false
 local observed_ranges = {}
 plugin.process_buffer = function(target, changed_range, close_incomplete)
   if target == buf and changed_range then
-    local current_lines = lines(buf)
-    local current = scanner.scan(table.concat(current_lines, "\n"), {
-      tabstop = vim.bo[buf].tabstop,
-    })
-    local cursor_row = api.nvim_win_get_cursor(0)[1] - 1
     observed_ranges[#observed_ranges + 1] = {
       start_row = changed_range.start_row,
       end_row = changed_range.end_row,
-      cursor_row = cursor_row,
+      cursor_row = api.nvim_win_get_cursor(0)[1] - 1,
     }
-    print("STANDALONE_RANGE " .. vim.inspect(observed_ranges[#observed_ranges]))
-
-    if changed_range.start_row < cursor_row
-      and changed_range.end_row > cursor_row
-      and current.complete then
-      for _, region in ipairs(current.heredocs) do
-        if region.operator == "<<-"
-          and region.body_start_line - 1 == cursor_row
-          and region.terminator_line then
-          local closer = assert(editing.closer_line(region))
-          api.nvim_buf_set_lines(buf, cursor_row + 1, cursor_row + 1, false, { closer })
-          candidate_applied = true
-          break
-        end
-      end
-    end
   end
-
   return original_process_buffer(target, changed_range, close_incomplete)
 end
 
--- Exercise actual Insert-mode input. The new opener is placed immediately
--- before an existing completed heredoc with the same delimiter.
 api.nvim_win_set_cursor(0, { 1, 0 })
 api.nvim_input("O")
 defer(function()
@@ -91,25 +62,18 @@ defer(function()
     api.nvim_input(api.nvim_replace_termcodes("<CR>", true, false, true))
     defer(function()
       wait_for(function()
-        return candidate_applied and lines(buf)[3] == "EOF"
-      end, "Return-local candidate should reserve the closer before the old heredoc")
+        local actual = lines(buf)
+        return actual[3] == "EOF" and actual[4] == "old_command <<'EOF'"
+      end, "production Return handling should reserve the closer before the old heredoc")
 
       local saw_return_range = false
-      local saw_plugin_insertion_range = false
       for _, range in ipairs(observed_ranges) do
-        if range.start_row < range.cursor_row
-          and range.end_row > range.cursor_row then
+        if range.start_row < range.cursor_row and range.end_row > range.cursor_row then
           saw_return_range = true
-        end
-        if range.start_row > range.cursor_row then
-          saw_plugin_insertion_range = true
         end
       end
       assert(saw_return_range,
         "standalone Return callback should span from before through the first body row; ranges="
-          .. vim.inspect(observed_ranges))
-      assert(saw_plugin_insertion_range,
-        "plugin closer insertion callback should begin after the cursor row; ranges="
           .. vim.inspect(observed_ranges))
 
       local actual = lines(buf)
@@ -121,7 +85,15 @@ defer(function()
         and actual[6] == "EOF",
         "the earlier completed heredoc should remain intact; lines=" .. vim.inspect(actual))
 
-      print("Return-local closer live callback candidate: PASS")
+      local result = scanner.scan(table.concat(actual, "\n"), {
+        tabstop = vim.bo[buf].tabstop,
+      })
+      assert(result.complete and #result.heredocs == 2
+        and result.heredocs[1].terminator_line == 3
+        and result.heredocs[2].terminator_line == 6,
+        "both heredoc obligations should remain visible in source order")
+
+      print("Return-local closer production integration: PASS")
       vim.cmd("qa!")
     end)
   end)
