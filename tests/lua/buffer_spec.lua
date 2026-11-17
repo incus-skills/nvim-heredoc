@@ -337,7 +337,7 @@ do
     "  }",
   })
   vim.api.nvim_win_set_cursor(0, { 3, 2 })
-  assert(plugin.process_buffer(buf, { start_row = 2, end_row = 3 }, false),
+  assert(plugin.process_buffer(buf, { start_row = 1, end_row = 3 }, false),
     "the new function heredoc should reserve its closer before the autoclose brace")
 
   local actual = lines(buf)
