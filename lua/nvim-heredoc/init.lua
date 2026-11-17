@@ -200,7 +200,16 @@ local function reconcile_managed_transition(buf, previous, current)
   local changed = false
   for _, old in ipairs(previous.heredocs) do
     local target_operator = old.operator == "<<-" and "<<" or old.operator == "<<" and "<<-" or nil
-    if target_operator then
+    local displaced = false
+    if old.terminator_line and old.opener_text then
+      for row = old.terminator_line + 1, #lines do
+        if lines[row] == old.opener_text then
+          displaced = true
+          break
+        end
+      end
+    end
+    if target_operator and not displaced then
       local replacement
       for _, new in ipairs(current.heredocs) do
         if new.operator == target_operator
