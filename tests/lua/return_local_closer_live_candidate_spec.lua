@@ -94,6 +94,24 @@ defer(function()
         return candidate_applied and lines(buf)[3] == "EOF"
       end, "Return-local candidate should reserve the closer before the old heredoc")
 
+      local saw_return_range = false
+      local saw_plugin_insertion_range = false
+      for _, range in ipairs(observed_ranges) do
+        if range.start_row < range.cursor_row
+          and range.end_row > range.cursor_row then
+          saw_return_range = true
+        end
+        if range.start_row > range.cursor_row then
+          saw_plugin_insertion_range = true
+        end
+      end
+      assert(saw_return_range,
+        "standalone Return callback should span from before through the first body row; ranges="
+          .. vim.inspect(observed_ranges))
+      assert(saw_plugin_insertion_range,
+        "plugin closer insertion callback should begin after the cursor row; ranges="
+          .. vim.inspect(observed_ranges))
+
       local actual = lines(buf)
       assert(api.nvim_get_mode().mode == "i", "Return should leave the user in Insert mode")
       assert(actual[1] == "command <<-'EOF'", "new opener should remain unchanged")
