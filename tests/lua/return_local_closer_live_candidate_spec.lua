@@ -5,15 +5,17 @@ local scanner = require("nvim-heredoc.scanner")
 local editing = require("nvim-heredoc.editing")
 local api = vim.api
 
-local function lines(buf)
-  return api.nvim_buf_get_lines(buf, 0, -1, false)
+local buf
+
+local function lines(target)
+  return api.nvim_buf_get_lines(target, 0, -1, false)
 end
 
 local function wait_for(predicate, message)
   assert(vim.wait(1000, predicate, 10), message .. "; lines=" .. vim.inspect(lines(buf)))
 end
 
-local buf = api.nvim_create_buf(true, false)
+buf = api.nvim_create_buf(true, false)
 api.nvim_buf_set_lines(buf, 0, -1, false, {
   "old_command <<'EOF'",
   "old payload",
