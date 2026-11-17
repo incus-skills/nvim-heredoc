@@ -121,6 +121,69 @@ local function ensure_body_prefix(buf, region, body_row)
   end
 end
 
+-- A Return edit can make an earlier completed heredoc appear to be the
+-- terminator for a newly opened managed heredoc. Reserve the new command's
+-- managed closers at the first body row before boundary recovery sees that
+-- misleading complete scan.
+local function insert_return_local_closers(buf, current, changed_range)
+  local cursor_row = active_cursor_row(buf)
+  if not cursor_row or not changed_range
+    or changed_range.start_row >= cursor_row
+    or changed_range.end_row <= cursor_row then
+    return false
+  end
+
+  local lines = get_lines(buf)
+  local body_line = lines[cursor_row + 1]
+  if not body_line or not body_line:match("^[ \t]*$") then
+    return false
+  end
+
+  local first
+  for _, region in ipairs(current.regions) do
+    if region.body_start_line - 1 == cursor_row and region.terminator_line
+      and region.opener_safe then
+      first = region
+      break
+    end
+  end
+  if not first then
+    return false
+  end
+
+  -- Mixed managed/unmanaged queues need distinct body positions and remain
+  -- on the existing conservative path.
+  local queued = {}
+  for _, heredoc in ipairs(current.heredocs) do
+    if heredoc.opener_line == first.opener_line then
+      if heredoc.operator ~= "<<-" or not heredoc.terminator_line or not heredoc.opener_safe then
+        return false
+      end
+      queued[#queued + 1] = heredoc
+    end
+  end
+  table.sort(queued, function(a, b)
+    return a.queue_position < b.queue_position
+  end)
+  if #queued == 0 then
+    return false
+  end
+
+  local closers = {}
+  for index, heredoc in ipairs(queued) do
+    local closer = editing.closer_line(heredoc)
+    if not closer then
+      return false
+    end
+    closers[index] = closer
+  end
+
+  -- One buffer edit reserves every queued obligation in declaration order.
+  vim.api.nvim_buf_set_lines(buf, cursor_row + 1, cursor_row + 1, false, closers)
+  ensure_body_prefix(buf, first, cursor_row)
+  return true
+end
+
 local function is_function_header(line)
   line = line or ""
   return line:match("^[ \t]*[A-Za-z_][A-Za-z0-9_]*%(%)[ \t]*{[ \t]*$")
@@ -290,6 +353,11 @@ function M.process_buffer(buf, changed_range, close_incomplete)
     for _ = 1, 32 do
       local lines = get_lines(buf)
       local result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
+      if result.complete and insert_return_local_closers(buf, result, changed_range) then
+        changed = true
+        lines = get_lines(buf)
+        result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
+      end
       local preserved_existing_heredoc =
         preserve_function_heredoc_boundary(previous_scan, result, lines)
       if not preserved_existing_heredoc and reconcile_managed_transition(buf, previous_scan, result) then
