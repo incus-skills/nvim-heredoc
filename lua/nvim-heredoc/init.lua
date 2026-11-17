@@ -202,8 +202,12 @@ local function reconcile_managed_transition(buf, previous, current)
     local target_operator = old.operator == "<<-" and "<<" or old.operator == "<<" and "<<-" or nil
     local displaced = false
     if old.opener_line and old.opener_text then
-      for row = old.opener_line + 1, #lines do
-        if lines[row] == old.opener_text then
+      -- Only a later opener recognised by the current scan can displace the
+      -- previous opener. Matching raw source text is unsafe: heredoc payload
+      -- may contain a byte-identical opener-looking line.
+      for _, candidate in ipairs(current.heredocs) do
+        if candidate.opener_line > old.opener_line
+          and candidate.opener_text == old.opener_text then
           displaced = true
           break
         end
