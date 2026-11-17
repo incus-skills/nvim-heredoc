@@ -53,10 +53,9 @@ plugin.process_buffer = function(target, changed_range, close_incomplete)
       complete = current.complete,
     }
 
-    -- Candidate E's proposed trigger: this on_lines range includes the
-    -- cursor's first body row; that row is still blank/autoindented; the
-    -- current scan is misleadingly complete; and the next line is not
-    -- already the closer. No persistent one-shot flag is used.
+    -- Candidate E's proposed stateless trigger: the on_lines range starts
+    -- before and includes the cursor's first body row; that row is still
+    -- blank/autoindented; and the current scan is misleadingly complete.
     if range_contains(changed_range, cursor_row)
       and changed_range.start_row < cursor_row
       and current.complete
