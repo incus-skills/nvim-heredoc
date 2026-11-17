@@ -191,7 +191,27 @@ local function normalize_heredoc_operators(line)
   return (line or ""):gsub("<<%-", "<<"):gsub("<<", "<")
 end
 
-local function reconcile_managed_transition(buf, previous, current)
+local function opener_was_displaced(old, lines, edits)
+  if not old.opener_line or not old.opener_text or not edits then
+    return false
+  end
+
+  -- Track only the previous opener's line through the edits in this batch.
+  -- An edit strictly before it moves the original line; an edit touching it
+  -- means a later identical line cannot establish that it survived.
+  local row = old.opener_line - 1
+  for _, edit in ipairs(edits) do
+    if edit.lastline <= row then
+      row = row + edit.new_lastline - edit.lastline
+    elseif edit.firstline <= row and row < edit.lastline then
+      return false
+    end
+  end
+
+  return row >= 0 and lines[row + 1] == old.opener_text
+end
+
+local function reconcile_managed_transition(buf, previous, current, edits)
   if not previous or not previous.heredocs or not current.heredocs then
     return false
   end
@@ -200,19 +220,7 @@ local function reconcile_managed_transition(buf, previous, current)
   local changed = false
   for _, old in ipairs(previous.heredocs) do
     local target_operator = old.operator == "<<-" and "<<" or old.operator == "<<" and "<<-" or nil
-    local displaced = false
-    if old.opener_line and old.opener_text then
-      -- Only a later opener recognised by the current scan can displace the
-      -- previous opener. Matching raw source text is unsafe: heredoc payload
-      -- may contain a byte-identical opener-looking line.
-      for _, candidate in ipairs(current.heredocs) do
-        if candidate.opener_line > old.opener_line
-          and candidate.opener_text == old.opener_text then
-          displaced = true
-          break
-        end
-      end
-    end
+    local displaced = opener_was_displaced(old, lines, edits)
     if target_operator and not displaced then
       local replacement
       for _, new in ipairs(current.heredocs) do
@@ -293,7 +301,7 @@ local function reconcile_managed_transition(buf, previous, current)
   return changed
 end
 
-function M.process_buffer(buf, changed_range, close_incomplete)
+function M.process_buffer(buf, changed_range, close_incomplete, edits)
   buf = buf or vim.api.nvim_get_current_buf()
   if not vim.api.nvim_buf_is_valid(buf) or not vim.api.nvim_buf_is_loaded(buf) then
     return false
@@ -319,7 +327,7 @@ function M.process_buffer(buf, changed_range, close_incomplete)
         lines = get_lines(buf)
         result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
       end
-      if reconcile_managed_transition(buf, previous_scan, result) then
+      if reconcile_managed_transition(buf, previous_scan, result, edits) then
         changed = true
         lines = get_lines(buf)
         result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
@@ -482,8 +490,8 @@ local function process_pending_ranges(buf, close_incomplete)
     M.process_buffer(buf, nil, close_incomplete)
     return
   end
-  for _, range in ipairs(pending.ranges) do
-    M.process_buffer(buf, range, close_incomplete)
+  for index, range in ipairs(pending.ranges) do
+    M.process_buffer(buf, range, close_incomplete, index == 1 and pending.edits or nil)
   end
 end
 
@@ -493,9 +501,14 @@ local function schedule_changed_range(buf, firstline, lastline, new_lastline)
   end
   local pending = pending_ranges[buf]
   if not pending then
-    pending = { ranges = {} }
+    pending = { ranges = {}, edits = {} }
     pending_ranges[buf] = pending
   end
+  pending.edits[#pending.edits + 1] = {
+    firstline = firstline,
+    lastline = lastline,
+    new_lastline = new_lastline,
+  }
   add_changed_range(pending.ranges, firstline, lastline, new_lastline)
 
   if pending.scheduled then
