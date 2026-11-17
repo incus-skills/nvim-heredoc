@@ -58,8 +58,7 @@ local function assert_true(value, message)
 end
 
 -- Baseline: the new function's unique close is visible, and an older
--- completed heredoc provides the structural evidence used by the current
--- production boundary-preservation path.
+-- completed heredoc remains visible after the Return-local closer is reserved.
 do
   local buf = make_buffer({
     "new_function() {",
@@ -84,9 +83,9 @@ do
   assert(tracked.valid and tracked.row == 3,
     "user opener/body edit should rebase the retained function-close row")
 
-  -- Invoke the real production processing path. It preserves the function
-  -- boundary by inserting a closer before the retained brace. That insertion
-  -- uses nvim_buf_set_lines() inside process_buffer().
+  -- Invoke the real Return-local production path on the first body row.
+  -- The closer insertion uses nvim_buf_set_lines() inside process_buffer().
+  vim.api.nvim_win_set_cursor(0, { 3, 0 })
   plugin.process_buffer(buf, { start_row = 1, end_row = 3 }, false)
 
   assert(tracked.valid, "plugin closer insertion must not invalidate the close")
