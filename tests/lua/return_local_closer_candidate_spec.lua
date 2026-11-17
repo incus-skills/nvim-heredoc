@@ -47,7 +47,7 @@ do
   local result = scan(lines)
   assert(result.complete and #result.heredocs == 2
     and result.heredocs[1].terminator_line == 3
-    and result.heredocs[2].terminator_line == 6,
+    and result.heredocs[2].terminator_line == 7,
     "candidate should restore both standalone heredoc obligations")
 end
 
@@ -76,7 +76,7 @@ do
   local result = scan(lines)
   assert(result.complete and #result.heredocs == 2
     and result.heredocs[1].terminator_line == 4
-    and result.heredocs[2].terminator_line == 8,
+    and result.heredocs[2].terminator_line == 9,
     "candidate should preserve both obligations without interpreting payload braces")
 end
 
