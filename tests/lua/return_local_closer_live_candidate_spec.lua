@@ -15,6 +15,16 @@ local function wait_for(predicate, message)
   assert(vim.wait(1000, predicate, 10), message .. "; lines=" .. vim.inspect(lines(buf)))
 end
 
+local function defer(fn)
+  vim.defer_fn(function()
+    local ok, err = xpcall(fn, debug.traceback)
+    if not ok then
+      print(err)
+      vim.cmd("cquit 1")
+    end
+  end, 20)
+end
+
 buf = api.nvim_create_buf(true, false)
 api.nvim_buf_set_lines(buf, 0, -1, false, {
   "old_command <<'EOF'",
@@ -61,28 +71,32 @@ end
 -- before an existing completed heredoc with the same delimiter.
 api.nvim_win_set_cursor(0, { 1, 0 })
 api.nvim_input("O")
-wait_for(function()
-  return api.nvim_get_mode().mode == "i"
-end, "O should enter Insert mode above the existing heredoc")
+defer(function()
+  assert(api.nvim_get_mode().mode == "i",
+    "O should enter Insert mode above the existing heredoc")
 
-api.nvim_input("command <<-'EOF'")
-wait_for(function()
-  return lines(buf)[1] == "command <<-'EOF'"
-end, "the new managed opener should be typed in Insert mode")
+  api.nvim_input("command <<-'EOF'")
+  defer(function()
+    assert(lines(buf)[1] == "command <<-'EOF'",
+      "the new managed opener should be typed in Insert mode; lines=" .. vim.inspect(lines(buf)))
 
-api.nvim_input(api.nvim_replace_termcodes("<CR>", true, false, true))
-wait_for(function()
-  return candidate_applied and lines(buf)[3] == "EOF"
-end, "Return-local candidate should reserve the closer before the old heredoc")
+    api.nvim_input(api.nvim_replace_termcodes("<CR>", true, false, true))
+    defer(function()
+      wait_for(function()
+        return candidate_applied and lines(buf)[3] == "EOF"
+      end, "Return-local candidate should reserve the closer before the old heredoc")
 
-local actual = lines(buf)
-assert(api.nvim_get_mode().mode == "i", "Return should leave the user in Insert mode")
-assert(actual[1] == "command <<-'EOF'", "new opener should remain unchanged")
-assert(actual[3] == "EOF", "new closer should follow the first body row")
-assert(actual[4] == "old_command <<'EOF'"
-  and actual[5] == "old payload"
-  and actual[6] == "EOF",
-  "the earlier completed heredoc should remain intact; lines=" .. vim.inspect(actual))
+      local actual = lines(buf)
+      assert(api.nvim_get_mode().mode == "i", "Return should leave the user in Insert mode")
+      assert(actual[1] == "command <<-'EOF'", "new opener should remain unchanged")
+      assert(actual[3] == "EOF", "new closer should follow the first body row")
+      assert(actual[4] == "old_command <<'EOF'"
+        and actual[5] == "old payload"
+        and actual[6] == "EOF",
+        "the earlier completed heredoc should remain intact; lines=" .. vim.inspect(actual))
 
-print("Return-local closer live callback candidate: PASS")
-vim.cmd("qa!")
+      print("Return-local closer live callback candidate: PASS")
+      vim.cmd("qa!")
+    end)
+  end)
+end)
