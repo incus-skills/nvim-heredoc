@@ -351,13 +351,8 @@ function M.process_buffer(buf, changed_range, close_incomplete, edits)
         local inserted = false
 
         -- Enter after the opener creates the first body line. Insert directly
-        -- below it so the closer is reserved before an enclosing brace.
-        if pending.boundary_line then
-          -- Keep the function's existing autoclose brace outside the
-          -- heredoc. Scanner line numbers are 1-based; buffer insertion rows
-          -- are 0-based.
-          inserted = insert_closer(buf, pending, pending.boundary_line - 1)
-        elseif cursor_row == body_row and changed_body_line then
+        -- below it so the closer is reserved before following source.
+        if cursor_row == body_row and changed_body_line then
           inserted = insert_closer(buf, pending, body_row + 1)
           if inserted then
             -- Complete the Enter transition synchronously: Neovim may have
