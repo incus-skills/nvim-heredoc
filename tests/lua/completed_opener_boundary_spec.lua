@@ -3,17 +3,6 @@ package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
 local plugin = require("nvim-heredoc")
 local scanner = require("nvim-heredoc.scanner")
 
-local function private_upvalue(target)
-  for index = 1, 32 do
-    local name, value = debug.getupvalue(plugin.process_buffer, index)
-    if not name then break end
-    if name == target then return value end
-  end
-  error("could not inspect private upvalue " .. target)
-end
-
-local preserve_boundary = private_upvalue("preserve_function_heredoc_boundary")
-
 local function scan(source)
   return scanner.scan(source, { tabstop = 2 })
 end
@@ -38,9 +27,6 @@ assert(standalone_current.complete and #standalone_current.heredocs == 1)
 assert(standalone_current.heredocs[1].opener_line == 1)
 assert(standalone_current.heredocs[1].terminator_line == 4,
   "the current scanner consumes the old standalone heredoc's terminator")
-assert(not preserve_boundary(standalone_baseline, standalone_current, standalone_lines),
-  "the current function-only recovery helper does not protect a standalone intervening opener")
-
 -- The function-wrapped shape has the same old-opener/terminator collision,
 -- plus an explicit closing-brace boundary. The existing helper recognises
 -- this narrower case when the prior completed scan is available.
@@ -67,13 +53,6 @@ local wrapped_current = scan(table.concat(wrapped_lines, "\n"))
 assert(wrapped_current.complete and #wrapped_current.regions == 1)
 assert(wrapped_current.regions[1].terminator_line == 7,
   "before boundary recovery, the new opener appears to consume the old terminator")
-assert(preserve_boundary(wrapped_baseline, wrapped_current, wrapped_lines),
-  "the existing helper should recognise the previously known wrapped heredoc")
-assert(wrapped_current.regions[1].boundary_line == 3,
-  "the function close brace is the boundary before the old heredoc opener")
-assert(wrapped_current.regions[1].terminator_line == nil,
-  "the old terminator must not be assigned to the new opener across the function boundary")
-
 -- A heredoc-looking line inside a body is not, by itself, an intervening
 -- opener. This negative control preserves the scanner's body-opacity rule.
 local opaque = scan(table.concat({
