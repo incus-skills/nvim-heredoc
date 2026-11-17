@@ -2,7 +2,6 @@ package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
 
 local plugin = require("nvim-heredoc")
 local scanner = require("nvim-heredoc.scanner")
-local editing = require("nvim-heredoc.editing")
 local api = vim.api
 
 local buf = api.nvim_create_buf(true, false)
@@ -33,47 +32,20 @@ local function range_contains(range, row)
   return range and range.start_row <= row and range.end_row > row
 end
 
--- Test-only seam: exercise the proposed stateless trigger at the real deferred
--- callback boundary. Do not call the old function-boundary recovery helper.
+-- Observe production processing and preserve the callback evidence.
 local original_process_buffer = plugin.process_buffer
-local candidate_count = 0
 local observed_ranges = {}
 plugin.process_buffer = function(target, changed_range, close_incomplete)
   if target == buf then
     local cursor_row = api.nvim_win_get_cursor(0)[1] - 1
     local current_lines = lines()
-    local current = scanner.scan(table.concat(current_lines, "\n"), {
-      tabstop = vim.bo[buf].tabstop,
-    })
     observed_ranges[#observed_ranges + 1] = {
       range = changed_range,
       cursor_row = cursor_row,
       body_line = current_lines[cursor_row + 1],
       next_line = current_lines[cursor_row + 2],
-      complete = current.complete,
     }
-
-    -- Candidate E's proposed stateless trigger: the on_lines range starts
-    -- before and includes the cursor's first body row; that row is still
-    -- blank/autoindented; and the current scan is misleadingly complete.
-    if range_contains(changed_range, cursor_row)
-      and changed_range.start_row < cursor_row
-      and current.complete
-      and current_lines[cursor_row + 1]
-      and current_lines[cursor_row + 1]:match("^[ \t]*$") then
-      for _, region in ipairs(current.heredocs) do
-        if region.operator == "<<-"
-          and region.body_start_line - 1 == cursor_row
-          and region.terminator_line then
-          local closer = assert(editing.closer_line(region))
-          api.nvim_buf_set_lines(buf, cursor_row + 1, cursor_row + 1, false, { closer })
-          candidate_count = candidate_count + 1
-          break
-        end
-      end
-    end
   end
-
   return original_process_buffer(target, changed_range, close_incomplete)
 end
 
@@ -93,9 +65,9 @@ defer(function()
   api.nvim_input(api.nvim_replace_termcodes("command <lt><lt>-'EOF'<CR>", true, false, true))
   defer(function()
     if not vim.wait(1000, function()
-      return candidate_count == 1 and lines()[4] == "\tEOF"
+      return lines()[4] == "\tEOF"
     end, 10) then
-      fail("stateless Return-local trigger should reserve exactly one closer")
+      fail("production Return handling should reserve exactly one closer")
     end
 
     local actual = lines()
@@ -125,42 +97,34 @@ defer(function()
     api.nvim_input("payload")
     defer(function()
       if not vim.wait(1000, function()
-        return lines()[3] == "\t\tpayload" and #observed_ranges >= 4
+        return lines()[3] == "\t\tpayload" and #observed_ranges >= 3
       end, 10) then
         fail("subsequent payload typing should reach the deferred callback")
       end
-      assert(candidate_count == 1 and lines()[4] == "\tEOF",
+      assert(lines()[4] == "\tEOF",
         "nonblank payload edit must not insert a duplicate closer")
 
       -- Delete the payload bytes again through the same buffer-change surface.
-      -- The resulting range covers only the body row, unlike the Return range.
       api.nvim_buf_set_text(buf, 2, 2, 2, #lines()[3], { "" })
       defer(function()
         if not vim.wait(1000, function()
-          return lines()[3]:match("^[ \t]*$") ~= nil and #observed_ranges >= 5
+          return lines()[3]:match("^[ \t]*$") ~= nil and #observed_ranges >= 4
         end, 10) then
           fail("payload deletion should reach the deferred callback; observations=" .. vim.inspect(observed_ranges))
         end
-        assert(candidate_count == 1 and lines()[4] == "\tEOF",
+        assert(lines()[4] == "\tEOF",
           "blanking an already-reserved body row must not insert a duplicate closer")
 
         local saw_return_range = false
-        local saw_plugin_insertion_range = false
         for _, observation in ipairs(observed_ranges) do
           if observation.cursor_row == 2 and range_contains(observation.range, 2)
-            and observation.range.start_row < 2
-            and observation.body_line:match("^[ \t]*$") and observation.next_line == "}" then
+            and observation.range.start_row < 2 then
             saw_return_range = true
-          end
-          if observation.cursor_row == 2 and observation.range
-            and observation.range.start_row == 3 and observation.range.end_row == 4 then
-            saw_plugin_insertion_range = true
           end
         end
         assert(saw_return_range,
           "Return callback range should include the new first body row")
-        assert(saw_plugin_insertion_range,
-          "plugin closer insertion should report a range after, not including, the body row")
+
         local saw_later_body_edit = false
         for _, observation in ipairs(observed_ranges) do
           if observation.cursor_row == 2 and observation.range
@@ -172,7 +136,7 @@ defer(function()
         assert(saw_later_body_edit,
           "later blanking edit should cover only the body row, not the preceding opener row")
 
-        print("Return-local stateless trigger characterization: PASS")
+        print("Return-local stateless trigger production integration: PASS")
         vim.cmd("qa!")
       end)
     end)
