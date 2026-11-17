@@ -42,8 +42,8 @@ do
     "control: current scan should demonstrate the terminator-claim ambiguity")
   assert(apply_return_local_closer(lines, current, 1),
     "candidate should recognise the first body row from the current scan")
-  assert(lines[3] == "\tEOF",
-    "candidate should insert the managed closer after the new body row")
+  assert(lines[3] == "EOF",
+    "column-zero opener should produce a column-zero managed closer")
   local result = scan(lines)
   assert(result.complete and #result.heredocs == 2
     and result.heredocs[1].terminator_line == 3
