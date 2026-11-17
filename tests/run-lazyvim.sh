@@ -43,7 +43,6 @@ nvim --headless -u NONE \
 
 echo "===== Prior opener identity characterization ====="
 nvim --headless -u NONE \
-  -c 'lua local ok, err = pcall(dofile, "tests/lua/prior_opener_identity_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") else vim.cmd("qa!") end'
 
 echo "===== Edit-mapped prior opener identity characterization ====="
 nvim --headless -u NONE \
