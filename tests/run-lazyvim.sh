@@ -17,6 +17,10 @@ echo "===== Return-local closer candidate reference model ====="
 nvim --headless -u NONE \
   -c 'lua local ok, err = pcall(dofile, "tests/lua/return_local_closer_candidate_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") else vim.cmd("qa!") end'
 
+echo "===== Return-local closer live callback candidate ====="
+nvim --headless -u NONE \
+  -c 'lua local ok, err = pcall(dofile, "tests/lua/return_local_closer_live_candidate_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
+
 echo "===== Incremental heredoc snapshot state characterization ====="
 nvim --headless -u NONE \
   -c 'lua local ok, err = pcall(dofile, "tests/lua/snapshot_state_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
