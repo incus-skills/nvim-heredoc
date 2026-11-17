@@ -131,4 +131,44 @@ do
     "one closer reserves the first new obligation, but the second still absorbs the old command as payload")
 end
 
+
+-- Narrow queue-count extension: reserve one managed closer for every
+-- obligation from the newly entered command, in declaration order.
+do
+  local lines = {
+    "command <<-'EOF' <<-'EOF'",
+    "",
+    "old_command <<'EOF' <<'EOF'",
+    "old payload one",
+    "EOF",
+    "old payload two",
+    "EOF",
+  }
+  local current = scan(lines)
+  local opener_line = current.heredocs[1].opener_line
+  local queued = {}
+  for _, heredoc in ipairs(current.heredocs) do
+    if heredoc.opener_line == opener_line and heredoc.operator == "<<-" then
+      queued[#queued + 1] = heredoc
+    end
+  end
+  assert(#queued == 2, "both new managed obligations should share the command opener")
+  for index, heredoc in ipairs(queued) do
+    local closer = (heredoc.structural_prefix or "") .. heredoc.delimiter
+    table.insert(lines, 3 + index - 1, closer)
+  end
+
+  local result = scan(lines)
+  assert(result.complete and #result.heredocs == 4
+    and result.heredocs[1].opener_line == 1
+    and result.heredocs[1].terminator_line == 3
+    and result.heredocs[2].opener_line == 1
+    and result.heredocs[2].terminator_line == 4
+    and result.heredocs[3].opener_line == 5
+    and result.heredocs[3].terminator_line == 7
+    and result.heredocs[4].opener_line == 5
+    and result.heredocs[4].terminator_line == 9,
+    "one adjacent closer per new queued obligation should restore all four obligations in source order")
+end
+
 print("Return-local closer candidate reference model: PASS")
