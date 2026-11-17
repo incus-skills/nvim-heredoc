@@ -171,19 +171,19 @@ if vim.env.NVIM_HEREDOC_FUNCTION_BOUNDARY == "1" or vim.env.NVIM_HEREDOC_FUNCTIO
               "the heredoc opener should retain the function body's indentation; lines="
                 .. vim.inspect(after_opener))
 
-            -- The old completed heredoc is now lexically inside the new
-            -- opener. The live on_lines/scheduled path must recognise the
-            -- still-present function brace and reserve the new closer before
-            -- it, without consuming or rewriting the old function.
-            wait_for(function()
-              actual = lines(buf)
-              return actual[3] == "\tEOF" and actual[4] == "}"
-            end, "live processing should insert the new closer before the MiniPairs brace")
-            actual = snapshot("after scheduled processing of the new opener")
-            assert_original(actual, 5)
+            -- The Return-local path reserves the closer at the first body
+            -- row. Typing the opener alone must leave the structural brace
+            -- untouched; Return performs the insertion.
+            assert(after_opener[3] == "}",
+              "the enclosing brace should remain untouched until Return; lines="
+                .. vim.inspect(after_opener))
 
             api.nvim_input(api.nvim_replace_termcodes("<CR>", true, false, true))
             defer(function()
+              wait_for(function()
+                actual = lines(buf)
+                return actual[3] == "\t\t" and actual[4] == "\tEOF" and actual[5] == "}"
+              end, "Return should reserve the new closer before the MiniPairs brace")
               local after_body_return = snapshot("after Return into the heredoc body")
               assert_insert_mode("Return after the heredoc opener must remain in Insert mode")
               assert(after_body_return[3] == "\t\t"
@@ -251,10 +251,12 @@ vim.api.nvim_win_set_cursor(0, { 1, #("\tcat <<-LIVE") })
 vim.api.nvim_input("A\n")
 
 defer(function()
+  wait_for(function()
+    local actual = lines(buf)
+    return actual[2] == "\t\t" and actual[3] == "\tLIVE"
+  end, "Enter should create the deeper body prefix and reserve an opener-aligned closer")
+
   local actual = lines(buf)
-  assert(actual[2] == "\t\t" and actual[3] == "\tLIVE",
-    "Enter should create the deeper body prefix and reserve an opener-aligned closer; lines="
-      .. vim.inspect(actual))
   assert_insert_mode("the first Enter transition must remain in Insert mode")
 
   vim.api.nvim_input("typed")

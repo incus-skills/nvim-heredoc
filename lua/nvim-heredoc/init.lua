@@ -121,68 +121,116 @@ local function ensure_body_prefix(buf, region, body_row)
   end
 end
 
-local function is_function_header(line)
-  line = line or ""
-  return line:match("^[ \t]*[A-Za-z_][A-Za-z0-9_]*%(%)[ \t]*{[ \t]*$")
-    or line:match("^[ \t]*function[ \t]+[A-Za-z_][A-Za-z0-9_]*[ \t]*{[ \t]*$")
-end
-local function function_header_before(lines, opener_line)
-  for row = opener_line - 1, 1, -1 do
-    if is_function_header(lines[row]) then
-      return row
-    end
-  end
-  return nil
-end
-
-local function preserve_function_heredoc_boundary(previous, current, lines)
-  if not previous or not previous.heredocs then
+-- A Return edit can make an earlier completed heredoc appear to be the
+-- terminator for a newly opened managed heredoc. Reserve the new command's
+-- managed closers at the first body row before boundary recovery sees that
+-- misleading complete scan.
+local function insert_return_local_closers(buf, current, changed_range)
+  local cursor_row = active_cursor_row(buf)
+  -- The observed Return edit replaces the opener's line boundary with
+  -- exactly the first body row. Broader edits that happen to cover the cursor
+  -- row are not a Return transition.
+  if not cursor_row or not changed_range
+    or changed_range.start_row ~= cursor_row - 1
+    or changed_range.end_row ~= cursor_row + 1 then
     return false
   end
 
-  for _, new in ipairs(current.regions) do
-    local terminator = new.terminator_line
-    if terminator then
-      local header = function_header_before(lines, new.opener_line)
-      if header then
-        for _, old in ipairs(previous.heredocs) do
-          if old.terminator_line and old.delimiter == new.delimiter and old.opener_text then
-            for old_opener = new.body_start_line, terminator - 1 do
-              if lines[old_opener] == old.opener_text then
-                -- The old completed heredoc is now lexically inside the new
-                -- region. A standalone brace between the new body and that
-                -- old opener is the containing function's still-present
-                -- autoclose boundary. Preserve both facts: the old heredoc
-                -- is known from the previous scan, and the brace determines
-                -- where the new heredoc must close.
-                for boundary = new.body_start_line, old_opener - 1 do
-                  if lines[boundary] and lines[boundary]:match("^[ \\t]*}$") then
-                    new.terminator_line = nil
-                    new.body_end_line = nil
-                    new.boundary_line = boundary
-                    new.editable = false
-                    new.confidence = "incomplete"
-                    current.complete = false
-                    return true
-                  end
-                end
-                -- The old opener is inside the apparent new body even when
-                -- its function brace has been removed. In that case the old
-                -- EOF is intentionally available as the new heredoc's
-                -- terminator, but this must not be mistaken for an operator
-                -- transition on the old opener's former line.
-                return true
-              end
-            end
-          end
-        end
-      end
+  local lines = get_lines(buf)
+  local body_line = lines[cursor_row + 1]
+  if not body_line or not body_line:match("^[ \t]*$") then
+    return false
+  end
+
+  local first
+  for _, region in ipairs(current.regions) do
+    if region.body_start_line - 1 == cursor_row and region.terminator_line
+      and region.opener_safe then
+      first = region
+      break
     end
   end
-  return false
+  if not first then
+    return false
+  end
+
+  -- Mixed managed/unmanaged queues need distinct body positions and remain
+  -- on the existing conservative path.
+  local queued = {}
+  for _, heredoc in ipairs(current.heredocs) do
+    if heredoc.opener_line == first.opener_line then
+      if heredoc.operator ~= "<<-" or not heredoc.terminator_line or not heredoc.opener_safe then
+        return false
+      end
+      queued[#queued + 1] = heredoc
+    end
+  end
+  table.sort(queued, function(a, b)
+    return a.queue_position < b.queue_position
+  end)
+  if #queued == 0 then
+    return false
+  end
+
+  local closers = {}
+  for index, heredoc in ipairs(queued) do
+    local closer = editing.closer_line(heredoc)
+    if not closer then
+      return false
+    end
+    closers[index] = closer
+  end
+
+  -- An earlier pass may already have reserved the leading queued closer
+  -- before Return. Keep that prefix and add only the remaining obligations.
+  local already_reserved = 0
+  for index, closer in ipairs(closers) do
+    if lines[cursor_row + 2 + index - 1] == closer then
+      already_reserved = index
+    else
+      break
+    end
+  end
+  if already_reserved == #closers then
+    return false
+  end
+
+  local missing = {}
+  for index = already_reserved + 1, #closers do
+    missing[#missing + 1] = closers[index]
+  end
+  -- One buffer edit reserves all remaining obligations in declaration order.
+  local insert_row = cursor_row + 1 + already_reserved
+  vim.api.nvim_buf_set_lines(buf, insert_row, insert_row, false, missing)
+  ensure_body_prefix(buf, first, cursor_row)
+  return true
 end
 
-local function reconcile_managed_transition(buf, previous, current)
+local function normalize_heredoc_operators(line)
+  return (line or ""):gsub("<<%-", "<<"):gsub("<<", "<")
+end
+
+local function opener_was_displaced(old, lines, edits)
+  if not old.opener_line or not old.opener_text or not edits then
+    return false
+  end
+
+  -- Track only the previous opener's line through the edits in this batch.
+  -- An edit strictly before it moves the original line; an edit touching it
+  -- means a later identical line cannot establish that it survived.
+  local row = old.opener_line - 1
+  for _, edit in ipairs(edits) do
+    if edit.lastline <= row then
+      row = row + edit.new_lastline - edit.lastline
+    elseif edit.firstline <= row and row < edit.lastline then
+      return false
+    end
+  end
+
+  return row >= 0 and lines[row + 1] == old.opener_text
+end
+
+local function reconcile_managed_transition(buf, previous, current, edits)
   if not previous or not previous.heredocs or not current.heredocs then
     return false
   end
@@ -191,14 +239,17 @@ local function reconcile_managed_transition(buf, previous, current)
   local changed = false
   for _, old in ipairs(previous.heredocs) do
     local target_operator = old.operator == "<<-" and "<<" or old.operator == "<<" and "<<-" or nil
-    if target_operator then
+    local displaced = opener_was_displaced(old, lines, edits)
+    if target_operator and not displaced then
       local replacement
       for _, new in ipairs(current.heredocs) do
         if new.operator == target_operator
           and new.opener_line == old.opener_line
           and new.queue_position == old.queue_position
           and new.delimiter == old.delimiter
-          and new.delimiter_original == old.delimiter_original then
+          and new.delimiter_original == old.delimiter_original
+          and normalize_heredoc_operators(new.opener_text)
+            == normalize_heredoc_operators(old.opener_text) then
           replacement = new
           break
         end
@@ -269,7 +320,7 @@ local function reconcile_managed_transition(buf, previous, current)
   return changed
 end
 
-function M.process_buffer(buf, changed_range, close_incomplete)
+function M.process_buffer(buf, changed_range, close_incomplete, edits)
   buf = buf or vim.api.nvim_get_current_buf()
   if not vim.api.nvim_buf_is_valid(buf) or not vim.api.nvim_buf_is_loaded(buf) then
     return false
@@ -290,9 +341,12 @@ function M.process_buffer(buf, changed_range, close_incomplete)
     for _ = 1, 32 do
       local lines = get_lines(buf)
       local result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
-      local preserved_existing_heredoc =
-        preserve_function_heredoc_boundary(previous_scan, result, lines)
-      if not preserved_existing_heredoc and reconcile_managed_transition(buf, previous_scan, result) then
+      if result.complete and insert_return_local_closers(buf, result, changed_range) then
+        changed = true
+        lines = get_lines(buf)
+        result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
+      end
+      if reconcile_managed_transition(buf, previous_scan, result, edits) then
         changed = true
         lines = get_lines(buf)
         result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
@@ -316,13 +370,8 @@ function M.process_buffer(buf, changed_range, close_incomplete)
         local inserted = false
 
         -- Enter after the opener creates the first body line. Insert directly
-        -- below it so the closer is reserved before an enclosing brace.
-        if pending.boundary_line then
-          -- Keep the function's existing autoclose brace outside the
-          -- heredoc. Scanner line numbers are 1-based; buffer insertion rows
-          -- are 0-based.
-          inserted = insert_closer(buf, pending, pending.boundary_line - 1)
-        elseif cursor_row == body_row and changed_body_line then
+        -- below it so the closer is reserved before following source.
+        if cursor_row == body_row and changed_body_line then
           inserted = insert_closer(buf, pending, body_row + 1)
           if inserted then
             -- Complete the Enter transition synchronously: Neovim may have
@@ -455,8 +504,8 @@ local function process_pending_ranges(buf, close_incomplete)
     M.process_buffer(buf, nil, close_incomplete)
     return
   end
-  for _, range in ipairs(pending.ranges) do
-    M.process_buffer(buf, range, close_incomplete)
+  for index, range in ipairs(pending.ranges) do
+    M.process_buffer(buf, range, close_incomplete, index == 1 and pending.edits or nil)
   end
 end
 
@@ -466,9 +515,14 @@ local function schedule_changed_range(buf, firstline, lastline, new_lastline)
   end
   local pending = pending_ranges[buf]
   if not pending then
-    pending = { ranges = {} }
+    pending = { ranges = {}, edits = {} }
     pending_ranges[buf] = pending
   end
+  pending.edits[#pending.edits + 1] = {
+    firstline = firstline,
+    lastline = lastline,
+    new_lastline = new_lastline,
+  }
   add_changed_range(pending.ranges, firstline, lastline, new_lastline)
 
   if pending.scheduled then
