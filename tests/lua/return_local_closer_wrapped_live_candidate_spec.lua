@@ -58,6 +58,7 @@ plugin.process_buffer = function(target, changed_range, close_incomplete)
     -- current scan is misleadingly complete; and the next line is not
     -- already the closer. No persistent one-shot flag is used.
     if range_contains(changed_range, cursor_row)
+      and changed_range.start_row < cursor_row
       and current.complete
       and current_lines[cursor_row + 1]
       and current_lines[cursor_row + 1]:match("^[ \t]*$") then
@@ -66,11 +67,9 @@ plugin.process_buffer = function(target, changed_range, close_incomplete)
           and region.body_start_line - 1 == cursor_row
           and region.terminator_line then
           local closer = assert(editing.closer_line(region))
-          if current_lines[cursor_row + 2] ~= closer then
-            api.nvim_buf_set_lines(buf, cursor_row + 1, cursor_row + 1, false, { closer })
-            candidate_count = candidate_count + 1
-            break
-          end
+          api.nvim_buf_set_lines(buf, cursor_row + 1, cursor_row + 1, false, { closer })
+          candidate_count = candidate_count + 1
+          break
         end
       end
     end
@@ -134,9 +133,9 @@ defer(function()
       assert(candidate_count == 1 and lines()[4] == "\tEOF",
         "nonblank payload edit must not insert a duplicate closer")
 
-      -- Delete the payload again. The row is blank, but the immediate next
-      -- line is already the reserved closer, so the trigger remains inert.
-      api.nvim_input(string.rep(api.nvim_replace_termcodes("<BS>", true, false, true), 7))
+      -- Delete the payload bytes again through the same buffer-change surface.
+      -- The resulting range covers only the body row, unlike the Return range.
+      api.nvim_buf_set_text(buf, 2, 2, 2, #lines()[3], { "" })
       defer(function()
         if not vim.wait(1000, function()
           return lines()[3]:match("^[ \\t]*$") ~= nil and #observed_ranges >= 5
@@ -150,6 +149,7 @@ defer(function()
         local saw_plugin_insertion_range = false
         for _, observation in ipairs(observed_ranges) do
           if observation.cursor_row == 2 and range_contains(observation.range, 2)
+            and observation.range.start_row < 2
             and observation.body_line:match("^[ \\t]*$") and observation.next_line == "}" then
             saw_return_range = true
           end
@@ -162,6 +162,16 @@ defer(function()
           "Return callback range should include the new first body row")
         assert(saw_plugin_insertion_range,
           "plugin closer insertion should report a range after, not including, the body row")
+        local saw_later_body_edit = false
+        for _, observation in ipairs(observed_ranges) do
+          if observation.cursor_row == 2 and observation.range
+            and observation.range.start_row == 2 and observation.range.end_row == 3
+            and observation.body_line:match("^[ \\t]*$") then
+            saw_later_body_edit = true
+          end
+        end
+        assert(saw_later_body_edit,
+          "later blanking edit should cover only the body row, not the preceding opener row")
 
         print("Return-local stateless trigger characterization: PASS")
         vim.cmd("qa!")
