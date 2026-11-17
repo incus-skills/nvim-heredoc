@@ -75,7 +75,7 @@ defer(function()
   assert(api.nvim_get_mode().mode == "i",
     "O should enter Insert mode above the existing heredoc")
 
-  api.nvim_input("command <<-'EOF'")
+  api.nvim_input(api.nvim_replace_termcodes("command <lt><lt>-'EOF'", true, false, true))
   defer(function()
     assert(lines(buf)[1] == "command <<-'EOF'",
       "the new managed opener should be typed in Insert mode; lines=" .. vim.inspect(lines(buf)))
