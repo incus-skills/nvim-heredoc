@@ -86,19 +86,20 @@ do
   local lines = {
     "command <<-'EOF'",
     "",
-    "payload }",
-    "cat <<'INNER'",
-    "EOF",
   }
   local current = scan(lines)
-  assert(current.complete and #current.heredocs == 1,
-    "payload lookalikes must remain opaque in the current scan")
+  assert(not current.complete and #current.heredocs == 1,
+    "control: a new opener with its first body row is an outstanding obligation")
   assert(apply_return_local_closer(lines, current, 1),
     "candidate should reserve the new closer without parsing payload")
+  -- Subsequent typing inserts payload before the reserved closer, as it does
+  -- in the live editing arrangement.
+  table.insert(lines, 3, "payload }")
+  table.insert(lines, 4, "cat <<'INNER'")
   local result = scan(lines)
   assert(result.complete and #result.heredocs == 1
-    and result.heredocs[1].terminator_line == 3,
-    "the new closer should end the obligation; payload remains opaque")
+    and result.heredocs[1].terminator_line == 5,
+    "brace and heredoc-looking payload must remain opaque before the reserved closer")
 end
 
 print("Return-local closer candidate reference model: PASS")
