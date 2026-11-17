@@ -251,10 +251,12 @@ vim.api.nvim_win_set_cursor(0, { 1, #("\tcat <<-LIVE") })
 vim.api.nvim_input("A\n")
 
 defer(function()
+  wait_for(function()
+    local actual = lines(buf)
+    return actual[2] == "\t\t" and actual[3] == "\tLIVE"
+  end, "Enter should create the deeper body prefix and reserve an opener-aligned closer")
+
   local actual = lines(buf)
-  assert(actual[2] == "\t\t" and actual[3] == "\tLIVE",
-    "Enter should create the deeper body prefix and reserve an opener-aligned closer; lines="
-      .. vim.inspect(actual))
   assert_insert_mode("the first Enter transition must remain in Insert mode")
 
   vim.api.nvim_input("typed")
