@@ -127,9 +127,12 @@ end
 -- misleading complete scan.
 local function insert_return_local_closers(buf, current, changed_range)
   local cursor_row = active_cursor_row(buf)
+  -- The observed Return edit replaces the opener's line boundary with
+  -- exactly the first body row. Broader edits that happen to cover the cursor
+  -- row are not a Return transition.
   if not cursor_row or not changed_range
-    or changed_range.start_row >= cursor_row
-    or changed_range.end_row <= cursor_row then
+    or changed_range.start_row ~= cursor_row - 1
+    or changed_range.end_row ~= cursor_row + 1 then
     return false
   end
 
