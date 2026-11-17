@@ -88,7 +88,7 @@ defer(function()
       assert(api.nvim_get_mode().mode == "i", "Return should leave the user in Insert mode")
       assert(actual[1] == "new_function() {" and actual[2] == "\tcommand <<-'EOF'",
         "new function and opener should remain intact")
-      assert(actual[3] == "\t" and actual[4] == "\tEOF" and actual[5] == "}",
+      assert(actual[3] == "\t\t" and actual[4] == "\tEOF" and actual[5] == "}",
         "new managed closer should be inside the function and before its structural close; lines="
           .. vim.inspect(actual))
       assert(actual[6] == "old_function() {"
