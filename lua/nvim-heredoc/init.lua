@@ -178,8 +178,27 @@ local function insert_return_local_closers(buf, current, changed_range)
     closers[index] = closer
   end
 
-  -- One buffer edit reserves every queued obligation in declaration order.
-  vim.api.nvim_buf_set_lines(buf, cursor_row + 1, cursor_row + 1, false, closers)
+  -- An earlier pass may already have reserved the leading queued closer
+  -- before Return. Keep that prefix and add only the remaining obligations.
+  local already_reserved = 0
+  for index, closer in ipairs(closers) do
+    if lines[cursor_row + 2 + index - 1] == closer then
+      already_reserved = index
+    else
+      break
+    end
+  end
+  if already_reserved == #closers then
+    return false
+  end
+
+  local missing = {}
+  for index = already_reserved + 1, #closers do
+    missing[#missing + 1] = closers[index]
+  end
+  -- One buffer edit reserves all remaining obligations in declaration order.
+  local insert_row = cursor_row + 1 + already_reserved
+  vim.api.nvim_buf_set_lines(buf, insert_row, insert_row, false, missing)
   ensure_body_prefix(buf, first, cursor_row)
   return true
 end
