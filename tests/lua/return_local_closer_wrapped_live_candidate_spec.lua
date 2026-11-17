@@ -29,41 +29,48 @@ local function fail(message)
   vim.cmd("cquit 1")
 end
 
--- Test-only seam: observe the changed range at the real deferred callback
--- boundary, then apply candidate E. Do not call the old boundary helper.
+local function range_contains(range, row)
+  return range and range.start_row <= row and range.end_row > row
+end
+
+-- Test-only seam: exercise the proposed stateless trigger at the real deferred
+-- callback boundary. Do not call the old function-boundary recovery helper.
 local original_process_buffer = plugin.process_buffer
-local candidate_applied = false
-local process_calls = 0
+local candidate_count = 0
 local observed_ranges = {}
 plugin.process_buffer = function(target, changed_range, close_incomplete)
   if target == buf then
-    process_calls = process_calls + 1
     local cursor_row = api.nvim_win_get_cursor(0)[1] - 1
-    observed_ranges[#observed_ranges + 1] = {
-      range = changed_range,
-      cursor_row = cursor_row,
-      line_count = api.nvim_buf_line_count(buf),
-      opener_line = lines()[2],
-    }
-    print("RETURN_RANGE_TRACE " .. vim.inspect(observed_ranges[#observed_ranges]))
-  end
-
-  if target == buf and not candidate_applied then
     local current_lines = lines()
     local current = scanner.scan(table.concat(current_lines, "\n"), {
       tabstop = vim.bo[buf].tabstop,
     })
-    local cursor_row = api.nvim_win_get_cursor(0)[1] - 1
+    observed_ranges[#observed_ranges + 1] = {
+      range = changed_range,
+      cursor_row = cursor_row,
+      body_line = current_lines[cursor_row + 1],
+      next_line = current_lines[cursor_row + 2],
+      complete = current.complete,
+    }
 
-    if current.complete then
+    -- Candidate E's proposed trigger: this on_lines range includes the
+    -- cursor's first body row; that row is still blank/autoindented; the
+    -- current scan is misleadingly complete; and the next line is not
+    -- already the closer. No persistent one-shot flag is used.
+    if range_contains(changed_range, cursor_row)
+      and current.complete
+      and current_lines[cursor_row + 1]
+      and current_lines[cursor_row + 1]:match("^[ \t]*$") then
       for _, region in ipairs(current.heredocs) do
         if region.operator == "<<-"
           and region.body_start_line - 1 == cursor_row
           and region.terminator_line then
           local closer = assert(editing.closer_line(region))
-          api.nvim_buf_set_lines(buf, cursor_row + 1, cursor_row + 1, false, { closer })
-          candidate_applied = true
-          break
+          if current_lines[cursor_row + 2] ~= closer then
+            api.nvim_buf_set_lines(buf, cursor_row + 1, cursor_row + 1, false, { closer })
+            candidate_count = candidate_count + 1
+            break
+          end
         end
       end
     end
@@ -88,9 +95,9 @@ defer(function()
   api.nvim_input(api.nvim_replace_termcodes("command <lt><lt>-'EOF'<CR>", true, false, true))
   defer(function()
     if not vim.wait(1000, function()
-      return candidate_applied and lines()[4] == "\tEOF"
+      return candidate_count == 1 and lines()[4] == "\tEOF"
     end, 10) then
-      fail("Return-local candidate should reserve the closer before the earlier heredoc terminator")
+      fail("stateless Return-local trigger should reserve exactly one closer")
     end
 
     local actual = lines()
@@ -111,14 +118,54 @@ defer(function()
     local result = scanner.scan(table.concat(actual, "\n"), {
       tabstop = vim.bo[buf].tabstop,
     })
-    assert(result.complete and #result.heredocs == 2,
-      "both heredoc obligations should be visible after the local insertion")
-    assert(result.heredocs[1].terminator_line == 4
+    assert(result.complete and #result.heredocs == 2
+      and result.heredocs[1].terminator_line == 4
       and result.heredocs[2].terminator_line == 9,
-      "new and prior terminators should retain source order")
+      "both obligations should be visible in source order")
 
-    print("RETURN_RANGE_TRACE_SUMMARY " .. vim.inspect(observed_ranges))
-    print("Function-wrapped Return-local closer live callback candidate: PASS")
-    vim.cmd("qa!")
+    -- Later typing edits the same body row and must not insert another closer.
+    api.nvim_input("payload")
+    defer(function()
+      if not vim.wait(1000, function()
+        return lines()[3] == "\t\tpayload" and #observed_ranges >= 4
+      end, 10) then
+        fail("subsequent payload typing should reach the deferred callback")
+      end
+      assert(candidate_count == 1 and lines()[4] == "\tEOF",
+        "nonblank payload edit must not insert a duplicate closer")
+
+      -- Delete the payload again. The row is blank, but the immediate next
+      -- line is already the reserved closer, so the trigger remains inert.
+      api.nvim_input(api.nvim_replace_termcodes("<C-w>", true, false, true))
+      defer(function()
+        if not vim.wait(1000, function()
+          return lines()[3] == "\t\t" and #observed_ranges >= 5
+        end, 10) then
+          fail("payload deletion should reach the deferred callback")
+        end
+        assert(candidate_count == 1 and lines()[4] == "\tEOF",
+          "blanking an already-reserved body row must not insert a duplicate closer")
+
+        local saw_return_range = false
+        local saw_plugin_insertion_range = false
+        for _, observation in ipairs(observed_ranges) do
+          if observation.cursor_row == 2 and range_contains(observation.range, 2)
+            and observation.body_line == "\t\t" and observation.next_line == "}" then
+            saw_return_range = true
+          end
+          if observation.cursor_row == 2 and observation.range
+            and observation.range.start_row == 3 and observation.range.end_row == 4 then
+            saw_plugin_insertion_range = true
+          end
+        end
+        assert(saw_return_range,
+          "Return callback range should include the new first body row")
+        assert(saw_plugin_insertion_range,
+          "plugin closer insertion should report a range after, not including, the body row")
+
+        print("Return-local stateless trigger characterization: PASS")
+        vim.cmd("qa!")
+      end)
+    end)
   end)
 end)
