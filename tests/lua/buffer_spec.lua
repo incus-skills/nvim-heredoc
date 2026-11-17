@@ -383,3 +383,36 @@ do
 end
 
 print("buffer integration tests: PASS")
+
+
+do
+  local buf = set_buffer({
+    "\tcat <<-'EOF'",
+    "\t\tpayload",
+    "\t\t  nested",
+    "\t\t",
+    "\tEOF",
+  })
+  vim.api.nvim_set_current_buf(buf)
+  plugin.setup()
+
+  -- Change the operator while introducing a payload line that exactly
+  -- matches the previous opener. It must not be mistaken for a displaced
+  -- opener: inside the heredoc it is payload, not a shell command.
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
+    "\tcat <<'EOF'",
+    "\tcat <<-'EOF'",
+    "\t\tpayload",
+    "\t\t  nested",
+    "\t\t",
+    "\tEOF",
+  })
+
+  assert(vim.wait(1000, function()
+    local actual = lines(buf)
+    return actual[3] == "payload"
+      and actual[4] == "  nested"
+      and actual[5] == ""
+      and actual[6] == "EOF"
+  end, 10), "an opener-looking payload line must not suppress managed-prefix removal")
+end
