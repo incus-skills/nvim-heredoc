@@ -111,6 +111,7 @@ do
     "\tcommand <<-'EOF'",
     "",
   })
+  vim.api.nvim_win_set_cursor(0, { 3, 0 })
   plugin.process_buffer(buf, { start_row = 1, end_row = 3 }, false)
 
   local processed = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
