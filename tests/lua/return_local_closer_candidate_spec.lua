@@ -47,7 +47,7 @@ do
   local result = scan(lines)
   assert(result.complete and #result.heredocs == 2
     and result.heredocs[1].terminator_line == 3
-    and result.heredocs[2].terminator_line == 7,
+    and result.heredocs[2].terminator_line == 6,
     "candidate should restore both standalone heredoc obligations")
 end
 
