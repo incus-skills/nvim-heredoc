@@ -137,7 +137,7 @@ defer(function()
       api.nvim_buf_set_text(buf, 2, 2, 2, #lines()[3], { "" })
       defer(function()
         if not vim.wait(1000, function()
-          return lines()[3]:match("^[ \\t]*$") ~= nil and #observed_ranges >= 5
+          return lines()[3]:match("^[ \t]*$") ~= nil and #observed_ranges >= 5
         end, 10) then
           fail("payload deletion should reach the deferred callback; observations=" .. vim.inspect(observed_ranges))
         end
@@ -149,7 +149,7 @@ defer(function()
         for _, observation in ipairs(observed_ranges) do
           if observation.cursor_row == 2 and range_contains(observation.range, 2)
             and observation.range.start_row < 2
-            and observation.body_line:match("^[ \\t]*$") and observation.next_line == "}" then
+            and observation.body_line:match("^[ \t]*$") and observation.next_line == "}" then
             saw_return_range = true
           end
           if observation.cursor_row == 2 and observation.range
@@ -165,7 +165,7 @@ defer(function()
         for _, observation in ipairs(observed_ranges) do
           if observation.cursor_row == 2 and observation.range
             and observation.range.start_row == 2 and observation.range.end_row == 3
-            and observation.body_line:match("^[ \\t]*$") then
+            and observation.body_line:match("^[ \t]*$") then
             saw_later_body_edit = true
           end
         end
