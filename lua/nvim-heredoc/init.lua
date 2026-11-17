@@ -184,67 +184,6 @@ local function insert_return_local_closers(buf, current, changed_range)
   return true
 end
 
-local function is_function_header(line)
-  line = line or ""
-  return line:match("^[ \t]*[A-Za-z_][A-Za-z0-9_]*%(%)[ \t]*{[ \t]*$")
-    or line:match("^[ \t]*function[ \t]+[A-Za-z_][A-Za-z0-9_]*[ \t]*{[ \t]*$")
-end
-local function function_header_before(lines, opener_line)
-  for row = opener_line - 1, 1, -1 do
-    if is_function_header(lines[row]) then
-      return row
-    end
-  end
-  return nil
-end
-
-local function preserve_function_heredoc_boundary(previous, current, lines)
-  if not previous or not previous.heredocs then
-    return false
-  end
-
-  for _, new in ipairs(current.regions) do
-    local terminator = new.terminator_line
-    if terminator then
-      local header = function_header_before(lines, new.opener_line)
-      if header then
-        for _, old in ipairs(previous.heredocs) do
-          if old.terminator_line and old.delimiter == new.delimiter and old.opener_text then
-            for old_opener = new.body_start_line, terminator - 1 do
-              if lines[old_opener] == old.opener_text then
-                -- The old completed heredoc is now lexically inside the new
-                -- region. A standalone brace between the new body and that
-                -- old opener is the containing function's still-present
-                -- autoclose boundary. Preserve both facts: the old heredoc
-                -- is known from the previous scan, and the brace determines
-                -- where the new heredoc must close.
-                for boundary = new.body_start_line, old_opener - 1 do
-                  if lines[boundary] and lines[boundary]:match("^[ \\t]*}$") then
-                    new.terminator_line = nil
-                    new.body_end_line = nil
-                    new.boundary_line = boundary
-                    new.editable = false
-                    new.confidence = "incomplete"
-                    current.complete = false
-                    return true
-                  end
-                end
-                -- The old opener is inside the apparent new body even when
-                -- its function brace has been removed. In that case the old
-                -- EOF is intentionally available as the new heredoc's
-                -- terminator, but this must not be mistaken for an operator
-                -- transition on the old opener's former line.
-                return true
-              end
-            end
-          end
-        end
-      end
-    end
-  end
-  return false
-end
-
 local function reconcile_managed_transition(buf, previous, current)
   if not previous or not previous.heredocs or not current.heredocs then
     return false
@@ -358,9 +297,7 @@ function M.process_buffer(buf, changed_range, close_incomplete)
         lines = get_lines(buf)
         result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
       end
-      local preserved_existing_heredoc =
-        preserve_function_heredoc_boundary(previous_scan, result, lines)
-      if not preserved_existing_heredoc and reconcile_managed_transition(buf, previous_scan, result) then
+      if reconcile_managed_transition(buf, previous_scan, result) then
         changed = true
         lines = get_lines(buf)
         result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
