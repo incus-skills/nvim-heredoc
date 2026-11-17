@@ -7,9 +7,9 @@ local function scan(lines)
 end
 
 -- Candidate E: model the first-Return transition without consulting a prior
--- scan. The changed body row is the line created immediately below the new
--- opener. Reserve the managed closer there before accepting a later candidate
--- terminator from the scanner.
+-- scan. body_row is the zero-based row created immediately below the opener.
+-- Reserve the managed closer after that row before accepting a later scanner
+-- candidate as the new heredoc's terminator.
 local function apply_return_local_closer(lines, current, body_row)
   local pending
   for _, heredoc in ipairs(current.heredocs) do
@@ -22,23 +22,12 @@ local function apply_return_local_closer(lines, current, body_row)
     return false
   end
   local closer = (pending.structural_prefix or "") .. pending.delimiter
-  table.insert(lines, body_row + 1, closer)
+  table.insert(lines, body_row + 2, closer)
   return true
 end
 
-local function assert_two_obligations(lines, message)
-  local result = scan(lines)
-  assert(result.complete and #result.heredocs == 2,
-    message .. "; scan=" .. vim.inspect(result))
-  assert(result.heredocs[1].terminator_line == 4,
-    message .. "; new closer should terminate the first obligation")
-  assert(result.heredocs[2].terminator_line == 9,
-    message .. "; old closer should remain with the second obligation")
-end
-
--- Standalone: the current scan incorrectly lets the new opener consume the
--- old terminator. The Return-local candidate needs no previous scan to repair
--- the source order.
+-- Standalone: current scan lets the new opener consume the old terminator.
+-- The Return-local candidate needs no previous scan to restore source order.
 do
   local lines = {
     "command <<-'EOF'",
@@ -51,16 +40,19 @@ do
   assert(current.complete and #current.heredocs == 1
     and current.heredocs[1].terminator_line == 5,
     "control: current scan should demonstrate the terminator-claim ambiguity")
-  assert(apply_return_local_closer(lines, current, 2),
+  assert(apply_return_local_closer(lines, current, 1),
     "candidate should recognise the first body row from the current scan")
-  assert(lines[4] == "\tEOF", "candidate should insert the managed closer after the new body row")
+  assert(lines[3] == "\tEOF",
+    "candidate should insert the managed closer after the new body row")
   local result = scan(lines)
-  assert(result.complete and #result.heredocs == 2,
-    "candidate should restore two standalone heredoc obligations")
+  assert(result.complete and #result.heredocs == 2
+    and result.heredocs[1].terminator_line == 3
+    and result.heredocs[2].terminator_line == 6,
+    "candidate should restore both standalone heredoc obligations")
 end
 
--- Function-wrapped: the first Return-local closer belongs before the
--- enclosing brace. A brace in payload remains opaque.
+-- Function-wrapped: the Return-local closer belongs before the enclosing
+-- brace. A brace in the earlier heredoc payload remains opaque.
 do
   local lines = {
     "new_function() {",
@@ -82,11 +74,10 @@ do
   assert(lines[4] == "\tEOF" and lines[5] == "}",
     "candidate closer must precede the function's structural close")
   local result = scan(lines)
-  assert(result.complete and #result.heredocs == 2,
-    "candidate should preserve both wrapped and earlier heredoc obligations")
-  assert(result.heredocs[1].terminator_line == 4
+  assert(result.complete and #result.heredocs == 2
+    and result.heredocs[1].terminator_line == 4
     and result.heredocs[2].terminator_line == 8,
-    "payload brace must not displace either terminator")
+    "candidate should preserve both obligations without interpreting payload braces")
 end
 
 -- Negative control: heredoc-looking syntax and braces inside a body are not
@@ -102,7 +93,7 @@ do
   local current = scan(lines)
   assert(current.complete and #current.heredocs == 1,
     "payload lookalikes must remain opaque in the current scan")
-  assert(apply_return_local_closer(lines, current, 2),
+  assert(apply_return_local_closer(lines, current, 1),
     "candidate should reserve the new closer without parsing payload")
   local result = scan(lines)
   assert(result.complete and #result.heredocs == 1
