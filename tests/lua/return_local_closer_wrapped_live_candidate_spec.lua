@@ -136,12 +136,12 @@ defer(function()
 
       -- Delete the payload again. The row is blank, but the immediate next
       -- line is already the reserved closer, so the trigger remains inert.
-      api.nvim_input(api.nvim_replace_termcodes("<C-w>", true, false, true))
+      api.nvim_input(string.rep(api.nvim_replace_termcodes("<BS>", true, false, true), 7))
       defer(function()
         if not vim.wait(1000, function()
           return lines()[3]:match("^[ \\t]*$") ~= nil and #observed_ranges >= 5
         end, 10) then
-          fail("payload deletion should reach the deferred callback")
+          fail("payload deletion should reach the deferred callback; observations=" .. vim.inspect(observed_ranges))
         end
         assert(candidate_count == 1 and lines()[4] == "\tEOF",
           "blanking an already-reserved body row must not insert a duplicate closer")
