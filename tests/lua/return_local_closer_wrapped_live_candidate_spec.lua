@@ -74,18 +74,15 @@ api.nvim_win_set_cursor(0, { 2, 1 })
 api.nvim_input("A")
 defer(function()
   assert(api.nvim_get_mode().mode == "i", "A should enter Insert mode")
-  api.nvim_input(api.nvim_replace_termcodes("command <lt><lt>-'EOF'", true, false, true))
+  -- Queue opener completion and Return together so the plugin observes
+  -- the first body row in the same deferred on_lines processing pass.
+  api.nvim_input(api.nvim_replace_termcodes("command <lt><lt>-'EOF'<CR>", true, false, true))
   defer(function()
-    assert(lines()[2] == "\tcommand <<-'EOF'",
-      "the managed opener should be typed inside the function; lines=" .. vim.inspect(lines()))
-
-    api.nvim_input(api.nvim_replace_termcodes("<CR>", true, false, true))
-    defer(function()
-      if not vim.wait(1000, function()
-        return candidate_applied and lines()[4] == "\tEOF"
-      end, 10) then
-        fail("Return-local candidate should reserve the closer before the earlier heredoc terminator")
-      end
+    if not vim.wait(1000, function()
+      return candidate_applied and lines()[4] == "\tEOF"
+    end, 10) then
+      fail("Return-local candidate should reserve the closer before the earlier heredoc terminator")
+    end
 
       local actual = lines()
       assert(api.nvim_get_mode().mode == "i", "Return should leave the user in Insert mode")
@@ -111,8 +108,7 @@ defer(function()
         and result.heredocs[2].terminator_line == 9,
         "new and prior terminators should retain source order")
 
-      print("Function-wrapped Return-local closer live callback candidate: PASS")
-      vim.cmd("qa!")
-    end)
+    print("Function-wrapped Return-local closer live callback candidate: PASS")
+    vim.cmd("qa!")
   end)
 end)
