@@ -37,20 +37,28 @@ assert(plugin.setup_buffer(buf), "plugin should attach to the shell buffer")
 
 -- Test-only integration seam: emulate candidate E at the exact deferred
 -- process_buffer call reached from the plugin's real on_lines callback.
--- No production callback or implementation is changed.
+-- Record callback ranges and use only the range/cursor relationship as the
+-- trigger; there is no one-shot guard or production change.
 local original_process_buffer = plugin.process_buffer
 local candidate_applied = false
+local observed_ranges = {}
 plugin.process_buffer = function(target, changed_range, close_incomplete)
-  if target == buf and not candidate_applied and changed_range then
+  if target == buf and changed_range then
     local current_lines = lines(buf)
     local current = scanner.scan(table.concat(current_lines, "\n"), {
       tabstop = vim.bo[buf].tabstop,
     })
     local cursor_row = api.nvim_win_get_cursor(0)[1] - 1
+    observed_ranges[#observed_ranges + 1] = {
+      start_row = changed_range.start_row,
+      end_row = changed_range.end_row,
+      cursor_row = cursor_row,
+    }
+    print("STANDALONE_RANGE " .. vim.inspect(observed_ranges[#observed_ranges]))
 
-    if current.complete
-      and changed_range.start_row <= cursor_row
-      and changed_range.end_row > cursor_row then
+    if changed_range.start_row < cursor_row
+      and changed_range.end_row > cursor_row
+      and current.complete then
       for _, region in ipairs(current.heredocs) do
         if region.operator == "<<-"
           and region.body_start_line - 1 == cursor_row
