@@ -373,8 +373,9 @@ do
     "  ",
   })
   vim.api.nvim_win_set_cursor(0, { 3, 2 })
-  assert(plugin.process_buffer(buf, { start_row = 2, end_row = 3 }, false),
-    "the first body line should still receive its structural prefix")
+  assert(vim.wait(1000, function()
+    return lines(buf)[3] == "\t\t"
+  end, 10), "the first body line should still receive its structural prefix")
 
   local actual = lines(buf)
   assert(actual[3] == "\t\t", "the body line should be prefixed without a function boundary")
