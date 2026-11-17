@@ -2,7 +2,6 @@ package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
 
 local plugin = require("nvim-heredoc")
 local scanner = require("nvim-heredoc.scanner")
-local editing = require("nvim-heredoc.editing")
 local api = vim.api
 
 local buf = api.nvim_create_buf(true, false)
@@ -27,45 +26,11 @@ local function fail(message)
 end
 
 local original_process_buffer = plugin.process_buffer
-local reserved_count = 0
+local callback_count = 0
 plugin.process_buffer = function(target, changed_range, close_incomplete)
   if target == buf and changed_range then
-    local cursor_row = api.nvim_win_get_cursor(0)[1] - 1
-    local current_lines = lines()
-    local current = scanner.scan(table.concat(current_lines, "\n"), {
-      tabstop = vim.bo[buf].tabstop,
-    })
-
-    if changed_range.start_row < cursor_row
-      and changed_range.end_row > cursor_row
-      and current_lines[cursor_row + 1]
-      and current_lines[cursor_row + 1]:match("^[ \t]*$") then
-      local first
-      for _, heredoc in ipairs(current.heredocs) do
-        if heredoc.operator == "<<-"
-          and heredoc.body_start_line - 1 == cursor_row then
-          first = heredoc
-          break
-        end
-      end
-
-      if first then
-        local queued = {}
-        for _, heredoc in ipairs(current.heredocs) do
-          if heredoc.opener_line == first.opener_line and heredoc.operator == "<<-" then
-            queued[#queued + 1] = heredoc
-          end
-        end
-
-        for index, heredoc in ipairs(queued) do
-          local closer = assert(editing.closer_line(heredoc))
-          api.nvim_buf_set_lines(buf, cursor_row + index, cursor_row + index, false, { closer })
-          reserved_count = reserved_count + 1
-        end
-      end
-    end
+    callback_count = callback_count + 1
   end
-
   return original_process_buffer(target, changed_range, close_incomplete)
 end
 
@@ -95,10 +60,11 @@ defer(function()
     api.nvim_input(api.nvim_replace_termcodes("<CR>", true, false, true))
     defer(function()
       wait_for(function()
-        return reserved_count == 2 and lines()[4] == "EOF"
+        return lines()[3] == "EOF" and lines()[4] == "EOF"
       end, "Return should reserve both new queued closers before the old command")
 
       local actual = lines()
+      assert(callback_count > 0, "the real on_lines callback should invoke production processing")
       assert(api.nvim_get_mode().mode == "i", "Return should leave the user in Insert mode")
       assert(actual[1] == "command <<-'EOF' <<-'EOF'",
         "new command should remain intact")
@@ -125,7 +91,7 @@ defer(function()
         and result.heredocs[4].terminator_line == 9,
         "all four heredoc obligations should remain visible in declaration order")
 
-      print("Queued Return-local closer live callback candidate: PASS")
+      print("Queued Return-local closer production integration: PASS")
       vim.cmd("qa!")
     end)
   end)
