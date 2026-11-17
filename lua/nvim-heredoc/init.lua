@@ -187,6 +187,10 @@ local function insert_return_local_closers(buf, current, changed_range)
   return true
 end
 
+local function normalize_heredoc_operators(line)
+  return (line or ""):gsub("<<%-", "<<"):gsub("<<", "<")
+end
+
 local function reconcile_managed_transition(buf, previous, current)
   if not previous or not previous.heredocs or not current.heredocs then
     return false
@@ -203,7 +207,9 @@ local function reconcile_managed_transition(buf, previous, current)
           and new.opener_line == old.opener_line
           and new.queue_position == old.queue_position
           and new.delimiter == old.delimiter
-          and new.delimiter_original == old.delimiter_original then
+          and new.delimiter_original == old.delimiter_original
+          and normalize_heredoc_operators(new.opener_text)
+            == normalize_heredoc_operators(old.opener_text) then
           replacement = new
           break
         end
