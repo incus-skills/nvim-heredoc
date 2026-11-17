@@ -102,4 +102,32 @@ do
     "brace and heredoc-looking payload must remain opaque before the reserved closer")
 end
 
+
+-- Multiple queued obligations: a single Return-local closer is not enough
+-- when two new heredocs on the same command can consume two old terminators.
+-- This is a scope boundary for candidate E, not a proposed implementation.
+do
+  local lines = {
+    "command <<-'EOF' <<-'EOF'",
+    "",
+    "old_command <<'EOF' <<'EOF'",
+    "old payload one",
+    "EOF",
+    "old payload two",
+    "EOF",
+  }
+  local current = scan(lines)
+  assert(not current.complete and #current.heredocs == 2
+    and current.heredocs[1].terminator_line == 5
+    and current.heredocs[2].terminator_line == nil,
+    "control: the first old terminator should satisfy only the first queued obligation")
+  assert(apply_return_local_closer(lines, current, 1),
+    "candidate should reserve the first queued obligation")
+  local result = scan(lines)
+  assert(not result.complete and #result.heredocs == 2
+    and result.heredocs[1].terminator_line == 3
+    and result.heredocs[2].terminator_line == 6,
+    "one closer protects the first obligation but the second still claims an old terminator")
+end
+
 print("Return-local closer candidate reference model: PASS")
