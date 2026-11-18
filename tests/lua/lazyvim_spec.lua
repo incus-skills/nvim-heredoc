@@ -87,7 +87,13 @@ blink.show({ providers = { "buffer" } })
 assert(vim.wait(5000, function()
   return blink.is_menu_visible() and #blink.get_items() > 0
 end, 20), "Blink did not display buffer completion inside the managed heredoc body")
-blink.hide()
+local completion_label = blink.get_items()[1].label
+vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<CR>", true, false, true), "xt", false)
+assert(vim.wait(1000, function()
+  local current = vim.api.nvim_buf_get_lines(completion_buf, 3, 4, false)[1] or ""
+  return current:find(completion_label, 1, true) ~= nil
+end, 10), "Return wrapper did not delegate to Blink to accept the visible completion")
+assert(not blink.is_menu_visible(), "Blink completion menu should close after Return acceptance")
 vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "xt", false)
 assert(vim.b.completion == nil, "Blink completion must remain buffer-enabled in heredoc")
 
