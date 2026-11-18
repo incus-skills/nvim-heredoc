@@ -61,22 +61,33 @@ The CI core job uses the mvdan/sh parser through the `shfmt --to-json` interface
 
 This is not a full parser for Bash, POSIX sh, or Zsh. Backtick substitutions, heredoc redirections inside command substitutions, multiline quoted commands, and other unsupported lexical contexts produce an uncertainty diagnostic. The scan stops at that point and no returned region is editable. The scanner's subset has not yet been demonstrated equivalent across every shell grammar edge case; new syntax should be added only with regression coverage for all intended dialects.
 
+## Governing editing contract
+
+The scanner is a bounded lexical helper. Its result fields describe what the current scanner can recognise; they do not define a requirement to maintain document-wide heredoc ownership or a graph of opener identities.
+
+The interactive editing commitment occurs on **Return after a completed managed opener**:
+
+- Typing the opener does not itself create a persistent editing obligation.
+- Return recognises the completed <<- opener and its delimiter.
+- The plugin immediately inserts the matching closer at the local structural position.
+- That inserted closer bounds the new heredoc body. Text between opener and closer is payload, including lines that resemble other heredoc openers.
+- Other heredocs elsewhere in the document are irrelevant to establishing this scope.
+
+The scanner may still recognise ordinary heredoc bodies so their payload is not misread as shell syntax in the supported lexical subset. It may also retain declaration-order handling for multiple heredocs on one command as a shell-language fact. Neither capability authorises a general document-wide tracking architecture for the Return-local path.
+
 ## Editing integration status
 
-The repository now contains an initial Neovim buffer integration in `nvim-heredoc.init`, plus pure helpers in `nvim-heredoc.editing`.
+The current production integration has evolved through several approaches, including retained scan snapshots, transition reconciliation, and Return-local insertion. Those mechanisms are implementation history, not all architectural requirements. The governing question for future changes is whether a mechanism is strictly necessary to fulfil the Return-local bounded-scope contract.
 
-The current integration:
+The intended interactive behaviour is:
 
-- attaches to Bash, `sh`, and Zsh buffers;
-- inserts a closer for a safely recognised incomplete managed heredoc;
-- derives the closer from the opener-aligned structural TAB prefix;
-- gives body lines a separate prefix with one additional literal TAB;
-- tracks changed line ranges with `nvim_buf_attach(on_lines)`;
-- retains disjoint notifications as separate ranges, rebases earlier pending ranges when edits insert/delete lines, and merges only overlapping or adjacent ranges;
-- prefixes only changed lines that intersect a scanner-confirmed body range;
-- avoids duplicating an already-present body prefix;
-- reconciles body and closer indentation in both directions when an opener changes between `<<-` and `<<`; ordinary heredocs that were never managed remain untouched.
+- recognise the completed managed opener at Return;
+- insert its matching closer immediately, before an existing enclosing structural closer where appropriate;
+- apply the body prefix and preserve the Insert-mode cursor position;
+- keep subsequent body edits and paste operations within the established lexical scope;
+- avoid duplicate edits when Neovim delivers the Return transition through multiple callbacks;
+- leave the buffer unchanged when the local opener or placement is ambiguous.
 
-The integration is headlessly tested, but this does not establish compatibility with LazyVim, `mini.pairs`, `blink.cmp`, or `conform.nvim`. Plugin-specific controls remain deliberately untouched pending inspection of the actual installed revisions and configuration.
+The integration is headlessly tested, but hosted tests do not establish compatibility with every user's live configuration or event ordering. Do not describe the behaviour as solved in a user's workstation until verified there. When debugging, reproduce the actual Return transition and instrument the development checkout or an isolated worktree; do not ask the user to edit an installed plugin copy as a substitute for a controlled diagnostic change.
 
-These behaviours remain prototype-level. The `editable` field is a conservative gate for the current editing operations, not proof that every possible shell construct has been parsed. Headless regressions cover disjoint edits; insertion/deletion before earlier pending edits; an overlapping replacement with a line-count change; a replacement spanning multiple disjoint pending ranges; and insertion at a pending-range boundary. They assert that changed content is prefixed while untouched neighboring lines remain byte-for-byte unchanged. Partial notifications, arbitrary concurrent buffer mutation paths, and broader real-workstation validation remain open.
+The scanner's complete, regions, heredocs, and diagnostics fields remain useful implementation/test interfaces for the current code. They must not be mistaken for a project-level requirement to preserve global scan history, cross-document opener identity, or source-order recovery machinery.

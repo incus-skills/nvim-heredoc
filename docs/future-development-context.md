@@ -58,10 +58,10 @@ The consumer signal needs semantic knowledge of the command and its input conven
 
 ## Architectural distinction to preserve
 
-The existing project decision is that the shared lexical scanner is the authority for structural heredoc regions. Future embedded-language work should preserve that authority while keeping these questions separate:
+The governing editing decision is Return-local bounded scope: Return after a completed managed opener commits the plugin to inserting its matching closer immediately, and that closer bounds the payload region. The scanner is a bounded lexical helper for recognising the opener/delimiter and supporting consumers; it is not a mandate for a document-wide heredoc ownership graph. Future embedded-language work should consume the established local body/closer boundary while keeping these questions separate:
 
 1. **Structural recognition — where is the payload?**  
-   The scanner identifies the opener, body, terminator, queue position, and confidence/ambiguity. This is the boundary information that editor integrations should consume. Do not create independent heredoc-boundary heuristics in each integration.
+   For interactive creation, Return establishes the local boundary by inserting the matching closer. The scanner supplies bounded lexical recognition; it does not need to maintain document-wide opener identity or discover the closer by searching later source. Embedded-language consumers should use the established body range rather than inventing independent boundary heuristics.
 
 2. **Payload classification — what is the payload language?**  
    A body may be identified as a known language, inferred with some confidence, or remain unknown/opaque. Structural recognition must not depend on successful language classification.
@@ -81,7 +81,7 @@ Unknown payloads should not be silently treated as shell merely because the encl
 
 ## Relationship to current architecture and tests
 
-The existing design contract already requires integrations to consume the shared region model and says future embedded-language support should be preserved. This note expands the rationale and identifies the separate layers that would need investigation; it does not change the scanner's current responsibility or claim that those integrations exist.
+The design contract now makes the Return-local bounded-scope decision explicit. This note expands the rationale for future embedded-language work; it does not authorise rebuilding a global heredoc model or claim that embedded-language integrations exist.
 
 Current mini.pairs and Blink tests demonstrate coexistence in the managed body, not payload-language isolation. The inspected controls for those plugins are buffer-wide; no region-scoped disable API was established. Do not disable them buffer-wide merely because a buffer contains a heredoc.
 

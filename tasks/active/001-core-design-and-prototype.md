@@ -1,67 +1,89 @@
-# Task 001 — Shared region model and executable core
+# Task 001 — Return-local bounded heredoc editing
 
-**Status:** active — initial scanner prototype and first validation commands added  
+**Status:** active — functional Return-local checkpoint integrated; live workstation behaviour and architectural simplification still require verification  
 **Priority:** foundational  
-**Scope:** establish and test the shared lexical model for managed `<<-` heredoc regions. Do not produce a user-facing installer yet.
+**Scope:** validate and simplify the managed <<- editing path around the established Return-local bounded-scope contract. Do not expand this task into a general shell parser or document-wide heredoc tracking system.
+
+## Governing decision
+
+The interactive commitment point is **Return after the user has completed a managed <<- opener**.
+
+Typing the opener is not itself a request to create or track a closer. When Return is pressed:
+
+1. Recognise the completed opener, its <<- operator, and delimiter.
+2. Commit to the new heredoc by inserting its matching closer immediately.
+3. Place the closer within the available enclosing shell structure (for example, before an existing function-closing brace), or at the natural end of a standalone construct.
+4. Treat the inserted closer as the end of this heredoc's lexical input scope.
+5. Treat all text between opener and closer as payload. Opener-looking text inside that body is not a competing heredoc declaration.
+
+This decision supersedes the earlier framing in this task that made a shared, document-wide region model the authority for all editing integrations. The scanner remains a bounded lexical helper; it does not need to maintain identities and lifetimes for every heredoc in the document, search later candidate terminators to discover ownership, or reconstruct general shell structure.
+
+Use existing shell indentation/structural context for function and compound-command layout where available. The plugin should calculate only the local information necessary to place the new closer. Do not build a second general shell indentation engine. If local placement is ambiguous, leave the buffer unchanged rather than widening the architecture.
+
+The shell language's declaration-order semantics for multiple heredocs on one command remain valid and may remain covered by scanner/shell tests. They do not imply a document-wide obligation ledger for Return-local scope creation.
 
 ## Objective
 
-Build a conservative, buffer-independent Lua scanner/prototype that identifies managed `<<-` heredoc regions in Bash, POSIX `sh`, and Zsh source without requiring Treesitter. Use the same scanner for all three. Treesitter may provide optional structural assistance, but must not be a runtime dependency.
-
-The scanner is the common authority for later editing mechanisms. Automatic closer insertion, indentation, paste preservation, auto-pairs, completion, and formatter integration must consume its region model rather than independently guessing the active heredoc.
+Validate the Return-local bounded-scope behaviour in Bash, POSIX sh, and Zsh buffers; preserve payload bytes and <<- TAB semantics; and remove or avoid implementation machinery that exists only to solve the superseded document-wide ownership problem.
 
 ## Required work
 
-1. Inspect the repository state and establish the implementation/test layout.
-2. Define a scanner interface returning opener span, operator kind, original and quote-removed delimiter, quote/expansion state, logical command boundary, queue position, body range, terminator, structural indentation bytes, and confidence/ambiguity information.
-3. Implement operator recognition that ignores quoted/escaped contexts and comments, distinguishes `<<-`, `<<`, and `<<<`, and handles quoted/escaped delimiters.
-4. Model multiple pending heredocs on a command in declaration order, including command continuation before body consumption.
-5. Resolve nested shell constructs sufficiently to avoid treating an earlier completed heredoc or a nearby opener as the active region.
-6. Make malformed or ambiguous input fail conservatively without authorising source mutation.
-7. Add buffer-independent unit tests for scanner and region results.
-8. Prototype region-based editing behaviour: closer placement from the opener's structural TAB prefix, and changed-range paste handling that preserves every existing byte and relative indentation.
-9. Ensure repeated/partial/ambiguous change notifications cannot duplicate prefixes or corrupt inserted text. If the changed range cannot be established, leave it unchanged.
-10. Add shell-delivery fixtures that demonstrate actual `<<-` tab stripping and payload bytes.
-11. Add formatter fixtures for `shfmt -i 0 -p` on Bash and POSIX `sh`, comparing payload bytes before and after formatting. Zsh must not be assigned to `shfmt`.
-12. Record unresolved grammar and editing limits explicitly rather than claiming complete shell parsing.
-13. Define stable local commands for core, shell-delivery, formatter, and headless LazyVim integration tests; CI must call these commands rather than duplicate test logic.
+1. Audit the current production path against the governing decision above. Identify which mechanisms are strictly required for Return recognition, immediate closer insertion, local structural placement, body prefixing, cursor placement, and duplicate-event protection.
+2. Separate unavoidable Neovim event/coalescing behaviour from architecture that attempts to reconstruct document-wide heredoc ownership.
+3. Keep the lexical scanner bounded. Add grammar support only when a concrete supported use case and regression demonstrate the need.
+4. Verify that Return after a completed opener inserts the matching closer before an existing enclosing structural closer, without synthesising or recreating that enclosing closer.
+5. Verify that a standalone managed heredoc receives its closer at the appropriate local position.
+6. Verify that body content resembling another heredoc opener remains payload once the Return-local closer has established the scope.
+7. Verify shell delimiter rules: <<- strips leading TAB bytes for matching, not spaces; ordinary << does not strip leading TABs or spaces.
+8. Preserve body spaces and relative indentation through typing and multi-line paste. Do not promise preservation of leading body TABs after shell execution because <<- strips them.
+9. Ensure repeated/deferred callbacks cannot duplicate the closer or body prefix and that the Insert-mode cursor is positioned after the structural body prefix before payload typing.
+10. Preserve existing managed <<- to << transition behaviour where it remains part of the supported contract, without allowing that compatibility path to dictate new-scope architecture.
+11. Keep the layered scanner, buffer, live Insert-mode, shell-delivery, formatter, and plugin-coexistence tests. Amend tests only when a case asserts a superseded implementation mechanism rather than observable behaviour.
+12. Record genuine lexical and editor-event limitations. Do not claim complete shell grammar support.
+13. Run the documented test commands and CI. Distinguish hosted fixture results from live workstation verification.
 
 ## Acceptance criteria
 
-- Ordinary `<<` and `<<<` are never classified as managed heredocs.
-- Operators inside quotes, escaped text, and comments are not detected as heredoc openers.
-- Multiple heredocs are associated with their correct body blocks in declaration order.
-- Quoted delimiters are matched correctly while preserving source spelling.
-- Nested constructs and command continuations do not cause nearest-opener misclassification.
-- Structural indentation is represented by TAB bytes; body spaces and relative indentation are preserved.
-- Changing an existing managed opener between `<<-` and `<<` reconciles the body and terminator indentation in both directions; an ordinary heredoc that was never managed remains untouched.
-- Tests prove that leading body tabs are stripped by the shell and leading spaces are retained.
-- Paste tests operate on complete changed ranges and demonstrate byte preservation, including empty and whitespace-only lines.
-- The tests demonstrate what Bash, a POSIX shell, and Zsh actually receive where those shells are available.
-- Formatter tests establish the effect of `shfmt -i 0 -p` on heredoc payloads; no assumption of preservation is accepted without evidence.
-- The scanner does not depend on Treesitter being installed or able to parse an incomplete buffer.
-- Test output is reproducible with documented commands.
-- A layered CI workflow runs core, shell-delivery, and formatter tests independently of LazyVim, with LazyVim integration isolated in a pinned container environment.
-- Each test command has a known passing fixture and a deliberately failing, contract-specific negative control. `tests/expect-failure.sh` requires both non-zero exit and the expected assertion marker, so unrelated setup failures do not count as successful controls.
+- Return after a completed managed opener establishes the body and immediately inserts its matching closer.
+- When an enclosing function/compound-command closer is already present, the heredoc closer is placed inside it; the plugin does not create or recreate the enclosing structural closer.
+- The inserted closer bounds the body. Opener-looking payload lines are not reinterpreted as new heredoc openers.
+- Delimiter matching follows the actual operator: <<- ignores leading TAB bytes but not leading spaces; ordinary << requires the delimiter at column zero.
+- The delimiter is derived from the actual opener, not hard-coded.
+- Structural indentation uses literal TAB bytes; body spaces and relative indentation remain intact.
+- The cursor remains in Insert mode and after the body prefix before the user types payload.
+- Subsequent Enter and multi-line paste preserve payload bytes and do not duplicate prefixes.
+- Ordinary << and <<< remain unmanaged and byte-for-byte unaffected by managed editing actions.
+- Existing scanner and buffer regressions remain green unless they explicitly require the superseded global ownership architecture.
+- Shell-delivery tests demonstrate the bytes Bash, a POSIX shell, and Zsh receive where available.
+- Formatter tests establish only the fixture-specific behaviour actually tested.
+- Unsupported or ambiguous local syntax fails conservatively.
+- CI results and live workstation observations are reported separately.
 
 ## Boundaries
 
+- Do not introduce opener-time character-by-character recognition or a persistent obligation created merely by typing the opener.
+- Do not add a document-wide heredoc identity ledger, retained scan history, global source-order ownership recovery, or a general shell structural parser unless a concrete regression proves it necessary for the Return-local contract.
+- Do not reinterpret opener-looking body text as shell syntax after the local closer has established the body.
 - Do not change the user's Neovim configuration.
-- Do not implement auto-pair/completion suppression until the actual installed plugin APIs have been inspected.
-- Do not add Zsh to `shfmt` formatting.
-- Do not strip, normalise, or blindly prefix pasted body whitespace.
-- Do not write an installer in this task. The repository currently has no tracked installer; a versioned installer is a later delivery mechanism and must package the tested implementation rather than become its only source.
+- Do not globally disable completion or pair insertion.
+- Do not add Zsh to shfmt formatting.
+- Do not strip, normalise, or blindly replace pasted body whitespace.
+- Do not expand shell grammar coverage merely to make the scanner appear comprehensive.
 
 ## Current architectural decisions
 
-- Shared Lua lexical scanner is authoritative for all three shell filetypes.
-- Treesitter availability is optional assistance only. The latest user diagnostic reports parsers available for Bash, `sh`, and Zsh; earlier reports of unavailable `sh`/Zsh parsers are superseded.
-- Editing is region-based. Integrations consume one shared region model; they do not independently search backwards for the nearest opener.
-- Structural indentation uses leading TAB bytes. Body spaces are payload and remain intact. Leading body TAB bytes are stripped by `<<-` at shell execution.
-- Paste handling must identify the full changed range and preserve bytes. If range identification is uncertain, do nothing.
-- `shfmt` is assigned only to Bash and POSIX `sh`; Zsh is excluded.
-- Formatting is independently validated against actual heredoc payload bytes.
-- CI is layered; the core and shell-semantic test paths do not require the LazyVim container. The container is an integration environment, not a runtime dependency.
+- Return after the completed managed opener is the commitment point.
+- The plugin inserts the matching closer immediately; the inserted closer defines the new body's lexical boundary.
+- Body text inside that boundary is payload, including text that resembles another opener.
+- Other heredocs elsewhere in the document are not needed to establish this scope.
+- Existing shell indentation machinery is preferred for enclosing function/compound-command context; plugin-owned structural reasoning is local and minimal.
+- The scanner is a bounded lexical helper, not a document-wide source of heredoc identity and lifetime.
+- Existing tests are retained as observable regression coverage. They do not make exploratory mechanisms into requirements.
+- CI is layered; hosted test success is not proof of live workstation behaviour.
+
+## Historical implementation record (non-normative)
+
+The notes below preserve evidence and decisions from earlier implementation cycles. They are historical context, not additional architectural requirements. Where they describe retained scans, opener identity, declaration-order ownership recovery, or broad region-model machinery, apply the governing decision above: retain only what is demonstrably necessary for the Return-local contract.
 
 ## Implementation progress
 
