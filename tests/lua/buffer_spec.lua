@@ -403,6 +403,7 @@ do
         "}",
       },
       terminator = "\tEOF",
+      terminator_index = 9,
       payload = "\t\t  cat <<'EOF'",
     },
     {
@@ -436,6 +437,7 @@ do
         "}",
       },
       terminator = "EOF",
+      terminator_index = 8,
       payload = "\t\tcat <<-'EOF'",
     },
   }
