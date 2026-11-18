@@ -125,11 +125,11 @@ end
 -- terminator for a newly opened managed heredoc. Reserve the new command's
 -- managed closers at the first body row before boundary recovery sees that
 -- misleading complete scan.
-local function insert_return_local_closers(buf, current, changed_range)
+-- Return is the commitment point for a new managed heredoc. Recognise
+-- only the completed opener line and establish its body boundary locally;
+-- no later buffer text or document-wide scan participates in this decision.
+local function insert_return_local_closers(buf, changed_range)
   local cursor_row = active_cursor_row(buf)
-  -- The observed Return edit replaces the opener's line boundary with
-  -- exactly the first body row. Broader edits that happen to cover the cursor
-  -- row are not a Return transition.
   if not cursor_row or not changed_range
     or changed_range.start_row ~= cursor_row - 1
     or changed_range.end_row ~= cursor_row + 1 then
@@ -137,72 +137,27 @@ local function insert_return_local_closers(buf, current, changed_range)
   end
 
   local lines = get_lines(buf)
+  local opener_line = lines[cursor_row]
   local body_line = lines[cursor_row + 1]
-  if not body_line or not body_line:match("^[ \t]*$") then
+  if not opener_line or not body_line or not body_line:match("^[ \\t]*$") then
     return false
   end
 
-  local first
-  for _, region in ipairs(current.regions) do
-    if region.body_start_line - 1 == cursor_row and region.terminator_line
-      and region.opener_safe then
-      first = region
-      break
-    end
+  local openers = scanner.parse_openers(opener_line, { tabstop = vim.bo[buf].tabstop })
+  -- Multiple queued heredocs require multiple body/terminator boundaries.
+  -- Keep that case conservative rather than guessing their placement here.
+  if not openers or #openers ~= 1 then
+    return false
   end
-  if not first then
+  local opener = openers[1]
+  if opener.operator ~= "<<-" or not opener.opener_safe then
     return false
   end
 
-  -- Mixed managed/unmanaged queues need distinct body positions and remain
-  -- on the existing conservative path.
-  local queued = {}
-  for _, heredoc in ipairs(current.heredocs) do
-    if heredoc.opener_line == first.opener_line then
-      if heredoc.operator ~= "<<-" or not heredoc.terminator_line or not heredoc.opener_safe then
-        return false
-      end
-      queued[#queued + 1] = heredoc
-    end
-  end
-  table.sort(queued, function(a, b)
-    return a.queue_position < b.queue_position
-  end)
-  if #queued == 0 then
+  if not insert_closer(buf, opener, cursor_row + 1) then
     return false
   end
-
-  local closers = {}
-  for index, heredoc in ipairs(queued) do
-    local closer = editing.closer_line(heredoc)
-    if not closer then
-      return false
-    end
-    closers[index] = closer
-  end
-
-  -- An earlier pass may already have reserved the leading queued closer
-  -- before Return. Keep that prefix and add only the remaining obligations.
-  local already_reserved = 0
-  for index, closer in ipairs(closers) do
-    if lines[cursor_row + 2 + index - 1] == closer then
-      already_reserved = index
-    else
-      break
-    end
-  end
-  if already_reserved == #closers then
-    return false
-  end
-
-  local missing = {}
-  for index = already_reserved + 1, #closers do
-    missing[#missing + 1] = closers[index]
-  end
-  -- One buffer edit reserves all remaining obligations in declaration order.
-  local insert_row = cursor_row + 1 + already_reserved
-  vim.api.nvim_buf_set_lines(buf, insert_row, insert_row, false, missing)
-  ensure_body_prefix(buf, first, cursor_row)
+  ensure_body_prefix(buf, opener, cursor_row)
   return true
 end
 
@@ -336,9 +291,14 @@ function M.process_buffer(buf, changed_range, close_incomplete, edits)
   local changed = false
   local previous_scan = scan_snapshots[buf]
   local success, err = pcall(function()
-    -- Each pass can close one pending heredoc. Re-scan so multiple queued
-    -- heredocs are resolved in declaration order rather than guessed.
-    for _ = 1, 32 do
+    -- A completed opener followed by Return is handled before any
+    -- document-wide scan. The inserted closer immediately bounds this body.
+    if insert_return_local_closers(buf, changed_range) then
+      changed = true
+    else
+      -- Existing-buffer recovery and managed-operator compatibility remain
+      -- separate from establishing a new Return-local scope.
+      for _ = 1, 32 do
       local lines = get_lines(buf)
       local result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
       if result.complete and insert_return_local_closers(buf, result, changed_range) then
@@ -400,6 +360,7 @@ function M.process_buffer(buf, changed_range, close_incomplete, edits)
         end
         changed = changed or pass_changed
         break
+      end
       end
     end
   end)
