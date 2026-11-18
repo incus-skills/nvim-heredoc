@@ -285,7 +285,7 @@ defer(function()
           "second body payload must follow the structural TAB; lines=" .. vim.inspect(actual))
         assert_insert_mode("typing on the newly indented line must remain in Insert mode")
 
-        vim.api.nvim_input("\n")
+        vim.api.nvim_input(vim.api.nvim_replace_termcodes("<CR>", true, false, true))
         defer(function()
           wait_for(function()
             return lines(buf)[4] == "\t\t"
@@ -305,7 +305,7 @@ defer(function()
           end, "multi-line paste must be indented before InsertLeave/save without changing payload bytes")
           assert_insert_mode("live paste processing must remain in Insert mode")
 
-          vim.api.nvim_input(vim.vim.api.nvim_replace_termcodes("<Esc>", true, false, true))
+          vim.api.nvim_input(vim.api.nvim_replace_termcodes("<Esc>", true, false, true))
           defer(function()
             assert(vim.api.nvim_get_mode().mode ~= "i", "Escape should leave Insert mode")
             actual = lines(buf)
