@@ -9,7 +9,7 @@ do
   assert(#openers == 1)
   local opener = openers[1]
   assert(opener.operator == "<<-" and opener.delimiter == "CUSTOM")
-  assert(opener.structural_prefix == "\\t" and opener.body_prefix == "\\t\\t")
+  assert(opener.structural_prefix == "\t" and opener.body_prefix == "\t\t")
   assert(opener.opener_safe and not opener.editable)
   local plain = assert(scanner.parse_openers("cat <<'PLAIN'"))
   assert(#plain == 1 and plain[1].operator == "<<")
