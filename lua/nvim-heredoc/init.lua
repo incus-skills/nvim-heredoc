@@ -142,7 +142,10 @@ local function insert_return_local_closers(buf, changed_range)
   local openers = scanner.parse_openers(opener_line, { tabstop = vim.bo[buf].tabstop })
   -- Multiple queued heredocs require multiple body/terminator boundaries.
   -- Keep that case conservative rather than guessing their placement here.
-  if not openers or #openers ~= 1 then
+  if not openers or #openers == 0 then
+    return nil
+  end
+  if #openers ~= 1 then
     return false
   end
   local opener = openers[1]
@@ -289,11 +292,13 @@ function M.process_buffer(buf, changed_range, close_incomplete, edits)
   local success, err = pcall(function()
     -- A completed opener followed by Return is handled before any
     -- document-wide scan. The inserted closer immediately bounds this body.
-    if insert_return_local_closers(buf, changed_range) then
+    local return_result = insert_return_local_closers(buf, changed_range)
+    if return_result == true then
       changed = true
-    else
+    elseif return_result == nil then
       -- Existing-buffer recovery and managed-operator compatibility remain
-      -- separate from establishing a new Return-local scope.
+      -- separate from establishing a new Return-local scope. A recognised
+      -- but unsupported Return candidate is left untouched.
       for _ = 1, 32 do
         local lines = get_lines(buf)
         local result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
