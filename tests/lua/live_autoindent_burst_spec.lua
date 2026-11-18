@@ -25,7 +25,7 @@ vim.api.nvim_set_current_buf(buf)
 plugin.setup()
 
 vim.api.nvim_win_set_cursor(0, { 2, #"\tcat <<-'BURST" })
-vim.api.nvim_input("A\nhello1\nhello2\nhello3")
+vim.api.nvim_input(vim.api.nvim_replace_termcodes("A<CR>hello1<CR>hello2<CR>hello3", true, false, true))
 
 vim.defer_fn(function()
   local ok, err = pcall(function()
