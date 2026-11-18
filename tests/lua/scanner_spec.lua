@@ -160,4 +160,93 @@ for _, path in ipairs({
   end
 end
 
+
+-- Regression cases: heredoc-looking payload is opaque, delimiter identity is
+-- per opener, and <<- removes leading TABs (never leading spaces) when
+-- matching a terminator. Each source is scanned independently: the first
+-- case is intentionally unterminated and therefore consumes the rest of
+-- its own source as payload.
+do
+  local source = table.concat({
+    "conf_print_test4() {",
+    "  cat <<'EOF'",
+    "  cat <<='EOF'",
+    "      hello1",
+    "          hello2",
+    "              hello3",
+    "                  hello4",
+    "    EOF",
+    "\tEOF",
+    "}",
+  }, "\n") .. "\n"
+  local result = scanner.scan(source)
+  assert(not result.complete, "plain << must not accept an indented terminator")
+  assert(#result.heredocs == 1 and #result.regions == 0,
+    "the apparent opener inside an unterminated plain heredoc must remain payload")
+  assert(result.heredocs[1].delimiter == "EOF"
+    and result.heredocs[1].terminator_line == nil,
+    "neither spaces nor TABs may indent a plain << terminator")
+end
+
+do
+  local source = table.concat({
+    "conf_print_test4() {",
+    "  cat <<-'EOF'",
+    "  cat <<'EOF'",
+    "      hello1",
+    "          hello2",
+    "              hello3",
+    "                  hello4",
+    "    EOF",
+    "\tEOF",
+    "}",
+  }, "\n") .. "\n"
+  local result = scanner.scan(source)
+  assert(result.complete, "the TAB-indented <<- terminator should close the heredoc")
+  assert(#result.heredocs == 1 and #result.regions == 1,
+    "the heredoc-looking body line must not create a second opener")
+  local r = result.regions[1]
+  assert(r.delimiter == "EOF" and r.terminator_line == 9 and r.body_end_line == 8,
+    "spaces must not terminate <<-, but a leading TAB must")
+end
+
+do
+  local source = table.concat({
+    "conf_print_test3() {",
+    "  cat <<-'FOE'",
+    "hello1",
+    "hello2",
+    "hello3",
+    "hello4",
+    "\tFOE",
+    "}",
+  }, "\n") .. "\n"
+  local result = scanner.scan(source)
+  assert(result.complete and #result.heredocs == 1 and #result.regions == 1)
+  assert(result.regions[1].delimiter == "FOE"
+    and result.regions[1].terminator_line == 7,
+    "the terminator must match the opener's actual delimiter, not a fixed EOF")
+end
+
+do
+  local source = table.concat({
+    "conf_print_test2() {",
+    "  cat <<-'EOF'",
+    "cat <<-'EOF'",
+    "hello1",
+    "hello2",
+    "hello3",
+    "hello4",
+    "EOF",
+    "  EOF",
+    "}",
+  }, "\n") .. "\n"
+  local result = scanner.scan(source)
+  assert(result.complete and #result.heredocs == 1 and #result.regions == 1,
+    "an opener-looking payload line must not enqueue another heredoc")
+  assert(result.regions[1].delimiter == "EOF"
+    and result.regions[1].terminator_line == 8,
+    "the first valid EOF at column zero must terminate the outer <<- heredoc")
+end
+
 print("scanner tests: PASS")
