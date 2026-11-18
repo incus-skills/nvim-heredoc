@@ -383,7 +383,6 @@ do
     "deleting the autoclose brace must not cause a synthetic closer before following code")
 end
 
-print("buffer integration tests: PASS")
 
 -- Regression: function-wrapped managed heredocs must keep heredoc-looking
 -- payload opaque and match the actual delimiter/<<- terminator rules.
@@ -419,6 +418,7 @@ do
         "}",
       },
       terminator = "\tFOE",
+      terminator_index = 7,
       payload = nil,
     },
     {
@@ -446,8 +446,8 @@ do
     assert(plugin.process_buffer(buf), case.name .. ": managed body should be processed")
     local actual = lines(buf)
     assert(actual[#actual] == "}", case.name .. ": function boundary must remain last")
-    assert(actual[#actual - 1] == case.terminator,
-      case.name .. ": expected original terminator before function close; lines=" .. vim.inspect(actual))
+    assert(actual[case.terminator_index] == case.terminator,
+      case.name .. ": expected terminator at its source position; lines=" .. vim.inspect(actual))
     if case.payload then
       assert(actual[3] == case.payload,
         case.name .. ": heredoc-looking payload must remain payload; lines=" .. vim.inspect(actual))
@@ -489,3 +489,5 @@ do
       and actual[6] == "EOF"
   end, 10), "an opener-looking payload line must not suppress managed-prefix removal")
 end
+
+print("buffer integration tests: PASS")
