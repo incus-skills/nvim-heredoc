@@ -143,7 +143,10 @@ local function insert_return_local_closers(buf, changed_range)
   if not openers then
     -- Do not let the document-wide recovery path reinterpret an unsupported
     -- managed-looking opener after this Return transition.
-    return opener_line:find("<<%-") and false or nil
+    if opener_line:find("<<%-") then
+      return false
+    end
+    return nil
   end
   -- Multiple queued heredocs require multiple body/terminator boundaries.
   -- Keep that case conservative rather than guessing their placement here.
