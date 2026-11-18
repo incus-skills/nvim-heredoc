@@ -301,11 +301,6 @@ function M.process_buffer(buf, changed_range, close_incomplete, edits)
       for _ = 1, 32 do
       local lines = get_lines(buf)
       local result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
-      if result.complete and insert_return_local_closers(buf, result, changed_range) then
-        changed = true
-        lines = get_lines(buf)
-        result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
-      end
       if reconcile_managed_transition(buf, previous_scan, result, edits) then
         changed = true
         lines = get_lines(buf)
