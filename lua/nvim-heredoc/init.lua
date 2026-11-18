@@ -577,6 +577,16 @@ local function return_key(buf)
     end
   end
 
+  -- Preserve Blink's default <CR> completion acceptance while its menu
+  -- is visible. Its accept() result indicates whether it consumed the key;
+  -- otherwise continue with the normal Insert-mode Return behaviour.
+  local blink = package.loaded["blink.cmp"]
+  if blink and type(blink.is_menu_visible) == "function"
+    and blink.is_menu_visible() and type(blink.accept) == "function"
+    and blink.accept() then
+    return
+  end
+
   -- MiniPairs' Insert-mode Return mapping is the common non-native mapping
   -- used by LazyVim. Resolve it at invocation time because MiniPairs may load
   -- after this buffer's FileType event.
