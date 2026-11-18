@@ -328,6 +328,49 @@ local function scan_command(chunk, first_line)
   return queue, diagnostics
 end
 
+-- Parse only the completed command text supplied by the Return integration.
+-- This deliberately does not search the surrounding buffer for a terminator:
+-- the caller establishes the body boundary by inserting the closer locally.
+function M.parse_openers(source, opts)
+  opts = opts or {}
+  local tabstop = tonumber(opts.tabstop) or 2
+  if tabstop < 1 then tabstop = 2 end
+  local lines = split_lines(source or "")
+  local queue, diagnostics = scan_command(table.concat(lines, "\\n"), 1)
+  if #diagnostics > 0 then
+    return nil, diagnostics
+  end
+
+  local openers = {}
+  for index, item in ipairs(queue) do
+    local opener = lines[item.opener_line] or ""
+    local prefix = opener:match("^([ \\t]*)") or ""
+    local structural_prefix, structural_column = structural_tab_prefix(prefix, tabstop)
+    local safe = structural_prefix ~= nil
+    openers[#openers + 1] = {
+      operator = item.operator,
+      opener_line = item.opener_line,
+      opener_text = opener,
+      command_end_line = #lines,
+      queue_position = index,
+      delimiter_original = item.delimiter_original,
+      delimiter = item.delimiter,
+      delimiter_quoted = item.delimiter_quoted,
+      body_start_line = #lines + 1,
+      structural_prefix = structural_prefix or "",
+      body_prefix = safe and (structural_prefix .. "\\t") or nil,
+      opener_prefix = prefix,
+      structural_column = structural_column,
+      tabstop = tabstop,
+      structural_tabs_only = safe,
+      opener_safe = safe,
+      confidence = safe and "local" or "unsupported-indent",
+      editable = false,
+    }
+  end
+  return openers
+end
+
 local function structural_tab_prefix(prefix, tabstop)
   local column = 0
   for index = 1, #prefix do
