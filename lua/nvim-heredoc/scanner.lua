@@ -354,7 +354,7 @@ function M.parse_openers(source, opts)
   local tabstop = tonumber(opts.tabstop) or 2
   if tabstop < 1 then tabstop = 2 end
   local lines = split_lines(source or "")
-  local queue, diagnostics = scan_command(table.concat(lines, "\\n"), 1)
+  local queue, diagnostics = scan_command(table.concat(lines, "\n"), 1)
   if #diagnostics > 0 then
     return nil, diagnostics
   end
@@ -376,7 +376,7 @@ function M.parse_openers(source, opts)
       delimiter_quoted = item.delimiter_quoted,
       body_start_line = #lines + 1,
       structural_prefix = structural_prefix or "",
-      body_prefix = safe and (structural_prefix .. "\\t") or nil,
+      body_prefix = safe and (structural_prefix .. "\t") or nil,
       opener_prefix = prefix,
       structural_column = structural_column,
       tabstop = tabstop,
