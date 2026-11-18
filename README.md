@@ -50,7 +50,11 @@ Ordinary `<<` heredocs and `<<<` here-strings are outside the managed scope and 
 
 ## Architecture
 
-A shared, buffer-independent Lua lexical scanner is the authority for heredoc regions in all three filetypes. Treesitter may provide optional structural assistance, but is not a dependency. Editing, closer insertion, paste handling, and later plugin integrations consume the same region model; they must not independently infer the active heredoc from the nearest preceding opener.
+**The interactive editing contract is Return-local, not document-global.** The plugin acts when the user presses Return after completing a managed <<- opener. That event commits to the new heredoc: the plugin inserts the matching closer immediately, placing it within the available enclosing shell structure (for example, before an existing function-closing brace). The inserted closer establishes the end of this heredoc's lexical input scope. Body text between the opener and closer is payload, even when it resembles another shell heredoc opener. The plugin does not need a document-wide ledger of other heredocs, opener identities, or competing future terminators to establish this scope.
+
+The lexical scanner remains a bounded helper for recognising the current opener, delimiter, mode, and safe local boundaries. It is not a mandate to reconstruct the entire document's heredoc ownership or shell structure. Existing shell indentation machinery remains responsible for ordinary function and compound-command indentation wherever it can provide that context. Do not duplicate it with a general structural parser merely to place this local closer.
+
+Typing the opener alone does not commit a closer; Return does. Existing-buffer recovery and other editing paths must not silently turn this into a general opener-time or document-wide tracking system.
 
 Paste handling must operate on the complete changed range and preserve existing bytes. If the range or region is ambiguous, the safe behaviour is to leave the text unchanged.
 
@@ -67,5 +71,5 @@ The next-stage design concern around embedded heredoc payloads—including langu
 - A conservative Lua scanner, pure structural closer/paste helpers, and Neovim buffer integration with changed-range tracking are present under `lua/` and `tests/`.
 - [The CI workflow](.github/workflows/test.yml) runs core, headless buffer integration, shell-delivery, formatter, and pinned LazyVim/plugin coexistence jobs.
 - The LazyVim integration harness now loads the repository as a local lazy.nvim plugin using `dir`, `ft`, and `opts`, exercising the same setup lifecycle as the documented installation spec. See [the CI design](docs/ci.md).
-- [Task 001](tasks/active/001-core-design-and-prototype.md) remains active: expand and validate shell grammar coverage, stress-test editing/paste behaviour, extend plugin interaction coverage, and complete deliberate-failure regression checks.
+- [Task 001](tasks/active/001-core-design-and-prototype.md) remains active. Its governing direction is the Return-local bounded-scope contract in [the design contract](docs/design.md); existing tests remain regression evidence, not a requirement to expand into a general shell parser or document-wide heredoc tracker.
 
