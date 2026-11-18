@@ -9,6 +9,8 @@ local scanner = require("nvim-heredoc.scanner")
 local result = scanner.scan(source_text)
 ```
 
+The scanner also exposes a deliberately narrower `parse_openers(source, opts)` helper for the Return transition. It parses only the completed command text supplied by the caller and returns opener records with delimiter and structural-prefix information. It does not scan for terminators or inspect surrounding buffer lines. The Return integration currently accepts exactly one managed `<<-` opener through this path; multiple queued heredocs remain conservative until their distinct body/terminator placement is implemented.
+
 The scanner is buffer-independent and does not mutate its input. It normalises CRLF/CR line endings for line analysis and returns:
 
 - `complete`: whether the source was scanned without a lexical ambiguity or unresolved heredoc;
