@@ -127,8 +127,8 @@ end
 local function insert_return_local_closers(buf, changed_range)
   local cursor_row = active_cursor_row(buf)
   if not cursor_row or not changed_range
-    or changed_range.start_row ~= cursor_row - 1
-    or changed_range.end_row ~= cursor_row + 1 then
+    or changed_range.start_row > cursor_row
+    or changed_range.end_row < cursor_row then
     return nil
   end
 
@@ -158,6 +158,10 @@ local function insert_return_local_closers(buf, changed_range)
     return false
   end
 
+  local expected_closer = editing.closer_line(opener)
+  if not expected_closer or lines[cursor_row + 2] == expected_closer then
+    return false
+  end
   if not insert_closer(buf, opener, cursor_row + 1) then
     return false
   end
