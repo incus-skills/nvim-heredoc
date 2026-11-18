@@ -85,7 +85,10 @@ local completion_buf = set_buffer(table.concat({
   "fi",
 }, "\n"), "bash")
 vim.api.nvim_win_set_cursor(0, { 4, 3 })
-vim.api.nvim_feedkeys("A", "xt", false)
+vim.api.nvim_input("A")
+assert(vim.wait(1000, function()
+  return vim.api.nvim_get_mode().mode:sub(1, 1) == "i"
+end, 10), "Blink Return delegation test could not enter Insert mode")
 blink.show({ providers = { "buffer" }, initial_selected_item_idx = 1 })
 assert(vim.wait(5000, function()
   return blink.is_menu_visible() and #blink.get_items() > 0
