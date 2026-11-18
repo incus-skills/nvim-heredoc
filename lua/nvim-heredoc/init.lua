@@ -548,7 +548,8 @@ end
 -- present) or native Return behaviour.
 local function return_key(buf)
   local win = vim.api.nvim_get_current_win()
-  if vim.api.nvim_win_get_buf(win) ~= buf or vim.api.nvim_get_mode().mode ~= "i" then
+  if vim.api.nvim_win_get_buf(win) ~= buf
+    or vim.api.nvim_get_mode().mode:sub(1, 1) ~= "i" then
     vim.api.nvim_feedkeys("\r", "ni", false)
     return
   end
