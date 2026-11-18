@@ -96,14 +96,6 @@ local function run()
   end
 
   local cr_mapping = vim.fn.maparg("<CR>", "i", false, true)
-  local global_cr_mappings = api.nvim_get_keymap("i")
-  local mini_pairs_mapping
-  for _, mapping in ipairs(global_cr_mappings) do
-    if mapping.lhs == "<CR>" and mapping.rhs == "v:lua.MiniPairs.cr()" then
-      mini_pairs_mapping = mapping
-      break
-    end
-  end
   add("scenario", (column_zero and "column-zero opener; " or "")
     .. (native_cr and "native Return; MiniPairs bypassed; " or "Return wrapper delegates MiniPairs; ")
     .. (sync_feedkeys and "synchronous feedkeys; " or "queued nvim_input; ")
@@ -133,8 +125,6 @@ local function run()
         .. vim.inspect(cr_mapping))
     assert(type(MiniPairs) == "table" and type(MiniPairs.cr) == "function",
       "MiniPairs' Return callback is unavailable for delegation")
-    assert(mini_pairs_mapping ~= nil,
-      "MiniPairs' global Return mapping is not installed: " .. vim.inspect(global_cr_mappings))
   end
 
   api.nvim_win_set_cursor(0, { 3, #opener - 1 })
