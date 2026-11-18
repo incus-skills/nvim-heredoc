@@ -176,6 +176,7 @@ local function insert_return_local_closers(buf, changed_range)
     return false
   end
   local opener = openers[1]
+  trace_return("parsed Return opener: body_prefix=" .. vim.inspect(opener.body_prefix) .. ", structural_prefix=" .. vim.inspect(opener.structural_prefix) .. ", tabstop=" .. tostring(opener.tabstop) .. ", safe=" .. tostring(opener.opener_safe), buf, changed_range)
   if opener.operator ~= "<<-" or not opener.opener_safe then
     return false
   end
