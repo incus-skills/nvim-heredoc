@@ -77,7 +77,8 @@ do
   assert(not plugin.process_buffer(buf, { start_row = 0, end_row = 2 }, false),
     "multiple queued openers must not fall through to document-wide Return recovery")
   local actual = lines(buf)
-  assert(vim.deep_equal(actual, original),
+  assert(#actual == #original and actual[1] == original[1]
+    and actual[2] == original[2] and actual[3] == original[3],
     "unsupported multiple-queue Return placement must leave the buffer unchanged")
 end
 
