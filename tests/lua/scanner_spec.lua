@@ -2,6 +2,23 @@ package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
 local scanner = require("nvim-heredoc.scanner")
 local editing = require("nvim-heredoc.editing")
 
+-- Return-local recognition parses the completed opener without searching
+-- later buffer lines for a candidate terminator.
+do
+  local openers = assert(scanner.parse_openers("  cat <<-'CUSTOM'"))
+  assert(#openers == 1)
+  local opener = openers[1]
+  assert(opener.operator == "<<-" and opener.delimiter == "CUSTOM")
+  assert(opener.structural_prefix == "\\t" and opener.body_prefix == "\\t\\t")
+  assert(opener.opener_safe and not opener.editable)
+  local plain = assert(scanner.parse_openers("cat <<'PLAIN'"))
+  assert(#plain == 1 and plain[1].operator == "<<")
+  local unsupported = assert(scanner.parse_openers("   cat <<-EOF", { tabstop = 2 }))
+  assert(#unsupported == 1 and not unsupported[1].opener_safe)
+  local none = assert(scanner.parse_openers("cat <<<VALUE"))
+  assert(#none == 0, "here-strings are not managed heredoc openers")
+end
+
 local function one(source)
   local result = scanner.scan(source)
   if #result.regions ~= 1 then
