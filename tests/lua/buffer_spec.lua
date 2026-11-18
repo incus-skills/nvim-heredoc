@@ -383,7 +383,81 @@ do
     "deleting the autoclose brace must not cause a synthetic closer before following code")
 end
 
-print("buffer integration tests: PASS")
+
+-- Regression: function-wrapped managed heredocs must keep heredoc-looking
+-- payload opaque and match the actual delimiter/<<- terminator rules.
+do
+  local cases = {
+    {
+      name = "function-wrapped EOF with spaces rejected and TAB accepted",
+      source = {
+        "conf_print_test4() {",
+        "  cat <<-'EOF'",
+        "  cat <<'EOF'",
+        "      hello1",
+        "          hello2",
+        "              hello3",
+        "                  hello4",
+        "    EOF",
+        "\tEOF",
+        "}",
+      },
+      terminator = "\tEOF",
+      terminator_index = 9,
+      payload = "\t\t  cat <<'EOF'",
+    },
+    {
+      name = "function-wrapped FOE delimiter",
+      source = {
+        "conf_print_test3() {",
+        "  cat <<-'FOE'",
+        "hello1",
+        "hello2",
+        "hello3",
+        "hello4",
+        "\tFOE",
+        "}",
+      },
+      terminator = "\tFOE",
+      terminator_index = 7,
+      payload = nil,
+    },
+    {
+      name = "function-wrapped payload opener does not queue",
+      source = {
+        "conf_print_test2() {",
+        "  cat <<-'EOF'",
+        "cat <<-'EOF'",
+        "hello1",
+        "hello2",
+        "hello3",
+        "hello4",
+        "EOF",
+        "  EOF",
+        "}",
+      },
+      terminator = "EOF",
+      terminator_index = 8,
+      payload = "\t\tcat <<-'EOF'",
+    },
+  }
+
+  for _, case in ipairs(cases) do
+    local buf = set_buffer(case.source)
+    vim.bo[buf].tabstop = 2
+    assert(plugin.process_buffer(buf), case.name .. ": managed body should be processed")
+    local actual = lines(buf)
+    assert(actual[#actual] == "}", case.name .. ": function boundary must remain last")
+    assert(actual[case.terminator_index] == case.terminator,
+      case.name .. ": expected terminator at its source position; lines=" .. vim.inspect(actual))
+    if case.payload then
+      assert(actual[3] == case.payload,
+        case.name .. ": heredoc-looking payload must remain payload; lines=" .. vim.inspect(actual))
+    end
+  end
+end
+
+
 
 
 do
@@ -417,3 +491,5 @@ do
       and actual[6] == "EOF"
   end, 10), "an opener-looking payload line must not suppress managed-prefix removal")
 end
+
+print("buffer integration tests: PASS")
