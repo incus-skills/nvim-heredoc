@@ -362,7 +362,7 @@ function M.parse_openers(source, opts)
   local openers = {}
   for index, item in ipairs(queue) do
     local opener = lines[item.opener_line] or ""
-    local prefix = opener:match("^([ \\t]*)") or ""
+    local prefix = opener:match("^([ \t]*)") or ""
     local structural_prefix, structural_column = structural_tab_prefix(prefix, tabstop)
     local safe = structural_prefix ~= nil
     openers[#openers + 1] = {
