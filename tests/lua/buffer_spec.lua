@@ -55,7 +55,7 @@ do
   vim.bo[buf].tabstop = 2
   vim.api.nvim_set_current_buf(buf)
   vim.api.nvim_win_set_cursor(0, { 2, 0 })
-  assert(plugin.process_buffer(buf, { start_row = 0, end_row = 2 }, false),
+  assert(plugin.process_buffer(buf, { start_row = 0, end_row = 1 }, false),
     "Return-local recognition should insert a closer without consulting a later same-delimiter heredoc")
   local actual = lines(buf)
   assert(actual[1] == "  cat <<-'EOF'")
@@ -67,6 +67,9 @@ do
     and actual[7] == "EOF"
     and actual[8] == "}",
     "the later same-delimiter heredoc and its enclosing structure must remain unchanged")
+  assert(not plugin.process_buffer(buf, { start_row = 0, end_row = 1 }, false),
+    "reprocessing the same Return range must not duplicate the closer")
+  assert(#lines(buf) == 8, "the local closer must remain unique")
 end
 
 do
