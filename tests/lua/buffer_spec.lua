@@ -43,6 +43,33 @@ do
 end
 
 do
+  local buf = set_buffer({
+    "  cat <<-'EOF'",
+    "  ",
+    "later_function() {",
+    "  cat <<'EOF'",
+    "payload",
+    "EOF",
+    "}",
+  })
+  vim.bo[buf].tabstop = 2
+  vim.api.nvim_set_current_buf(buf)
+  vim.api.nvim_win_set_cursor(0, { 2, 0 })
+  assert(plugin.process_buffer(buf, { start_row = 0, end_row = 2 }, false),
+    "Return-local recognition should insert a closer without consulting a later same-delimiter heredoc")
+  local actual = lines(buf)
+  assert(actual[1] == "  cat <<-'EOF'")
+  assert(actual[2] == "\t\t", "the first body line should receive its structural TAB prefix")
+  assert(actual[3] == "\tEOF", "the new closer should be inserted before the later function")
+  assert(actual[4] == "later_function() {"
+    and actual[5] == "  cat <<'EOF'"
+    and actual[6] == "payload"
+    and actual[7] == "EOF"
+    and actual[8] == "}",
+    "the later same-delimiter heredoc and its enclosing structure must remain unchanged")
+end
+
+do
   local buf = set_buffer({ "\tcat <<-EOF", "\t  already", "  pasted", "" })
   assert(plugin.process_buffer(buf))
   local actual = lines(buf)
