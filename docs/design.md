@@ -88,7 +88,11 @@ Ordinary << heredocs and here-strings (<<<) remain unmanaged. They must not be m
 
 ## 5. Interactive event handling and paste preservation
 
-The Return event is the semantic commitment point, but Neovim may deliver the key's buffer changes and plugin callbacks through a sequence of queued or deferred events. The implementation must reliably recognise the actual Return transition and complete the local insertion without depending on a later body scan to infer ownership.
+The Return event is the semantic commitment point. Buffer-change callbacks are deferred and may coalesce a rapid sequence of Returns and payload keystrokes into one range; they are therefore not a reliable source of the individual commitment events.
+
+The interactive path uses a buffer-local, non-expression Insert-mode <CR> mapping. Expression mappings run under Neovim's textlock and cannot perform the required buffer edit. The mapping examines only the current line when the cursor is at its end. For exactly one safe managed <<- opener, it synchronously inserts the first body line and matching closer in one edit, then places the Insert-mode cursor after the body prefix. The new closer immediately bounds the body. It does not wait for on_lines, a scheduled scan, or a later candidate terminator.
+
+For non-managed Return, the wrapper delegates to Blink's accept action when its completion menu is visible, then to MiniPairs' Return behaviour when available, and otherwise feeds native Return ahead of the remaining typeahead. This delegation is part of plugin coexistence, not a second heredoc parser.
 
 - Distinguish Return immediately after the completed opener from ordinary later body edits. Do not use a broad changed-range coincidence as a substitute for the event's meaning.
 - Insert the closer before the existing enclosing structural closer when that is the correct local placement. Do not synthesize a missing function brace or other enclosing construct.
