@@ -533,7 +533,10 @@ local function schedule_changed_range(buf, firstline, lastline, new_lastline)
 end
 
 local function process_text_changed(buf)
-  process_pending_ranges(buf, true)
+  -- TextChanged is not a commitment event for an incomplete opener. Only
+  -- Return may create a new heredoc scope; generic text changes must not
+  -- append a closer before the user has completed the opener and pressed CR.
+  process_pending_ranges(buf, false)
 end
 
 local function attach(buf)
