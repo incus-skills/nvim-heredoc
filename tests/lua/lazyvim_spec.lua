@@ -42,7 +42,10 @@ assert(vim.b.minipairs_disable ~= true, "mini.pairs must not be disabled in the 
 -- This keeps the installed plugin's default completion path under test.
 require("blink.cmp").setup({
   sources = { default = { "buffer" } },
-  completion = { menu = { auto_show = false } },
+  completion = {
+    menu = { auto_show = false },
+    list = { selection = { preselect = false, auto_insert = false } },
+  },
 })
 local blink_config = require("blink.cmp.config")
 assert(vim.wait(10000, function()
@@ -88,6 +91,9 @@ assert(vim.wait(5000, function()
   return blink.is_menu_visible() and #blink.get_items() > 0
 end, 20), "Blink did not display buffer completion inside the managed heredoc body")
 local completion_label = blink.get_items()[1].label
+blink.select_next()
+assert(not (vim.api.nvim_buf_get_lines(completion_buf, 3, 4, false)[1] or ""):find(completion_label, 1, true),
+  "the test must select a completion without auto-inserting it")
 vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<CR>", true, false, true), "xt", false)
 assert(vim.wait(1000, function()
   local current = vim.api.nvim_buf_get_lines(completion_buf, 3, 4, false)[1] or ""
