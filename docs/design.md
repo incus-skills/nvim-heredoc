@@ -45,56 +45,61 @@ The shell removes the leading TABs from each body line and the terminator. The e
 
 These rules need explicit regression tests. The editor must not claim to preserve payload tabs that the shell itself strips.
 
-## 3. Shared region model
+## 3. Governing interaction model: Return establishes a bounded scope
 
-Recognition is the common authority for all editing integrations. Indentation, paste handling, automatic closer insertion, auto-pairs, completion, and formatting integration must consume the same region information; they must not independently guess the active heredoc by searching for the nearest preceding opener.
+The interactive contract is deliberately local.
 
-The scanner should expose a buffer-independent result with, at minimum:
+1. The user completes a managed <<- opener.
+2. The user presses Return.
+3. The plugin recognises the completed opener at this transition, resolves its delimiter and <<- mode, and commits to creating the matching closer.
+4. The plugin inserts that closer immediately, at the appropriate local position: within the available enclosing shell structure (for example, before an existing function-closing brace), or at the natural end of a standalone construct.
+5. The inserted closer defines the end of the new heredoc's lexical input scope. The body is the text between this opener and this closer.
 
-- opener line and source span;
-- operator kind (`<<-`, ordinary `<<`, or `<<<`);
-- original delimiter spelling and quote-removed delimiter value;
-- whether delimiter quoting suppresses expansion;
-- command boundary at which heredoc body consumption begins;
-- queue position for multiple heredocs on the same command;
-- body start and end lines, when known;
-- terminator line and matched delimiter, when present;
-- opener-aligned structural prefix and its byte representation (used by the closing delimiter);
-- body prefix, consisting of the structural prefix plus one additional literal TAB;
-- confidence/ambiguity status and a reason when the region cannot safely be resolved.
+The plugin does not need to recognise and maintain an opener lifecycle character-by-character while the delimiter is being typed. Nor does it need a document-wide ledger of heredocs, stable identities for every opener, or a search through later candidate terminators to discover which closer belongs to the newly opened heredoc. The closer is created at the commitment point; it is not discovered later.
 
-The scanner processes shell source in lexical order. It recognises pending heredocs on a command, waits until that command's complete logical line ends, then consumes bodies in declaration order. A completed earlier heredoc must not be mistaken for the active region when later nested shell constructs contain another opener.
+An opener-looking line inside the established body is payload, not a competing shell command or heredoc declaration. A delimiter-looking line is governed by the shell's actual delimiter matching rules; it does not acquire ownership of the new scope merely because it appears later in the document. Other heredocs elsewhere in the buffer are outside the scope-establishment decision.
 
-The scanner is conservative, not a claim to implement every shell grammar production. On malformed or ambiguous input it must report uncertainty and avoid authorising destructive edits.
+This is not a general shell parser design. The plugin should use existing shell indentation/structural context for function and compound-command layout where available. Its own structural work should be limited to the local information genuinely needed to place the newly committed closer. If that local placement cannot be established safely, leave the buffer unchanged rather than reconstructing the whole document.
 
-## 4. Editing behaviour
+The shell itself permits multiple heredoc redirections on one command and consumes them in declaration order. That language fact may remain represented in scanner fixtures where relevant, but it does not justify a document-wide ownership model for the Return-local editing path.
 
-- Recognise only valid `<<-` operators outside shell quotes and comments.
-- Ignore `<<<` and ordinary `<<` for managed editing.
-- Track multiple pending heredocs on a command in declaration order.
-- Recognise delimiter lines according to shell tab-stripping semantics.
-- Insert a matching closer automatically without placing it at hard column zero when the opener has structural TAB indentation.
-- The closer uses the opener-aligned structural TAB prefix and occupies the same visual column as the opener.
-- Each body line uses that same prefix plus one additional literal TAB, so the body is visually indented one TAB beyond the opener and closer. The opener's original indentation bytes are not rewritten; a space-indented opener is supported only when its visual column is exactly representable by TABs at the buffer's tabstop. Leading spaces are not a valid substitute for TABs on the closer.
-- Preserve all existing body whitespace when indenting or pasting. Never implement paste handling by removing all leading whitespace and prefixing a replacement.
-- Any structural prefix added to a body line must be a TAB byte if the resulting script is expected to rely on `<<-` tab stripping.
-- If the opener's indentation uses spaces in a way that cannot be represented by structural tabs without changing alignment, do not silently rewrite it. Report or document the limitation and leave the source intact.
-- Keep ordinary `<<` heredocs byte-for-byte unaffected by managed editing actions.
+## 4. Bounded lexical recognition and editing responsibilities
 
-## 5. Interactive editing and paste preservation
+The scanner is a supporting lexical recogniser, not the authority for a global document-wide region graph. For the Return transition it needs enough information to establish:
 
-Interactive editing is region-based rather than a sequence of isolated current-line corrections.
+- that the current completed opener is a managed <<- redirection;
+- the delimiter spelling and quote-removed delimiter value;
+- the opener's structural indentation and the TAB prefixes required by <<-;
+- the start of the body created by Return;
+- whether the local closer placement is safe in the current structural context.
 
-- Automatic closer insertion is driven by a recognised opener and the shared region model, not by the first blank line encountered after an opener.
-- Paste handling must identify the complete changed range. It must not assume that a `TextChangedI` event describes only the cursor's current line.
-- The paste operation must preserve the relative indentation of the inserted lines. It must not trim leading whitespace from each line, including whitespace-only pasted lines.
-- On an interactive Enter transition, a whitespace-only line whose indentation width exactly matches the opener's visual column is Neovim's copied structural autoindent; replace that copied prefix with the deeper body TAB prefix before further typing. Do not apply this conversion to paste ranges, where the same bytes may be intentional payload whitespace.
-- Structural indentation may be added only when the edit context establishes that the prefix is not already present. Repeated events must not duplicate prefixes.
-- Empty lines, lines containing only spaces, and lines containing tabs require explicit handling and tests.
-- If the changed range cannot be reliably identified, or the region is ambiguous, leave the inserted text unchanged rather than guessing.
-- Neovim's normal indentation, pair insertion, and completion behaviour should be allowed to coexist unless a verified, region-scoped integration is necessary.
+The scanner may retain broader lexical coverage used by existing tests and by safe handling of ordinary heredoc payload. Such coverage is a bounded implementation aid. It must not turn into a requirement to track every heredoc's identity or lifetime across the document.
 
-The initial Neovim integration runs on `InsertLeave` and `TextChanged`, uses the shared scanner, inserts a closer for a safe incomplete opener, and applies idempotent body TAB prefixes (one TAB beyond opener alignment) to the recognised body range. It now tracks changed line ranges with `nvim_buf_attach(on_lines)` and prefixes only the intersection of a changed range and a recognised heredoc body. `InsertLeave` performs a full-region pass and inserts a closer for a safe incomplete opener. Headless tests verify range isolation and cursor preservation. This is still an initial integration prototype: extmark behaviour, plugin coexistence, and more complex edit sequences remain to be validated. A future implementation may use extmarks or another stable range-tracking mechanism, but the design contract does not prescribe a specific Neovim API until the prototype demonstrates the required behaviour.
+Editing responsibilities are correspondingly narrow:
+
+- **Closer commitment:** create the matching closer on Return, rather than waiting for a later scan to discover a candidate terminator.
+- **Structural placement:** put the closer inside an already-present enclosing boundary when that is the correct local placement; do not invent or recreate a function/compound-command closer.
+- **Body indentation:** add the managed body TAB prefix while preserving payload spaces and relative indentation.
+- **Terminator indentation:** align the closer with the opener using literal TAB bytes that <<- will strip.
+- **Existing managed transition:** preserve the established behaviour for changing an already-managed opener between <<- and <<, but do not let this compatibility path define the architecture of new Return-local scope creation.
+- **Paste preservation:** operate on the actual changed range and preserve existing bytes. This is a separate buffer-editing concern, not a reason to build a global heredoc identity system.
+
+Ordinary << heredocs and here-strings (<<<) remain unmanaged. They must not be modified by managed editing actions.
+
+## 5. Interactive event handling and paste preservation
+
+The Return event is the semantic commitment point, but Neovim may deliver the key's buffer changes and plugin callbacks through a sequence of queued or deferred events. The implementation must reliably recognise the actual Return transition and complete the local insertion without depending on a later body scan to infer ownership.
+
+- Distinguish Return immediately after the completed opener from ordinary later body edits. Do not use a broad changed-range coincidence as a substitute for the event's meaning.
+- Insert the closer before the existing enclosing structural closer when that is the correct local placement. Do not synthesize a missing function brace or other enclosing construct.
+- Establish the first body TAB prefix and keep the Insert-mode cursor after it before the user types payload.
+- Repeated callbacks must not duplicate the closer or body prefix.
+- Later body edits and multi-line paste must not cause opener-looking payload to be reinterpreted as shell syntax.
+- Paste handling must identify the complete changed range. It must preserve relative indentation, including spaces on whitespace-only lines; do not trim or normalise payload whitespace.
+- Empty lines, space-only lines, and tab-containing lines require explicit tests. Leading payload TABs are stripped by the shell under <<- and cannot be promised as preserved payload indentation.
+- If the current opener, local placement, or changed range is ambiguous, leave the text unchanged rather than searching the document for a plausible substitute.
+
+Normal shell indentation, pair insertion, and completion should coexist. Do not introduce buffer-wide suppression or a second general structural indentation engine without a demonstrated, region-specific need.
 
 ## 6. Plugin coexistence and formatting
 
@@ -115,17 +120,17 @@ Save-time formatting is a separate mechanism from interactive indentation. Tests
 
 ## 7. Scanner architecture and grammar limits
 
-Use a shared lexical scanner rather than requiring Treesitter. It must account for:
+Use a bounded lexical scanner rather than requiring Treesitter. It supports local opener/delimiter recognition and conservative payload handling; it is not a mandate to construct a document-wide heredoc ownership graph. It must account for:
 
 - Single-quoted, double-quoted, and escaped text when detecting operators.
 - Comments, without treating `#` inside words/quotes as a comment.
 - Here-strings versus heredoc operators.
 - Quoted and escaped delimiters.
 - Command continuations and the point at which pending heredoc bodies begin.
-- Multiple heredocs attached to one command.
+- Shell declaration-order semantics for multiple heredocs attached to one command, where covered by the supported lexical subset; this does not imply cross-document obligation tracking.
 - Nested shell constructs sufficiently to avoid false operator detection.
 
-The scanner should expose region information to editing integrations. It must explicitly record unsupported or ambiguous grammar cases. It must not report a high-confidence region merely because a line resembles a heredoc opener.
+The scanner should expose only the bounded lexical information needed by its consumers and explicitly record unsupported or ambiguous grammar cases. It must not authorise edits merely because a line resembles a heredoc opener. Once Return has established a closer, opener-looking text within that bounded body is payload.
 
 Treesitter may be used as an optional cross-check or structural aid when a parser is available and successfully parses the relevant buffer. The lexical scanner remains authoritative for shared behaviour and must work when Treesitter is absent, unavailable for a filetype, or unable to parse an incomplete editing buffer.
 
@@ -137,10 +142,14 @@ Validation has independent layers.
 
 ### Buffer-level tests
 
-Verify exact bytes, region results, and cursor placement for:
+The existing scanner and buffer tests remain applicable unless an individual case is explicitly superseded. Their role is to validate the bounded Return-local contract, shell lexical rules, and safe non-interference—not to require the implementation to retain every investigative mechanism used to reach that contract.
+
+Verify exact bytes, local scope boundaries, and cursor placement for:
 
 - A single indented `<<-` heredoc.
-- An opener inside an indented function/conditional.
+- Return after an opener inside an indented function/conditional, with the new closer inserted before the existing structural closer.
+- Body lines resembling other heredoc openers, proving that they remain payload inside the established scope.
+- Delimiter-looking lines with valid and invalid TAB/space indentation, proving that shell delimiter rules remain authoritative.
 - Multiple heredocs on one command.
 - Quoted and escaped delimiters.
 - Empty body lines and whitespace-only lines.
