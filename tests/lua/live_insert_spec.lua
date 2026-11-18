@@ -248,7 +248,7 @@ plugin.setup()
 -- "x"), it does not drain the whole sequence inside this synchronous Lua
 -- command and accidentally turn the test into a Normal-mode observation.
 vim.api.nvim_win_set_cursor(0, { 1, #("\tcat <<-LIVE") })
-vim.api.nvim_input("A\n")
+vim.api.nvim_input("A" .. api.nvim_replace_termcodes("<CR>", true, false, true))
 
 defer(function()
   wait_for(function()
@@ -271,7 +271,7 @@ defer(function()
     -- deferred changed-range processor before typing; this regression guard
     -- checks the existing body-prefix behaviour without claiming that
     -- the live Insert-mode timing problem is solved.
-    vim.api.nvim_input("\n")
+    vim.api.nvim_input(api.nvim_replace_termcodes("<CR>", true, false, true))
     defer(function()
       wait_for(function()
         return lines(buf)[3] == "\t\t"
