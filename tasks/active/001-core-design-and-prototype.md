@@ -87,6 +87,14 @@ The notes below preserve evidence and decisions from earlier implementation cycl
 
 ## Implementation progress
 
+### Return-local refactor in progress
+
+- Added `scanner.parse_openers()` to recognise the completed command text without scanning the surrounding buffer or searching for a later terminator.
+- The interactive Return path now invokes this bounded recogniser before the document-wide scanner. For a single safe managed `<<-` opener, it derives the closer from the actual delimiter, inserts it immediately after the first body line, and establishes the body prefix/cursor position. This makes the new-scope commitment independent of an unrelated later heredoc using the same delimiter.
+- Multiple heredoc redirections on one command remain conservative in this Return-local path; the parser returns their records, but the editor does not guess the distinct body/terminator placement.
+- Added core tests for local opener recognition, delimiter derivation, literal TAB prefixes, unsupported indentation, ordinary `<<`, and here-string rejection. The existing live function-boundary test already places a later independent `<<` heredoc with the same `EOF` delimiter after the new opener and asserts that the new closer is inserted before the existing function brace and original source.
+- Hosted CI and live workstation verification are still pending for this refactor. The compatibility scan/snapshot path remains for existing-buffer recovery and managed operator transitions; it is not used to commit a new Return-local scope.
+
 ### Present
 
 - The scanner now exposes `heredocs` for all lexically recognised heredoc operators while retaining `regions` as the managed `<<-` subset. Buffer snapshots use this distinction to recognise an operator change on an already managed heredoc: `<<-` to `<<` removes the plugin’s body prefix and opener-aligned TABs from the terminator; `<<` to `<<-` reapplies them. The transition is matched by opener line, queue position, and delimiter identity. A headless regression exercises both directions, including a blank body line and nested space indentation.
