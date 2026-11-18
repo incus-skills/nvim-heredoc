@@ -86,19 +86,22 @@ local completion_buf = set_buffer(table.concat({
 }, "\n"), "bash")
 vim.api.nvim_win_set_cursor(0, { 4, 3 })
 vim.api.nvim_feedkeys("A", "xt", false)
-blink.show({ providers = { "buffer" } })
+blink.show({ providers = { "buffer" }, initial_selected_item_idx = 1 })
 assert(vim.wait(5000, function()
   return blink.is_menu_visible() and #blink.get_items() > 0
 end, 20), "Blink did not display buffer completion inside the managed heredoc body")
 local completion_label = blink.get_items()[1].label
-blink.select_next()
+assert(blink.get_selected_item() ~= nil, "Blink test must have a selected item before Return")
 assert(not (vim.api.nvim_buf_get_lines(completion_buf, 3, 4, false)[1] or ""):find(completion_label, 1, true),
   "the test must select a completion without auto-inserting it")
 vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<CR>", true, false, true), "xt", false)
 assert(vim.wait(1000, function()
   local current = vim.api.nvim_buf_get_lines(completion_buf, 3, 4, false)[1] or ""
   return current:find(completion_label, 1, true) ~= nil
-end, 10), "Return wrapper did not delegate to Blink to accept the visible completion")
+end, 10), "Return wrapper did not delegate to Blink to accept the visible completion; line="
+  .. vim.inspect(vim.api.nvim_buf_get_lines(completion_buf, 3, 4, false)[1])
+  .. "; selected=" .. vim.inspect(blink.get_selected_item())
+  .. "; menu_visible=" .. tostring(blink.is_menu_visible()))
 assert(not blink.is_menu_visible(), "Blink completion menu should close after Return acceptance")
 vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "xt", false)
 assert(vim.b.completion == nil, "Blink completion must remain buffer-enabled in heredoc")
