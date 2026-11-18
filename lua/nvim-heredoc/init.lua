@@ -129,14 +129,14 @@ local function insert_return_local_closers(buf, changed_range)
   if not cursor_row or not changed_range
     or changed_range.start_row ~= cursor_row - 1
     or changed_range.end_row ~= cursor_row + 1 then
-    return false
+    return nil
   end
 
   local lines = get_lines(buf)
   local opener_line = lines[cursor_row]
   local body_line = lines[cursor_row + 1]
   if not opener_line or not body_line or not body_line:match("^[ \\t]*$") then
-    return false
+    return nil
   end
 
   local openers = scanner.parse_openers(opener_line, { tabstop = vim.bo[buf].tabstop })
