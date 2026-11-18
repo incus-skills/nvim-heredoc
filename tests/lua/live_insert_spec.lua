@@ -121,7 +121,7 @@ if vim.env.NVIM_HEREDOC_FUNCTION_BOUNDARY == "1" or vim.env.NVIM_HEREDOC_FUNCTIO
 
         -- This is MiniPairs' actual Insert-mode Return mapping, not a buffer
         -- API insertion or a synthetic process_buffer call.
-        api.nvim_input(api.nvim_replace_termcodes("<CR>", true, false, true))
+        api.nvim_input(vim.api.nvim_replace_termcodes("<CR>", true, false, true))
         defer(function()
           local after_pair_return = snapshot("after Return inside the function pair")
           assert_insert_mode("Return inside the function pair must remain in Insert mode")
@@ -134,14 +134,14 @@ if vim.env.NVIM_HEREDOC_FUNCTION_BOUNDARY == "1" or vim.env.NVIM_HEREDOC_FUNCTIO
             -- Withdraw MiniPairs' brace before opening the heredoc. This
             -- avoids racing the scheduled on_lines processor: the boundary
             -- is already absent when the new heredoc becomes visible.
-            api.nvim_input(api.nvim_replace_termcodes("<C-o>j<C-o>x<C-o>k", true, false, true))
+            api.nvim_input(vim.api.nvim_replace_termcodes("<C-o>j<C-o>x<C-o>k", true, false, true))
             defer(function()
               assert_insert_mode("withdrawing the function brace must remain in Insert mode")
               actual = snapshot("after deleting the auto-paired function brace")
               assert(actual[3] == "",
                 "the deliberate brace deletion should leave the line empty; lines=" .. vim.inspect(actual))
 
-              api.nvim_input(api.nvim_replace_termcodes("  cat <lt><lt>-'EOF'", true, false, true))
+              api.nvim_input(vim.api.nvim_replace_termcodes("  cat <lt><lt>-'EOF'", true, false, true))
               defer(function()
                 vim.wait(200, function() return false end, 10)
                 actual = snapshot("after processing the opener with the brace withdrawn")
@@ -163,7 +163,7 @@ if vim.env.NVIM_HEREDOC_FUNCTION_BOUNDARY == "1" or vim.env.NVIM_HEREDOC_FUNCTIO
             end)
             return
           end
-          api.nvim_input(api.nvim_replace_termcodes("cat <lt><lt>-'EOF'", true, false, true))
+          api.nvim_input(vim.api.nvim_replace_termcodes("cat <lt><lt>-'EOF'", true, false, true))
           defer(function()
             local after_opener = snapshot("after typing the new heredoc opener")
             assert_insert_mode("typing the heredoc opener must remain in Insert mode")
@@ -178,7 +178,7 @@ if vim.env.NVIM_HEREDOC_FUNCTION_BOUNDARY == "1" or vim.env.NVIM_HEREDOC_FUNCTIO
               "the enclosing brace should remain untouched until Return; lines="
                 .. vim.inspect(after_opener))
 
-            api.nvim_input(api.nvim_replace_termcodes("<CR>", true, false, true))
+            api.nvim_input(vim.api.nvim_replace_termcodes("<CR>", true, false, true))
             defer(function()
               wait_for(function()
                 actual = lines(buf)
@@ -200,7 +200,7 @@ if vim.env.NVIM_HEREDOC_FUNCTION_BOUNDARY == "1" or vim.env.NVIM_HEREDOC_FUNCTIO
                 assert(after_payload[3] == "\t\tnew payload",
                   "payload should follow the structural body TAB; lines=" .. vim.inspect(after_payload))
 
-                api.nvim_input(api.nvim_replace_termcodes("<Esc>", true, false, true))
+                api.nvim_input(vim.api.nvim_replace_termcodes("<Esc>", true, false, true))
                 defer(function()
                   assert(api.nvim_get_mode().mode:sub(1, 1) ~= "i",
                     "Escape should leave Insert mode")
@@ -248,7 +248,7 @@ plugin.setup()
 -- "x"), it does not drain the whole sequence inside this synchronous Lua
 -- command and accidentally turn the test into a Normal-mode observation.
 vim.api.nvim_win_set_cursor(0, { 1, #("\tcat <<-LIVE") })
-vim.api.nvim_input("A" .. api.nvim_replace_termcodes("<CR>", true, false, true))
+vim.api.nvim_input("A" .. vim.api.nvim_replace_termcodes("<CR>", true, false, true))
 
 defer(function()
   wait_for(function()
@@ -271,7 +271,7 @@ defer(function()
     -- deferred changed-range processor before typing; this regression guard
     -- checks the existing body-prefix behaviour without claiming that
     -- the live Insert-mode timing problem is solved.
-    vim.api.nvim_input(api.nvim_replace_termcodes("<CR>", true, false, true))
+    vim.api.nvim_input(vim.api.nvim_replace_termcodes("<CR>", true, false, true))
     defer(function()
       wait_for(function()
         return lines(buf)[3] == "\t\t"
@@ -305,7 +305,7 @@ defer(function()
           end, "multi-line paste must be indented before InsertLeave/save without changing payload bytes")
           assert_insert_mode("live paste processing must remain in Insert mode")
 
-          vim.api.nvim_input(vim.api.nvim_replace_termcodes("<Esc>", true, false, true))
+          vim.api.nvim_input(vim.vim.api.nvim_replace_termcodes("<Esc>", true, false, true))
           defer(function()
             assert(vim.api.nvim_get_mode().mode ~= "i", "Escape should leave Insert mode")
             actual = lines(buf)
