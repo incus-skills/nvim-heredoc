@@ -70,6 +70,18 @@ do
 end
 
 do
+  local original = { "cat <<-A <<-B", "", "}" }
+  local buf = set_buffer(original)
+  vim.api.nvim_set_current_buf(buf)
+  vim.api.nvim_win_set_cursor(0, { 2, 0 })
+  assert(not plugin.process_buffer(buf, { start_row = 0, end_row = 2 }, false),
+    "multiple queued openers must not fall through to document-wide Return recovery")
+  local actual = lines(buf)
+  assert(vim.deep_equal(actual, original),
+    "unsupported multiple-queue Return placement must leave the buffer unchanged")
+end
+
+do
   local buf = set_buffer({ "\tcat <<-EOF", "\t  already", "  pasted", "" })
   assert(plugin.process_buffer(buf))
   local actual = lines(buf)
