@@ -549,7 +549,8 @@ end
 local function return_key(buf)
   local win = vim.api.nvim_get_current_win()
   if vim.api.nvim_win_get_buf(win) ~= buf or vim.api.nvim_get_mode().mode ~= "i" then
-    return "\\r"
+    vim.api.nvim_feedkeys("\\r", "ni", false)
+    return
   end
 
   local cursor = vim.api.nvim_win_get_cursor(win)
@@ -580,20 +581,24 @@ local function return_key(buf)
   -- used by LazyVim. Resolve it at invocation time because MiniPairs may load
   -- after this buffer's FileType event.
   local mini_pairs = rawget(_G, "MiniPairs")
+  local keys = "\\r"
   if mini_pairs and type(mini_pairs.cr) == "function" then
-    return mini_pairs.cr()
+    keys = mini_pairs.cr() or keys
   end
-  return "\\r"
+  -- This is a non-expression mapping so buffer edits above are permitted.
+  -- Put the delegated Return sequence before the remaining typeahead: rapid
+  -- nvim_input() bursts must observe the same key order as ordinary typing.
+  keys = vim.api.nvim_replace_termcodes(keys, true, false, true)
+  vim.api.nvim_feedkeys(keys, "ni", false)
 end
 
 local function install_return_mapping(buf)
   vim.keymap.set("i", "<CR>", function()
-    return return_key(buf)
+    return_key(buf)
   end, {
     buffer = buf,
-    expr = true,
+    expr = false,
     noremap = true,
-    replace_keycodes = true,
     silent = true,
     desc = "nvim-heredoc: commit managed heredoc on Return",
   })
