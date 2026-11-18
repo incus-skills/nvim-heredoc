@@ -552,7 +552,7 @@ local function return_key(buf)
             closer,
           })
           vim.api.nvim_win_set_cursor(win, { row + 2, #body_prefix })
-          return ""
+          return
         end
       end
     end
