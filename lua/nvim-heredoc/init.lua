@@ -28,6 +28,23 @@ local function active_cursor_row(buf)
   return vim.api.nvim_win_get_cursor(win)[1] - 1
 end
 
+local function trace_return(label, buf, range, firstline, lastline, new_lastline)
+  if vim.env.NVIM_HEREDOC_TRACE_RETURN ~= "1" then
+    return
+  end
+  local cursor = active_cursor_row(buf)
+  local lines = get_lines(buf)
+  local payload = {
+    label = label,
+    range = range,
+    on_lines = firstline and { firstline = firstline, lastline = lastline, new_lastline = new_lastline } or nil,
+    cursor_row = cursor,
+    mode = vim.api.nvim_get_mode().mode,
+    lines = lines,
+  }
+  print("nvim-heredoc Return trace: " .. vim.inspect(payload))
+end
+
 local function position_insert_cursor(buf, row, col)
   if active_cursor_row(buf) ~= row or vim.api.nvim_get_mode().mode ~= "i" then
     return
@@ -126,6 +143,7 @@ end
 -- no later buffer text or document-wide scan participates in this decision.
 local function insert_return_local_closers(buf, changed_range)
   local cursor_row = active_cursor_row(buf)
+  trace_return("process_buffer before local recognition", buf, changed_range)
   if not cursor_row or not changed_range
     or changed_range.start_row ~= cursor_row - 1
     or changed_range.end_row < cursor_row
@@ -306,6 +324,7 @@ function M.process_buffer(buf, changed_range, close_incomplete, edits)
     -- A completed opener followed by Return is handled before any
     -- document-wide scan. The inserted closer immediately bounds this body.
     local return_result = insert_return_local_closers(buf, changed_range)
+    trace_return("process_buffer after local recognition: " .. tostring(return_result), buf, changed_range)
     if return_result == true then
       changed = true
     elseif return_result == nil then
@@ -530,6 +549,7 @@ local function attach(buf)
   scan_snapshots[buf] = scanner.scan(get_source(get_lines(buf)), { tabstop = vim.bo[buf].tabstop })
   vim.api.nvim_buf_attach(buf, false, {
     on_lines = function(_, changed_buf, _, firstline, lastline, new_lastline)
+      trace_return("on_lines callback", changed_buf, nil, firstline, lastline, new_lastline)
       schedule_changed_range(changed_buf, firstline, lastline, new_lastline)
     end,
     on_detach = function(_, detached_buf)
