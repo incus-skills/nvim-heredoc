@@ -540,6 +540,65 @@ local function process_text_changed(buf)
   process_pending_ranges(buf, false)
 end
 
+-- Insert-mode Return is the commitment event. Buffer-change notifications are
+-- deferred and may coalesce several Returns with later typing into one range,
+-- so they cannot reliably identify this transition. Intercept Return itself:
+-- for one safe managed opener, create the first body line and closer before
+-- returning to Neovim's input loop. Other lines retain MiniPairs' mapping (when
+-- present) or native Return behaviour.
+local function return_key(buf)
+  local win = vim.api.nvim_get_current_win()
+  if vim.api.nvim_win_get_buf(win) ~= buf or vim.api.nvim_get_mode().mode ~= "i" then
+    return "\\r"
+  end
+
+  local cursor = vim.api.nvim_win_get_cursor(win)
+  local row, col = cursor[1] - 1, cursor[2]
+  local line = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1] or ""
+  if col == #line then
+    local openers = scanner.parse_openers(line, { tabstop = vim.bo[buf].tabstop })
+    if openers and #openers == 1 then
+      local opener = openers[1]
+      if opener.operator == "<<-" and opener.opener_safe then
+        local closer = editing.closer_line(opener)
+        if closer then
+          local body_prefix = opener.body_prefix or ((opener.structural_prefix or "") .. "\\t")
+          -- Insert the bounded scope in one synchronous edit. Native Return
+          -- must not run as well, or it would create a second body line.
+          vim.api.nvim_buf_set_lines(buf, row + 1, row + 1, false, {
+            body_prefix,
+            closer,
+          })
+          vim.api.nvim_win_set_cursor(win, { row + 2, #body_prefix })
+          return ""
+        end
+      end
+    end
+  end
+
+  -- MiniPairs' Insert-mode Return mapping is the common non-native mapping
+  -- used by LazyVim. Resolve it at invocation time because MiniPairs may load
+  -- after this buffer's FileType event.
+  local mini_pairs = rawget(_G, "MiniPairs")
+  if mini_pairs and type(mini_pairs.cr) == "function" then
+    return mini_pairs.cr()
+  end
+  return "\\r"
+end
+
+local function install_return_mapping(buf)
+  vim.keymap.set("i", "<CR>", function()
+    return return_key(buf)
+  end, {
+    buffer = buf,
+    expr = true,
+    noremap = true,
+    replace_keycodes = true,
+    silent = true,
+    desc = "nvim-heredoc: commit managed heredoc on Return",
+  })
+end
+
 local function attach(buf)
   if attached[buf] then
     return
@@ -550,6 +609,7 @@ local function attach(buf)
 
   attached[buf] = true
   vim.b[buf].nvim_heredoc_attached = true
+  install_return_mapping(buf)
   scan_snapshots[buf] = scanner.scan(get_source(get_lines(buf)), { tabstop = vim.bo[buf].tabstop })
   vim.api.nvim_buf_attach(buf, false, {
     on_lines = function(_, changed_buf, _, firstline, lastline, new_lastline)
