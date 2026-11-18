@@ -549,7 +549,7 @@ end
 local function return_key(buf)
   local win = vim.api.nvim_get_current_win()
   if vim.api.nvim_win_get_buf(win) ~= buf or vim.api.nvim_get_mode().mode ~= "i" then
-    vim.api.nvim_feedkeys("\\r", "ni", false)
+    vim.api.nvim_feedkeys("\r", "ni", false)
     return
   end
 
@@ -581,7 +581,7 @@ local function return_key(buf)
   -- used by LazyVim. Resolve it at invocation time because MiniPairs may load
   -- after this buffer's FileType event.
   local mini_pairs = rawget(_G, "MiniPairs")
-  local keys = "\\r"
+  local keys = "\r"
   if mini_pairs and type(mini_pairs.cr) == "function" then
     keys = mini_pairs.cr() or keys
   end
