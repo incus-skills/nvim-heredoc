@@ -328,6 +328,24 @@ local function scan_command(chunk, first_line)
   return queue, diagnostics
 end
 
+local function structural_tab_prefix(prefix, tabstop)
+  local column = 0
+  for index = 1, #prefix do
+    local byte = prefix:sub(index, index)
+    if byte == "\t" then
+      column = column + tabstop - (column % tabstop)
+    elseif byte == " " then
+      column = column + 1
+    else
+      return nil, column
+    end
+  end
+
+  if not prefix:find(" ", 1, true) then return prefix, column end
+  if column % tabstop ~= 0 then return nil, column end
+  return string.rep("\t", column / tabstop), column
+end
+
 -- Parse only the completed command text supplied by the Return integration.
 -- This deliberately does not search the surrounding buffer for a terminator:
 -- the caller establishes the body boundary by inserting the closer locally.
@@ -369,24 +387,6 @@ function M.parse_openers(source, opts)
     }
   end
   return openers
-end
-
-local function structural_tab_prefix(prefix, tabstop)
-  local column = 0
-  for index = 1, #prefix do
-    local byte = prefix:sub(index, index)
-    if byte == "\t" then
-      column = column + tabstop - (column % tabstop)
-    elseif byte == " " then
-      column = column + 1
-    else
-      return nil, column
-    end
-  end
-
-  if not prefix:find(" ", 1, true) then return prefix, column end
-  if column % tabstop ~= 0 then return nil, column end
-  return string.rep("\t", column / tabstop), column
 end
 
 function M.scan(source, opts)
