@@ -79,6 +79,18 @@ The existing same-delimiter scanner regression remains a separate collision case
 
 The existing CI gap is recorded for future reference only. Adding a Tree-sitter parser environment or parser-tree diagnostic is not the next action for this task and is not required to validate the current scanner, shell-delivery, or formatter regressions.
 
+## Current regression evidence (2026-11-19)
+
+Hosted workflow run [44640744894](https://github.com/incus-skills/nvim-heredoc/actions/runs/44640744894) completed with all five jobs successful:
+
+- `core scanner` — passed.
+- `Neovim buffer integration` — passed.
+- `shell delivery` — passed.
+- `shfmt payload preservation` — passed.
+- `LazyVim plugin coexistence` — passed.
+
+This confirms the current CI regression layers for scanner recognition, editing behaviour, shell-delivered payload bytes, formatter preservation, and plugin coexistence. It does not establish Tree-sitter syntax-presentation containment: the workflow does not install or test the pinned nvim-treesitter/Bash parser tree or query captures. That distinction is intentional; parser-tree and injection work is deferred as described above.
+
 ## Regression fixture already added
 
 The distinct-delimiter fixture and its scanner, shell-delivery, and formatter checks have already been added. Their current purpose is to establish all of the following:
