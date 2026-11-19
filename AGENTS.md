@@ -13,6 +13,32 @@ Before making changes:
 5. Record what is established, what is observed in the current state, what remains unresolved, and what is interpretation or proposal.
 6. Identify the next concrete action and any assumptions that must not be carried forward without verification.
 
+### Distinguish concurrent working lines
+
+A repository may contain more than one relevant line of work: for example, a technical baseline on `main` and collaboration, design, or ingress changes on a separate branch. Do not assume that the branch most relevant to the immediate technical task is the only branch relevant to reconstructing the session's working context.
+
+When prior context, a handoff, or the requested work identifies another branch, PR, or commit as carrying relevant work:
+
+- inspect that ref explicitly and verify its current head;
+- read the relevant files from that ref, rather than assuming they are present on the checked-out branch;
+- distinguish the technical baseline from the separate workstream and state how they relate;
+- do not imply that a file or policy was inspected unless it was actually read at the identified ref;
+- do not merge the workstreams conceptually or operationally unless the repository records establish that relationship.
+
+This is a targeted discovery obligation, not a requirement to enumerate every repository branch or load unrelated work. If no separate relevant ref is indicated or discovered, say so only when the distinction materially affects the reconstruction.
+
+### Demonstrate reconstruction, not just document discovery
+
+Reading an ingress or collaboration document is not by itself evidence that its distinctions have informed the reasoning. Where the task or handoff makes the collaboration model relevant, demonstrate its use in the reconstruction:
+
+- distinguish repository-grounded observations and adopted decisions from interpretations, hypotheses, alternatives, and proposals;
+- explain which constraints govern the current task and which do not restrict wider interpretation;
+- identify at least one consequential uncertainty, tension, or plausible alternative where the evidence warrants it;
+- show how an imported model or term informs interpretation without treating its associations as equivalences, prescriptions, or independent authority;
+- remain willing to challenge an inherited interpretation, including one recorded in the repository, while respecting the authority and scope of adopted decisions.
+
+Do not manufacture alternatives or uncertainty to satisfy these points. A concise, evidence-grounded explanation is preferable to a checklist or a recital of terminology. The aim is to make the reasoning inspectable, not to enforce a fixed sequence of activities.
+
 Do not treat a prior chat summary, previous assistant statement, or remembered plan as a substitute for checking current repository evidence. Conversation context may help identify where to look, but repository state and governing documents determine the current project position.
 
 ## Collaboration
