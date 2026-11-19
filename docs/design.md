@@ -161,6 +161,8 @@ Verify exact bytes, local scope boundaries, and cursor placement for:
 - A single indented `<<-` heredoc.
 - Return after an opener inside an indented function/conditional, with the new closer inserted before the existing structural closer.
 - Body lines resembling other heredoc openers, proving that they remain payload inside the established scope.
+- Heredoc cargo (an embedded script containing its own heredoc) should use an inner delimiter that does not collide with any enclosing delimiter under the enclosing heredoc's matching rules. This keeps the fixture's intended inner terminator from also terminating the outer shell heredoc. For `<<-`, leading TAB bytes are stripped for matching; a hard-left matching delimiter also terminates it.
+- Keep a separate same-delimiter collision fixture when testing shell-delivery/editor-region differences. Do not use that case as the ordinary lexical-containment fixture or interpret an outer parse ending at the first matching line as a parser defect without accounting for Bash delimiter semantics.
 - Delimiter-looking lines with valid and invalid TAB/space indentation, proving that shell delimiter rules remain authoritative.
 - Multiple heredocs on one command.
 - Quoted and escaped delimiters.
