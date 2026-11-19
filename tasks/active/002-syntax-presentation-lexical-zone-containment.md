@@ -17,11 +17,13 @@ The adopted policy is recorded in [the design contract](../../docs/design.md) an
 
 **Defer how the payload is represented, not whether its lexical boundary is respected.**
 
-## Objective
+## Current investigation outcome and boundary
 
-Determine whether the reported inner-heredoc highlighting behaviour persists when the inner heredoc uses a delimiter distinct from the enclosing heredoc. The same-delimiter case is a separate collision condition: under Bash `<<-` matching rules, a hard-left line matching the outer delimiter terminates the outer shell heredoc too. Do not treat that case alone as evidence of a parser defect. Establish the parser's behaviour on a non-colliding cargo fixture, while preserving the distinction between editor-established range, shell-delivered body, and containing-shell syntax representation.
+The non-colliding cargo fixture uses distinct outer (`EOF`) and inner (`FOE`) delimiters. It is the valid fixture for exercising the plugin's lexical-zone and shell-delivery behaviour. The same-delimiter case remains a separate shell-delivery collision: under Bash `<<-` matching rules, a hard-left line matching the outer delimiter terminates the outer shell heredoc too. Do not treat that collision alone as evidence of a parser defect.
 
-The first implementation target is the reproduced Bash case. Do not claim equivalent behaviour for POSIX sh or Zsh until their parsers and fixtures are independently assessed.
+The current work establishes the distinction between the plugin's scanner-derived region, the bytes delivered by the shell, and syntax presentation. The existing test suite covers scanner recognition, editor behaviour, shell delivery, formatter preservation, and plugin coexistence. It does not claim to establish Tree-sitter parse-tree containment.
+
+**Tree-sitter parse-tree boundary diagnosis and syntax-presentation implementation are explicitly deferred to future development.** They are not the next step or an acceptance prerequisite for the current investigation. No parser tree, capture, injection, grammar, or highlighting strategy should be changed as part of closing the present fixture/test clarification.
 
 ## Initial source inspection
 
@@ -34,20 +36,13 @@ The pinned nvim-treesitter revision recorded in the project compatibility invent
 
 This establishes that the standard Bash injection query consumes the Bash parser's own heredoc boundary; it does not consume the nvim-heredoc plugin's scanner-derived body range. It also establishes that the heredoc terminator capture is a standard Bash highlight. It does **not** yet establish why the target buffer's inner `EOF` is being captured or whether the outer parse is actually truncated: that requires the exact minimal buffer and its parse tree from the target Neovim installation. Do not change the upstream grammar, query, or plugin integration based on this source inspection alone.
 
-## Required investigation
+## Future development direction (not current task work)
 
-1. Reproduce the behaviour with two deliberately distinct fixtures. (a) A non-colliding cargo fixture: use different outer and inner delimiter values (for example outer `EOF`, inner `FOE`) and record exact bytes, including TAB indentation. This is the primary fixture for testing lexical containment/highlighting of embedded heredoc cargo. (b) A same-delimiter collision fixture matching the reported `<<-'EOF'` / inner `<<'EOF'` case. Record that the first hard-left `EOF` matches and terminates the outer Bash heredoc under `<<-` semantics. Distinguish editor-established range, shell-delivered body, parser nodes, and query captures; do not infer a parser defect from the collision case alone.
-2. Inspect the exact installed Neovim, nvim-treesitter, and Bash parser revisions used by the target environment. Identify which parser nodes/captures cover the outer opener, body, inner opener, inner `EOF`, outer terminator, and following shell code.
-3. Establish whether the current parser's behaviour is caused by the Bash grammar/external scanner, highlight query captures, or both. Do not infer parse structure from `:Inspect` captures alone.
-4. Inspect supported Neovim Tree-sitter APIs for representing scanner-derived included regions or contained-language regions. Verify actual APIs at the pinned target revision; do not rely on undocumented or guessed methods.
-5. Evaluate candidate mechanisms against the adopted policy:
-   - scanner-derived region/included-range handling;
-   - a contained-language injection whose range is derived from the authoritative body boundary;
-   - a parser/grammar change where the current Bash parser cannot represent the required boundary;
-   - an opaque presentation fallback when no safe contained-language representation is available.
-6. Determine whether a mechanism can stop the containing Bash parse from claiming the payload, rather than merely overlaying another highlight on top of an already incorrect outer parse.
-7. Identify ownership and lifecycle: who updates the presentation range after edits, how incomplete buffers behave, and how parser refreshes avoid stale or overlapping regions.
-8. Keep language classification separate. A successful structural boundary must work even when the payload language is unknown. Shebang and receiving-command signals remain possible future classification evidence, not prerequisites for boundary correctness.
+When this area is deliberately reopened, investigate syntax presentation as part of a broader embedded-language capability rather than limiting the design to Bash heredoc body highlighting. Tree-sitter injections are one possible mechanism for presenting embedded content such as Python, Rust, markup, and other payload languages. The investigation may need to establish parser-tree boundaries, injection content ranges, language selection, unknown-language fallback, and lifecycle behaviour.
+
+That future work must consume the plugin's authoritative scanner-established region; it must not make Tree-sitter the source of truth for heredoc structure or introduce a Tree-sitter dependency into closer insertion or payload editing. Injection should not be assumed to solve the containing-parser boundary, language services, diagnostics, completion, linting, or formatting without separate evidence.
+
+The exact parser revisions, parse-tree node ranges, query captures, supported APIs, injection strategy, and language-classification model are intentionally left for that future investigation. No such diagnosis is requested or implied by this task's current status.
 
 ## Implementation constraints
 
@@ -82,11 +77,11 @@ The non-colliding cargo fixture is added at `tests/fixtures/heredoc-cargo-distin
 
 The existing same-delimiter scanner regression remains a separate collision case. The existing live Neovim payload tests remain editing-behaviour tests; they do not inspect Tree-sitter highlighting.
 
-The next syntax-presentation test must therefore be a distinct parser diagnostic: load the exact pinned Bash parser in the target Neovim/Tree-sitter environment, record the syntax-tree node ranges and query captures for the non-colliding fixture, and verify the outer terminator and following shell syntax. Do not claim that the current CI suite has performed this check.
+The existing CI gap is recorded for future reference only. Adding a Tree-sitter parser environment or parser-tree diagnostic is not the next action for this task and is not required to validate the current scanner, shell-delivery, or formatter regressions.
 
-## Required regression fixture
+## Regression fixture already added
 
-Create a minimal fixture and tests that establish all of the following:
+The distinct-delimiter fixture and its scanner, shell-delivery, and formatter checks have already been added. Their current purpose is to establish all of the following:
 
 1. The outer opener and its actual terminator define one complete payload region.
 2. In the non-colliding fixture, the inner heredoc opener and its distinct terminator remain inside the outer payload region and are not represented as active constructs/terminators of the containing Bash document.
@@ -98,17 +93,14 @@ Create a minimal fixture and tests that establish all of the following:
 8. Existing live heredoc payload Return tests continue to pass unchanged.
 9. The solution leaves ordinary shell regions outside the payload with their existing parser/highlighting behaviour.
 
-## Acceptance criteria
+## Current-task acceptance / handoff boundary
 
-- The exact current Tree-sitter Bash mismatch is reproduced and explained from parser structure and query behaviour.
-- The chosen mechanism is supported by verified APIs at the pinned target revision.
-- The containing Bash parse no longer treats inner payload heredoc syntax as active shell syntax.
-- The outer body boundary comes from the plugin's established lexical region, not a second delimiter-matching implementation.
-- Unknown payloads are opaque.
-- Shell parsing resumes correctly after the outer terminator.
-- Region updates are safe across edits and incomplete buffers.
-- Existing editing, scanner, shell-delivery, formatter, and plugin-coexistence regressions remain green.
-- Hosted CI evidence and live workstation verification are reported separately.
+- Preserve the distinct-delimiter fixture as the primary non-colliding cargo fixture.
+- Keep the same-delimiter shell collision separate and explain it using Bash `<<-` matching semantics.
+- Keep scanner-derived region assertions distinct from shell-delivery assertions and from syntax-presentation claims.
+- Report the actual results of scanner, editing, shell-delivery, formatter, and plugin-coexistence tests without claiming they prove Tree-sitter containment.
+- Report hosted CI evidence and live workstation verification separately.
+- Do not add parser-tree diagnosis, injection implementation, or syntax-presentation changes to this task.
 
 ## Handoff
 
@@ -125,4 +117,4 @@ Report:
 9. Whether the current inner-`EOF` mismatch is fully resolved or only masked.
 10. Recommended next task for other embedded-language integrations.
 
-Keep this task in `active/` until implementation, regression tests, and handoff are complete.
+Keep this record as deferred future-development context. Reopen it only when a broader embedded-language presentation investigation is explicitly authorised; do not continue parser-tree diagnosis as an implied next step.
