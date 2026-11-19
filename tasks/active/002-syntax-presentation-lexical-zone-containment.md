@@ -60,12 +60,11 @@ Create a minimal fixture and tests that establish all of the following:
 2. An inner heredoc opener and inner `EOF` line remain inside that region and are not represented as active constructs/terminators of the containing Bash document.
 3. The outer terminator remains the only boundary that closes the containing heredoc.
 4. Shell syntax immediately following the outer terminator is parsed/highlighted as shell syntax.
-5. The result does not depend on the inner and outer delimiter having different names; include a collision case where the inner delimiter spelling equals the outer delimiter spelling if that is a supported/meaningful fixture under the adopted lexical-zone contract.
-6. An unknown payload remains opaque; no fallback to Bash parsing is silently applied.
-7. Edits before, within, and after the body update the represented range without stale offsets or leakage.
-8. Incomplete opener/body/terminator states fail conservatively and do not let the parser claim uncertain payload as active shell syntax.
-9. Existing live heredoc payload Return tests continue to pass unchanged.
-10. The solution leaves ordinary shell regions outside the payload with their existing parser/highlighting behaviour.
+5. An unknown payload remains opaque; no fallback to Bash parsing is silently applied.
+6. Edits before, within, and after the body update the represented range without stale offsets or leakage.
+7. Incomplete opener/body/terminator states fail conservatively and do not let the parser claim uncertain payload as active shell syntax.
+8. Existing live heredoc payload Return tests continue to pass unchanged.
+9. The solution leaves ordinary shell regions outside the payload with their existing parser/highlighting behaviour.
 
 ## Acceptance criteria
 
