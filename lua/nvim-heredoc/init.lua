@@ -544,7 +544,7 @@ local function return_key(buf)
       if opener.operator == "<<-" and opener.opener_safe then
         local closer = editing.closer_line(opener)
         if closer then
-          local body_prefix = opener.body_prefix or ((opener.structural_prefix or "") .. "\\t")
+          local body_prefix = opener.body_prefix or ((opener.structural_prefix or "") .. "\t")
           -- Insert the bounded scope in one synchronous edit. Native Return
           -- must not run as well, or it would create a second body line.
           vim.api.nvim_buf_set_lines(buf, row + 1, row + 1, false, {
