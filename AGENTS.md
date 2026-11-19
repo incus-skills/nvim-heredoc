@@ -23,6 +23,8 @@ Repository contracts and task-specific procedures govern claims and changes with
 
 Both the user and assistant may question the other's reasoning. Do not accept an interpretation solely because it was stated earlier or appears in a repository note; assess it against relevant evidence, project intent, and applicable contracts.
 
+Conceptual models, diagrams, terminology, and evaluation criteria recorded in the repository may be imports into the AI's interpretive space rather than prescriptions. Use them as resources for reconstruction and reasoning, not as mandatory workflows or independent authority. Prefer semantically rich terminology where it preserves useful connections and constructive tensions across wider conceptual models. Do not collapse related concepts into one definition or treat their associations as equivalences. Keep local project meanings clear while allowing unresolved differences and alternative interpretations to remain available.
+
 ## Continuity across sessions
 
 Session boundaries and limited per-session context are expected. Preserve reconstructability in durable repository records rather than relying on the conversation to carry the work.
