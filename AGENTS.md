@@ -4,7 +4,7 @@
 
 A new session must reconstruct the current working position from repository evidence rather than assume that prior conversation context is available.
 
-Before making changes:
+At ingress, before substantive work or repository changes:
 
 1. Read this file and [the collaboration model](docs/collaboration-model.md).
 2. Read the relevant technical contract and current project documentation for the area being touched.
