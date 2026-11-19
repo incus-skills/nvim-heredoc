@@ -121,88 +121,55 @@ local function ensure_body_prefix(buf, region, body_row)
   end
 end
 
--- A Return edit can make an earlier completed heredoc appear to be the
--- terminator for a newly opened managed heredoc. Reserve the new command's
--- managed closers at the first body row before boundary recovery sees that
--- misleading complete scan.
-local function insert_return_local_closers(buf, current, changed_range)
+-- Return is the commitment point for a new managed heredoc. Recognise
+-- only the completed opener line and establish its body boundary locally;
+-- no later buffer text or document-wide scan participates in this decision.
+local function insert_return_local_closers(buf, changed_range)
   local cursor_row = active_cursor_row(buf)
-  -- The observed Return edit replaces the opener's line boundary with
-  -- exactly the first body row. Broader edits that happen to cover the cursor
-  -- row are not a Return transition.
   if not cursor_row or not changed_range
     or changed_range.start_row ~= cursor_row - 1
-    or changed_range.end_row ~= cursor_row + 1 then
-    return false
+    or changed_range.end_row < cursor_row
+    or changed_range.end_row > cursor_row + 1 then
+    return nil
   end
 
   local lines = get_lines(buf)
+  local opener_line = lines[cursor_row]
   local body_line = lines[cursor_row + 1]
-  if not body_line or not body_line:match("^[ \t]*$") then
-    return false
+  if not opener_line or not body_line or not body_line:match("^[ \t]*$") then
+    return nil
   end
 
-  local first
-  for _, region in ipairs(current.regions) do
-    if region.body_start_line - 1 == cursor_row and region.terminator_line
-      and region.opener_safe then
-      first = region
-      break
-    end
-  end
-  if not first then
-    return false
-  end
-
-  -- Mixed managed/unmanaged queues need distinct body positions and remain
-  -- on the existing conservative path.
-  local queued = {}
-  for _, heredoc in ipairs(current.heredocs) do
-    if heredoc.opener_line == first.opener_line then
-      if heredoc.operator ~= "<<-" or not heredoc.terminator_line or not heredoc.opener_safe then
-        return false
-      end
-      queued[#queued + 1] = heredoc
-    end
-  end
-  table.sort(queued, function(a, b)
-    return a.queue_position < b.queue_position
-  end)
-  if #queued == 0 then
-    return false
-  end
-
-  local closers = {}
-  for index, heredoc in ipairs(queued) do
-    local closer = editing.closer_line(heredoc)
-    if not closer then
+  local openers = scanner.parse_openers(opener_line, { tabstop = vim.bo[buf].tabstop })
+  if not openers then
+    -- Do not let the document-wide recovery path reinterpret an unsupported
+    -- managed-looking opener after this Return transition.
+    if opener_line:find("<<%-") then
       return false
     end
-    closers[index] = closer
+    return nil
   end
-
-  -- An earlier pass may already have reserved the leading queued closer
-  -- before Return. Keep that prefix and add only the remaining obligations.
-  local already_reserved = 0
-  for index, closer in ipairs(closers) do
-    if lines[cursor_row + 2 + index - 1] == closer then
-      already_reserved = index
-    else
-      break
-    end
+  -- Multiple queued heredocs require multiple body/terminator boundaries.
+  -- Keep that case conservative rather than guessing their placement here.
+  if not openers or #openers == 0 then
+    return nil
   end
-  if already_reserved == #closers then
+  if #openers ~= 1 then
+    return false
+  end
+  local opener = openers[1]
+  if opener.operator ~= "<<-" or not opener.opener_safe then
     return false
   end
 
-  local missing = {}
-  for index = already_reserved + 1, #closers do
-    missing[#missing + 1] = closers[index]
+  local expected_closer = editing.closer_line(opener)
+  if not expected_closer or lines[cursor_row + 2] == expected_closer then
+    return false
   end
-  -- One buffer edit reserves all remaining obligations in declaration order.
-  local insert_row = cursor_row + 1 + already_reserved
-  vim.api.nvim_buf_set_lines(buf, insert_row, insert_row, false, missing)
-  ensure_body_prefix(buf, first, cursor_row)
+  if not insert_closer(buf, opener, cursor_row + 1) then
+    return false
+  end
+  ensure_body_prefix(buf, opener, cursor_row)
   return true
 end
 
@@ -336,72 +303,75 @@ function M.process_buffer(buf, changed_range, close_incomplete, edits)
   local changed = false
   local previous_scan = scan_snapshots[buf]
   local success, err = pcall(function()
-    -- Each pass can close one pending heredoc. Re-scan so multiple queued
-    -- heredocs are resolved in declaration order rather than guessed.
-    for _ = 1, 32 do
-      local lines = get_lines(buf)
-      local result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
-      if result.complete and insert_return_local_closers(buf, result, changed_range) then
-        changed = true
-        lines = get_lines(buf)
-        result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
-      end
-      if reconcile_managed_transition(buf, previous_scan, result, edits) then
-        changed = true
-        lines = get_lines(buf)
-        result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
-      end
-      if not result.complete then
-        local pending
-        for _, region in ipairs(result.regions) do
-          if not region.terminator_line and region.opener_safe then
-            pending = region
-            break
-          end
+    -- A completed opener followed by Return is handled before any
+    -- document-wide scan. The inserted closer immediately bounds this body.
+    local return_result = insert_return_local_closers(buf, changed_range)
+    if return_result == true then
+      changed = true
+    elseif return_result == nil then
+      -- Existing-buffer recovery and managed-operator compatibility remain
+      -- separate from establishing a new Return-local scope. A recognised
+      -- but unsupported Return candidate is left untouched.
+      for _ = 1, 32 do
+        local lines = get_lines(buf)
+        local result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
+        if reconcile_managed_transition(buf, previous_scan, result, edits) then
+          changed = true
+          lines = get_lines(buf)
+          result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
         end
-        if not pending then
-          break
-        end
-
-        local body_row = pending.body_start_line - 1
-        local cursor_row = active_cursor_row(buf)
-        local changed_body_line = not changed_range
-          or (changed_range.start_row <= body_row and changed_range.end_row > body_row)
-        local inserted = false
-
-        -- Enter after the opener creates the first body line. Insert directly
-        -- below it so the closer is reserved before following source.
-        if cursor_row == body_row and changed_body_line then
-          inserted = insert_closer(buf, pending, body_row + 1)
-          if inserted then
-            -- Complete the Enter transition synchronously: Neovim may have
-            -- auto-indented the new line already, but can leave the cursor
-            -- before that TAB. Ensure both the prefix and insertion point
-            -- are correct before the user types the first payload byte.
-            ensure_body_prefix(buf, pending, body_row)
-          end
-        elseif close_incomplete then
-          -- Retain the fallback for buffers opened with an incomplete region.
-          inserted = insert_closer(buf, pending, vim.api.nvim_buf_line_count(buf))
-        end
-
-        if not inserted then
-          break
-        end
-        changed = true
-      else
-        local pass_changed = false
-        for _, region in ipairs(result.regions) do
-          if region.editable and (region.body_prefix or ((region.structural_prefix or "") .. "\t")) ~= "" then
-            if prefix_region_range(buf, region, changed_range) then
-              pass_changed = true
+        if not result.complete then
+          local pending
+          for _, region in ipairs(result.regions) do
+            if not region.terminator_line and region.opener_safe then
+              pending = region
+              break
             end
           end
+          if not pending then
+            break
+          end
+  
+          local body_row = pending.body_start_line - 1
+          local cursor_row = active_cursor_row(buf)
+          local changed_body_line = not changed_range
+            or (changed_range.start_row <= body_row and changed_range.end_row > body_row)
+          local inserted = false
+  
+          -- Enter after the opener creates the first body line. Insert directly
+          -- below it so the closer is reserved before following source.
+          if cursor_row == body_row and changed_body_line then
+            inserted = insert_closer(buf, pending, body_row + 1)
+            if inserted then
+              -- Complete the Enter transition synchronously: Neovim may have
+              -- auto-indented the new line already, but can leave the cursor
+              -- before that TAB. Ensure both the prefix and insertion point
+              -- are correct before the user types the first payload byte.
+              ensure_body_prefix(buf, pending, body_row)
+            end
+          elseif close_incomplete then
+            -- Retain the fallback for buffers opened with an incomplete region.
+            inserted = insert_closer(buf, pending, vim.api.nvim_buf_line_count(buf))
+          end
+  
+          if not inserted then
+            break
+          end
+          changed = true
+        else
+          local pass_changed = false
+          for _, region in ipairs(result.regions) do
+            if region.editable and (region.body_prefix or ((region.structural_prefix or "") .. "\t")) ~= "" then
+              if prefix_region_range(buf, region, changed_range) then
+                pass_changed = true
+              end
+            end
+          end
+          changed = changed or pass_changed
+          break
         end
-        changed = changed or pass_changed
-        break
+        end
       end
-    end
   end)
 
   processing[buf] = nil
@@ -544,7 +514,85 @@ local function schedule_changed_range(buf, firstline, lastline, new_lastline)
 end
 
 local function process_text_changed(buf)
-  process_pending_ranges(buf, true)
+  -- TextChanged is not a commitment event for an incomplete opener. Only
+  -- Return may create a new heredoc scope; generic text changes must not
+  -- append a closer before the user has completed the opener and pressed CR.
+  process_pending_ranges(buf, false)
+end
+
+-- Insert-mode Return is the commitment event. Buffer-change notifications are
+-- deferred and may coalesce several Returns with later typing into one range,
+-- so they cannot reliably identify this transition. Intercept Return itself:
+-- for one safe managed opener, create the first body line and closer before
+-- returning to Neovim's input loop. Other lines retain MiniPairs' mapping (when
+-- present) or native Return behaviour.
+local function return_key(buf)
+  local win = vim.api.nvim_get_current_win()
+  if vim.api.nvim_win_get_buf(win) ~= buf
+    or vim.api.nvim_get_mode().mode:sub(1, 1) ~= "i" then
+    vim.api.nvim_feedkeys("\r", "ni", false)
+    return
+  end
+
+  local cursor = vim.api.nvim_win_get_cursor(win)
+  local row, col = cursor[1] - 1, cursor[2]
+  local line = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1] or ""
+  if col == #line then
+    local openers = scanner.parse_openers(line, { tabstop = vim.bo[buf].tabstop })
+    if openers and #openers == 1 then
+      local opener = openers[1]
+      if opener.operator == "<<-" and opener.opener_safe then
+        local closer = editing.closer_line(opener)
+        if closer then
+          local body_prefix = opener.body_prefix or ((opener.structural_prefix or "") .. "\t")
+          -- Insert the bounded scope in one synchronous edit. Native Return
+          -- must not run as well, or it would create a second body line.
+          vim.api.nvim_buf_set_lines(buf, row + 1, row + 1, false, {
+            body_prefix,
+            closer,
+          })
+          vim.api.nvim_win_set_cursor(win, { row + 2, #body_prefix })
+          return
+        end
+      end
+    end
+  end
+
+  -- Preserve Blink's default <CR> completion acceptance while its menu
+  -- is visible. Its accept() result indicates whether it consumed the key;
+  -- otherwise continue with the normal Insert-mode Return behaviour.
+  local blink = package.loaded["blink.cmp"]
+  if blink and type(blink.is_menu_visible) == "function"
+    and blink.is_menu_visible() and type(blink.accept) == "function"
+    and blink.accept() then
+    return
+  end
+
+  -- MiniPairs' Insert-mode Return mapping is the common non-native mapping
+  -- used by LazyVim. Resolve it at invocation time because MiniPairs may load
+  -- after this buffer's FileType event.
+  local mini_pairs = rawget(_G, "MiniPairs")
+  local keys = "\r"
+  if mini_pairs and type(mini_pairs.cr) == "function" then
+    keys = mini_pairs.cr() or keys
+  end
+  -- This is a non-expression mapping so buffer edits above are permitted.
+  -- Put the delegated Return sequence before the remaining typeahead: rapid
+  -- nvim_input() bursts must observe the same key order as ordinary typing.
+  keys = vim.api.nvim_replace_termcodes(keys, true, false, true)
+  vim.api.nvim_feedkeys(keys, "ni", false)
+end
+
+local function install_return_mapping(buf)
+  vim.keymap.set("i", "<CR>", function()
+    return_key(buf)
+  end, {
+    buffer = buf,
+    expr = false,
+    noremap = true,
+    silent = true,
+    desc = "nvim-heredoc: commit managed heredoc on Return",
+  })
 end
 
 local function attach(buf)
@@ -557,6 +605,7 @@ local function attach(buf)
 
   attached[buf] = true
   vim.b[buf].nvim_heredoc_attached = true
+  install_return_mapping(buf)
   scan_snapshots[buf] = scanner.scan(get_source(get_lines(buf)), { tabstop = vim.bo[buf].tabstop })
   vim.api.nvim_buf_attach(buf, false, {
     on_lines = function(_, changed_buf, _, firstline, lastline, new_lastline)

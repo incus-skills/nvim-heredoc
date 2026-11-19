@@ -42,7 +42,10 @@ assert(vim.b.minipairs_disable ~= true, "mini.pairs must not be disabled in the 
 -- This keeps the installed plugin's default completion path under test.
 require("blink.cmp").setup({
   sources = { default = { "buffer" } },
-  completion = { menu = { auto_show = false } },
+  completion = {
+    menu = { auto_show = false },
+    list = { selection = { preselect = false, auto_insert = false } },
+  },
 })
 local blink_config = require("blink.cmp.config")
 assert(vim.wait(10000, function()

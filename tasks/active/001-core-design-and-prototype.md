@@ -87,6 +87,15 @@ The notes below preserve evidence and decisions from earlier implementation cycl
 
 ## Implementation progress
 
+### Return-local refactor in progress
+
+- Added `scanner.parse_openers()` to recognise the completed command text without scanning the surrounding buffer or searching for a later terminator.
+- The interactive path now intercepts the actual Insert-mode <CR> key through a buffer-local non-expression mapping. For a single safe managed <<- opener at end-of-line, it derives the closer from the actual delimiter and synchronously inserts the first body line plus closer in one edit, then positions the cursor after the body prefix. This is the commitment event; deferred on_lines ranges are no longer used to infer that a Return occurred. The closer bounds the body independently of unrelated later heredocs using the same delimiter.
+- For other Return keys, the mapping delegates to Blink completion acceptance when its menu is visible, then MiniPairs' Return callback when available, otherwise native Return. Expression mappings were rejected because Neovim's textlock prevents their callbacks from editing the buffer.
+- Multiple heredoc redirections on one command remain conservative in this Return-local path; the parser returns their records, but the editor does not guess the distinct body/terminator placement.
+- Added core tests for local opener recognition, delimiter derivation, literal TAB prefixes, unsupported indentation, ordinary `<<`, and here-string rejection. The existing live function-boundary test already places a later independent `<<` heredoc with the same `EOF` delimiter after the new opener and asserts that the new closer is inserted before the existing function brace and original source.
+- Full five-job hosted workflow [#44359228055](https://github.com/incus-skills/nvim-heredoc/actions/runs/44359228055) passed on implementation head `dc410bd`, including Neovim buffer integration, core scanner, shell delivery, formatter payload preservation, and pinned LazyVim/MiniPairs/Blink integration. The current head only adds this validation note; its documentation-only workflow is pending. Workstation verification remains pending. The compatibility scan/snapshot path remains for existing-buffer recovery and managed operator transitions; it is not used to commit a new Return-local scope.
+
 ### Present
 
 - The scanner now exposes `heredocs` for all lexically recognised heredoc operators while retaining `regions` as the managed `<<-` subset. Buffer snapshots use this distinction to recognise an operator change on an already managed heredoc: `<<-` to `<<` removes the plugin’s body prefix and opener-aligned TABs from the terminator; `<<` to `<<-` reapplies them. The transition is matched by opener line, queue position, and delimiter identity. A headless regression exercises both directions, including a blank body line and nested space indentation.

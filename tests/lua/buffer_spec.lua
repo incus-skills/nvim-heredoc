@@ -43,6 +43,71 @@ do
 end
 
 do
+  local buf = set_buffer({
+    "  cat <<-'EOF'",
+    "  ",
+    "later_function() {",
+    "  cat <<'EOF'",
+    "payload",
+    "EOF",
+    "}",
+  })
+  vim.bo[buf].tabstop = 2
+  vim.api.nvim_set_current_buf(buf)
+  vim.api.nvim_win_set_cursor(0, { 2, 0 })
+  assert(plugin.process_buffer(buf, { start_row = 0, end_row = 1 }, false),
+    "Return-local recognition should insert a closer without consulting a later same-delimiter heredoc")
+  local actual = lines(buf)
+  assert(actual[1] == "  cat <<-'EOF'")
+  assert(actual[2] == "\t\t", "the first body line should receive its structural TAB prefix")
+  assert(actual[3] == "\tEOF", "the new closer should be inserted before the later function")
+  assert(actual[4] == "later_function() {"
+    and actual[5] == "  cat <<'EOF'"
+    and actual[6] == "payload"
+    and actual[7] == "EOF"
+    and actual[8] == "}",
+    "the later same-delimiter heredoc and its enclosing structure must remain unchanged")
+  assert(not plugin.process_buffer(buf, { start_row = 0, end_row = 1 }, false),
+    "reprocessing the same Return range must not duplicate the closer")
+  assert(#lines(buf) == 8, "the local closer must remain unique")
+end
+
+do
+  -- A first body line containing literal TABs is whitespace-only too.
+  -- Return-local recovery must recognise it just as it recognises spaces.
+  local buf = set_buffer({
+    "  cat <<-'TAB_BODY'",
+    "\t\t",
+    "later_function() {",
+    "}",
+  })
+  vim.bo[buf].tabstop = 2
+  vim.api.nvim_set_current_buf(buf)
+  vim.api.nvim_win_set_cursor(0, { 2, 0 })
+  assert(plugin.process_buffer(buf, { start_row = 0, end_row = 1 }, false),
+    "Return-local recognition should accept a TAB-indented first body line")
+  local actual = lines(buf)
+  assert(actual[1] == "  cat <<-'TAB_BODY'")
+  assert(actual[2] == "\t\t", "the existing TAB-only body prefix should be preserved")
+  assert(actual[3] == "\tTAB_BODY", "the closer should be inserted after the TAB-only body line")
+  assert(actual[4] == "later_function() {"
+    and actual[5] == "}", "following structure should remain unchanged")
+end
+
+do
+  local original = { "cat <<-A <<-B", "", "}" }
+  local buf = set_buffer(original)
+  vim.api.nvim_set_current_buf(buf)
+  vim.api.nvim_win_set_cursor(0, { 2, 0 })
+  assert(not plugin.process_buffer(buf, { start_row = 0, end_row = 2 }, false),
+    "multiple queued openers must not fall through to document-wide Return recovery")
+  local actual = lines(buf)
+  assert(#actual == #original and actual[1] == original[1]
+    and actual[2] == original[2] and actual[3] == original[3],
+    "unsupported multiple-queue Return placement must leave the buffer unchanged")
+end
+
+do
   local buf = set_buffer({ "\tcat <<-EOF", "\t  already", "  pasted", "" })
   assert(plugin.process_buffer(buf))
   local actual = lines(buf)

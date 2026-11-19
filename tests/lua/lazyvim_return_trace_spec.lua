@@ -97,7 +97,7 @@ local function run()
 
   local cr_mapping = vim.fn.maparg("<CR>", "i", false, true)
   add("scenario", (column_zero and "column-zero opener; " or "")
-    .. (native_cr and "native Return; MiniPairs bypassed; " or "")
+    .. (native_cr and "native Return; MiniPairs bypassed; " or "Return wrapper delegates MiniPairs; ")
     .. (sync_feedkeys and "synchronous feedkeys; " or "queued nvim_input; ")
     .. (provisioned_expandtab and "provisioning expandtab=false" or "expandtab=true")
     .. (control and "; indentexpr disabled" or "; shell indentexpr enabled"))
@@ -117,11 +117,14 @@ local function run()
     assert(cr_mapping.buffer == 1 and cr_mapping.noremap == 1,
       "native <CR> buffer-local nonrecursive mapping is not active: "
         .. vim.inspect(cr_mapping))
-    assert(cr_mapping.rhs ~= "v:lua.MiniPairs.cr()",
-      "MiniPairs <CR> mapping is still active: " .. vim.inspect(cr_mapping))
+    assert(cr_mapping.rhs == "<CR>",
+      "native <CR> mapping should bypass the plugin wrapper: " .. vim.inspect(cr_mapping))
   else
-    assert(cr_mapping.rhs == "v:lua.MiniPairs.cr()",
-      "MiniPairs' real <CR> mapping is not active: " .. vim.inspect(cr_mapping))
+    assert(cr_mapping.buffer == 1 and cr_mapping.callback ~= nil,
+      "nvim-heredoc's synchronous buffer-local Return wrapper is not active: "
+        .. vim.inspect(cr_mapping))
+    assert(type(MiniPairs) == "table" and type(MiniPairs.cr) == "function",
+      "MiniPairs' Return callback is unavailable for delegation")
   end
 
   api.nvim_win_set_cursor(0, { 3, #opener - 1 })

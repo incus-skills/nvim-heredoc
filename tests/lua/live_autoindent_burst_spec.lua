@@ -25,23 +25,30 @@ vim.api.nvim_set_current_buf(buf)
 plugin.setup()
 
 vim.api.nvim_win_set_cursor(0, { 2, #"\tcat <<-'BURST" })
-vim.api.nvim_input("A\nhello1\nhello2\nhello3")
+vim.api.nvim_input(vim.api.nvim_replace_termcodes("A<CR>hello1<CR>hello2<CR>hello3", true, false, true))
 
 vim.defer_fn(function()
-  local actual = lines()
-  local expected = {
-    "conf_print_test() {",
-    "\tcat <<-'BURST'",
-    "\t\thello1",
-    "\t\thello2",
-    "\t\thello3",
-    "\tBURST",
-  }
-  assert(vim.deep_equal(actual, expected),
-    "rapid successive Returns must not accumulate body TABs; actual="
-      .. vim.inspect(actual) .. "; expected=" .. vim.inspect(expected))
-  assert(vim.api.nvim_get_mode().mode == "i",
-    "burst input must remain in Insert mode until explicitly exited")
+  local ok, err = pcall(function()
+    local actual = lines()
+    local expected = {
+      "conf_print_test() {",
+      "\tcat <<-'BURST'",
+      "\t\thello1",
+      "\t\thello2",
+      "\t\thello3",
+      "\tBURST",
+    }
+    assert(vim.deep_equal(actual, expected),
+      "rapid successive Returns must not accumulate body TABs; actual="
+        .. vim.inspect(actual) .. "; expected=" .. vim.inspect(expected))
+    assert(vim.api.nvim_get_mode().mode == "i",
+      "burst input must remain in Insert mode until explicitly exited")
+  end)
+  if not ok then
+    io.stderr:write("rapid TAB-opener autoindent regression test: FAIL: " .. tostring(err) .. "\\n")
+    vim.cmd("cquit 1")
+    return
+  end
   print("rapid TAB-opener autoindent regression test: PASS")
   vim.cmd("qa!")
 end, 50)
