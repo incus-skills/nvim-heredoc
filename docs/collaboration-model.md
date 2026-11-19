@@ -52,6 +52,19 @@ Implementation and testing may also reveal new evidence or questions, feeding ba
 
 The activities interact. The following flowchart represents their relationships without imposing a required order of traversal. The dotted, non-directional connections indicate observational or relational association, not a control-flow transition or a claim that one activity must follow another.
 
+**Intended-structure reference:** `collaboration-interface-topology-v1` (conceptual reference; not a workflow specification).
+
+| Interface | Relationship | Semantic field made available |
+|---|---|---|
+| Observation ↔ Interpretation | Observational / relational | Evidence, provenance, abductive interpretation |
+| Interpretation ↔ Adjudication | Observational / relational | Hypotheses, alternatives, critical examination |
+| Adjudication ↔ Observation | Observational / relational | Challenge, verification, evidential revision |
+| Adjudication ↔ Repository action | Observational / relational | Adopted decisions, constraints, change authority |
+| Repository action ↔ Observation | Observational / relational | Implementation evidence, consequences, validation |
+| Repository action ↔ Interpretation | Observational / relational | Emergent questions, tensions, new possibilities |
+
+The four activity nodes are the activities defined above. The six interfaces are characteristic relationships, not an exhaustive edge inventory. Their semantic fields intentionally overlap; the terms are access points to related but non-equivalent conceptual models.
+
 ```mermaid
 flowchart TD
     subgraph collaboration["Collaboration activities"]
@@ -60,12 +73,12 @@ flowchart TD
         A["Adjudication"]
         R["Repository action"]
 
-        O -.-|"Evidence, provenance and observed conditions"| I
-        I -.-|"Hypotheses, alternatives and conceptual connections"| A
-        A -.-|"Critical examination and requests for verification"| O
-        A -.-|"Adopted distinctions, decisions and constraints"| R
-        R -.-|"Implementation, consequences and validation evidence"| O
-        R -.-|"New questions, tensions and emergent possibilities"| I
+        O -.-|"Evidence / provenance"| I
+        I -.-|"Abduction / alternatives"| A
+        A -.-|"Critique / verification"| O
+        A -.-|"Decision / constraint"| R
+        R -.-|"Implementation / evidence"| O
+        R -.-|"Consequence / emergence"| I
     end
 ```
 
@@ -185,7 +198,20 @@ The distinction between two evaluation concerns should remain available:
 - **Ingress effectiveness:** whether an incoming observer can reconstruct enough of the working position to proceed responsibly. Cold-start reconstruction exercises can provide direct evidence.
 - **Collaboration effectiveness:** whether the interfaces between observation, interpretation, adjudication, and repository action support productive reasoning and sound outcomes. This is broader and cannot be established by ingress checks alone.
 
-A conceptual feedback topology is:
+A conceptual feedback topology is represented below.
+
+**Intended-structure reference:** `ingress-recursive-evaluation-v1` (conceptual reference; not a mandatory lifecycle).
+
+| Element | Intended contribution |
+|---|---|
+| Incoming reconstruction | A situated account of working position and provenance |
+| Evaluation | Examination against task-relevant evidence and criteria |
+| Visible discrepancy | A gap, tension, uncertainty, or misleading context |
+| Interpretation and adjudication | Consideration of explanations and possible adaptations |
+| Authorised adaptation | A change to the appropriate durable artifact, if adopted |
+| Subsequent ingress | Further evidence about reconstructability and consequences |
+
+The feedback relationship is recursive but not automatic: discrepancy does not entail correction, and correction does not entail improvement. The intervening interpretive and adjudicative relationship preserves agency, uncertainty, and change authority.
 
 ```mermaid
 flowchart TD
