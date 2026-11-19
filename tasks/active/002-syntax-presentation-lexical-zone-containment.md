@@ -63,6 +63,27 @@ This establishes that the standard Bash injection query consumes the Bash parser
 - Preserve normal shell parsing/highlighting before and after the payload region.
 - Keep this task focused on syntax representation. Diagnostics, completion, LSP, linting, and formatter isolation remain separate integrations unless a concrete dependency is demonstrated.
 
+## Existing CI coverage and diagnostic gap
+
+The repository's existing `.github/workflows/test.yml` runs five independent jobs:
+
+- `core`: Lua scanner tests, with `shfmt --to-json` used as an mvdan/sh syntax oracle for selected unsupported-grammar fixtures.
+- `buffer-integration`: headless Neovim editing and changed-range tests.
+- `shell-delivery`: Bash, Dash, and Zsh payload-byte comparisons.
+- `formatter`: `shfmt -i 0 -p` payload-preservation checks.
+- `lazyvim-integration`: pinned Neovim/LazyVim/plugin coexistence tests.
+
+These are useful regression layers, but the current workflow does **not** install or pin nvim-treesitter or the Bash Tree-sitter parser, and it does not inspect parser trees or query captures. The `shfmt --to-json` step is an independent shell-syntax oracle; it is not a Tree-sitter test. A green result from the existing five jobs therefore cannot establish syntax-presentation containment.
+
+The non-colliding cargo fixture is added at `tests/fixtures/heredoc-cargo-distinct-delimiters.sh` and is consumed by:
+- the Lua scanner suite, to assert that the embedded opener/terminator remain payload and that the outer `EOF` alone closes the scanner's outer region;
+- shell-delivery tests, to compare the exact bytes delivered by Bash, Dash, and Zsh when available;
+- formatter tests, to check that `shfmt` does not change the delivered cargo payload.
+
+The existing same-delimiter scanner regression remains a separate collision case. The existing live Neovim payload tests remain editing-behaviour tests; they do not inspect Tree-sitter highlighting.
+
+The next syntax-presentation test must therefore be a distinct parser diagnostic: load the exact pinned Bash parser in the target Neovim/Tree-sitter environment, record the syntax-tree node ranges and query captures for the non-colliding fixture, and verify the outer terminator and following shell syntax. Do not claim that the current CI suite has performed this check.
+
 ## Required regression fixture
 
 Create a minimal fixture and tests that establish all of the following:
