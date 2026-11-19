@@ -1,7 +1,7 @@
 # Task 002 — Enforce lexical-zone boundaries in syntax representation
 
-**Status:** active — policy adopted; implementation investigation not started  
-**Priority:** high — current syntax representation contradicts the adopted design contract  
+**Status:** active — non-colliding cargo fixture added; parser-tree diagnosis pending  
+**Priority:** diagnostic — the previously reported mismatch was associated with a same-delimiter collision; a non-colliding parser result still requires direct tree/capture inspection  
 **Scope:** determine and implement a syntax-presentation path that prevents the containing shell parser from claiming established heredoc payload as active shell syntax. Do not change the Return-local editing architecture or select a payload-language strategy by assumption.
 
 ## Governing policy
@@ -10,7 +10,7 @@ The adopted policy is recorded in [the design contract](../../docs/design.md) an
 
 - An established heredoc body is a lexical zone distinct from the active syntax of its containing shell document.
 - The boundary is authoritative for both editing behaviour and syntax representation.
-- The containing shell parse must not adopt an inner payload heredoc delimiter (including an inner `EOF`) as an outer-shell heredoc terminator or construct.
+- The containing shell parse must not adopt a non-colliding inner payload heredoc delimiter as an outer-shell heredoc terminator or construct. If an inner-looking line also matches the enclosing delimiter under Bash's rules, it is the enclosing shell heredoc terminator; retain that as a separate collision case rather than calling it payload containment.
 - Payload classification is independent of structural recognition. An unknown payload must not silently become active Bash syntax.
 - The visual representation may eventually be a contained-language parse/injection or opaque content. The project has not selected that strategy.
 - The existing scanner/closer boundary is the structural source of truth. A syntax parser or injection query must not independently redefine it.
