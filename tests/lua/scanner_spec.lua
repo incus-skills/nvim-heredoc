@@ -269,4 +269,19 @@ do
     "the first valid EOF at column zero must terminate the outer <<- heredoc")
 end
 
+-- A non-colliding inner heredoc is cargo within the established outer region.
+do
+  local file = assert(io.open("tests/fixtures/heredoc-cargo-distinct-delimiters.sh", "rb"))
+  local source = file:read("*a")
+  file:close()
+  local result = scanner.scan(source)
+  assert(result.complete, "distinct-delimiter heredoc cargo should leave the outer region complete")
+  assert(#result.heredocs == 1 and #result.regions == 1,
+    "the inner heredoc opener must remain payload, not a second shell heredoc")
+  local region = result.regions[1]
+  assert(region.delimiter == "EOF" and region.terminator_line == 9
+    and region.body_end_line == 8,
+    "the outer EOF alone should close the non-colliding cargo fixture")
+end
+
 print("scanner tests: PASS")
