@@ -103,6 +103,12 @@ Current Conform/shfmt tests establish preservation for selected shell fixtures, 
 
 The scanner should continue to report structural regions and confidence. Language identification and editor-tool policy should be layered consumers of that information, not reasons to weaken conservative structural recognition.
 
+## Broader embedded-language presentation direction
+
+Future syntax-presentation work should be considered as a general embedded-language capability, not only as a fix for Bash heredoc body highlighting. Tree-sitter injections are a possible mechanism for presenting embedded payloads such as Python, Rust, Markdown/markup, and other languages where the surrounding document has a different filetype. The same separation remains essential across these cases: the host document or plugin establishes the authoritative region; language classification selects a parser when sufficiently grounded; presentation consumes the region; and unknown content remains opaque. Injection does not, by itself, establish host-language lexical boundaries or guarantee region-aware diagnostics, completion, linting, LSP, or formatting.
+
+Parse-tree boundary analysis, query-capture inspection, parser/API compatibility checks, and injection lifecycle design belong to that future investigation. They are not prerequisites for the current heredoc scanner/editing/shell-delivery/formatter work and should not be treated as its immediate next step.
+
 ## Open questions for future investigation
 
 These are deliberately unresolved:
