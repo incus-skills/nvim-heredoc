@@ -136,6 +136,29 @@ A new session should, to the extent relevant to its task:
 
 Ingress should be proportionate. It should direct a session to the relevant context, not require loading the entire repository or every historical discussion. When the correct next step is uncertain, inspect the governing records and evidence before asking the user to repeat information that may already be recorded.
 
+### Reconstruction across concurrent workstreams
+
+The repository's current technical baseline and its current collaboration or ingress model may not reside on the same branch or ref. A session can therefore reconstruct the immediate technical task correctly while still missing a relevant change to the conditions under which collaboration is expected to happen.
+
+When the available context identifies such parallel work, ingress should reconstruct both positions without conflating them. For example, it may report that the technical investigation is grounded in `main` at a particular commit while the collaboration model is being developed on a named documentation branch. The session should inspect the relevant ref and files directly, verify their current state, and explain the relationship between the workstreams. A branch name in a handoff is a lead to verify, not proof that its contents remain unchanged.
+
+This is not a general obligation to survey every branch. It is a way to avoid treating the current checkout as the whole relevant repository state when the work itself points elsewhere. It also avoids the opposite error: assuming that a separate collaboration document silently supersedes the technical contracts or task procedures on the technical branch.
+
+### Reconstruction as an interpretive demonstration
+
+Ingress is not demonstrated merely by naming the files read or repeating their headings. When the collaboration model is relevant, the incoming observer should make visible how it changes the quality of the reconstruction.
+
+That may include explaining:
+- which claims are direct repository observations, which are adopted project decisions, and which remain interpretations or hypotheses;
+- how a task-specific procedure constrains the current investigation without becoming a universal limit on exploration;
+- where an inherited interpretation is well supported, where it remains open to challenge, and what evidence could distinguish plausible alternatives;
+- how a conceptual import opens useful interpretive connections while leaving related models non-equivalent and avoiding hidden prescriptions;
+- what is sufficiently established to act on now, and what should remain unresolved pending evidence or adjudication.
+
+These are prompts for situated reasoning, not mandatory fields or a scoring rubric. Not every ingress needs to manufacture alternatives or discuss every conceptual lens. The relevant test is whether the observer can use the distinctions when they matter, rather than merely recite them.
+
+A cold-start exercise should therefore assess both **position reconstruction** and **collaboration reconstruction** where both are in scope. Position reconstruction asks whether the observer can identify the relevant work, evidence, decisions, open questions, and next action. Collaboration reconstruction asks whether the observer can reason with interpretive freedom, epistemic separation, and mutual challenge while treating conceptual models as imports rather than authority. Success in the first does not establish success in the second.
+
 ### What a useful handoff preserves
 
 When work materially changes the project position, or when a session is nearing its context limit, record a concise handoff in the appropriate durable location. It should preserve:
