@@ -1,8 +1,22 @@
 # Future development context: embedded heredoc payloads
 
-**Status:** exploratory design context; not an implementation commitment or a change to the current release contract.
+**Status:** mixed: the lexical-zone boundary policy below is adopted project policy; the choice and implementation of payload presentation, language classification, and region-aware editor integrations remain future-development work.
 
-This note records a development concern raised while considering what happens inside a managed heredoc body. It is intended to survive context changes and help a fresh contributor or AI session resume the discussion without treating an open question as an established requirement.
+This note records both the adopted boundary policy and the still-open design questions for embedded payload support. It is intended to survive context changes and help a fresh contributor or AI session distinguish settled requirements from unresolved implementation choices.
+
+## Adopted project policy: lexical-zone boundary
+
+An established heredoc body is a lexical zone distinct from the active syntax of its containing shell document. This boundary is authoritative for both editing behaviour and syntax representation.
+
+- The plugin must not recursively interpret payload text as active shell syntax. Embedded opener-looking lines and delimiter-looking lines remain payload for the containing heredoc.
+- The containing shell syntax parse must not adopt constructs inside that payload zone. In particular, an inner heredoc terminator such as `EOF` must not be interpreted as the terminator of an outer Bash heredoc.
+- The boundary is independent of payload-language classification. A payload may be known, inferred, or unknown; uncertainty about its language does not permit the containing shell parser to claim it as shell syntax.
+- The eventual presentation may use a contained-language parser/injection or opaque content. The project has not yet selected that presentation strategy, nor has it committed to a particular language-classification mechanism.
+- Tree-sitter injections are a possible future consumer of the established body range, not the authority that establishes the range or the structural source of truth.
+- The current Tree-sitter Bash behaviour that adopts an inner `EOF` as an outer-shell terminator is a known mismatch with this policy. Deferring the choice of visual representation does not make that incorrect outer-shell interpretation acceptable.
+
+This policy does not require immediate implementation of a particular injection, parser, or highlighting mechanism. It does establish the invariant that any future visual representation must respect: **defer how the payload is represented, not whether its lexical boundary is respected.**
+
 
 ## The concern: a shell buffer can contain non-shell payloads
 
@@ -67,7 +81,7 @@ The governing editing decision is Return-local bounded scope: Return after a com
    A body may be identified as a known language, inferred with some confidence, or remain unknown/opaque. Structural recognition must not depend on successful language classification.
 
 3. **Presentation — how is the payload parsed and highlighted?**  
-   Tree-sitter injections are one possible consumer of the scanner's body ranges. They should not become a replacement authority for shell heredoc structure, especially in incomplete editing buffers.
+   The adopted policy requires the containing shell parse not to claim payload content as active shell syntax. The specific presentation remains open: a Tree-sitter injection or another contained-language mechanism may be used, or the region may remain opaque. Any such mechanism must consume the established body range; it must not become the authority for shell heredoc structure, especially in incomplete editing buffers.
 
 4. **Language services — which tools may operate in the region?**  
    Diagnostics, completion, LSP features, linting, and related services need their own region-aware integration. Availability of an embedded parser or language server is not proof that requests and diagnostics are scoped correctly.
@@ -77,7 +91,7 @@ The governing editing decision is Return-local bounded scope: Return after a com
 
 The desired direction is not necessarily to disable every shell feature for an entire buffer. A buffer can contain shell code both before and after a heredoc, and may contain several heredocs with different payload languages. The longer-term model should therefore investigate region-aware behaviour where the relevant tool supports it. Where a tool cannot safely respect regions, an explicit conservative isolation or opt-out may be safer than allowing it to process arbitrary payload as shell.
 
-Unknown payloads should not be silently treated as shell merely because the enclosing buffer is a shell file. Keeping an unknown body opaque is a candidate safe fallback; its exact user-visible behaviour remains to be designed.
+Unknown payloads must not be silently treated as shell merely because the enclosing buffer is a shell file. Keeping an unknown body opaque is the safe fallback direction under the adopted lexical-zone policy; the exact user-visible presentation of that opaque region remains to be designed.
 
 ## Relationship to current architecture and tests
 
@@ -93,7 +107,7 @@ The scanner should continue to report structural regions and confidence. Languag
 
 These are deliberately unresolved:
 
-- Should editor-tool isolation apply to every managed `<<-` body, or only to a subset? The working recommendation raised in discussion was to treat all managed bodies as payload regions regardless of delimiter quoting: delimiter quoting controls shell expansion at execution time, not whether the editor should assume the body is shell code. This has not yet been confirmed as a project decision.
+- Which editing and language-service integrations can reliably respect the established lexical-zone boundary for every supported heredoc body? The boundary itself is adopted policy; the scope and implementation details of individual tool integrations remain to be investigated.
 - How should the two observed contextual signals be resolved: an explicit shebang in the payload, and an implicit language/format indication from the downstream command consuming the heredoc (including pipeline and redirection context)? What command-to-language knowledge is needed, how should conflicting signals be handled, and what confidence threshold is required?
 - How should unknown or ambiguous payloads behave? Is opaque treatment the default, and how should users opt into a language?
 - Which Neovim/Tree-sitter APIs can consume scanner-derived ranges robustly as the buffer changes?
