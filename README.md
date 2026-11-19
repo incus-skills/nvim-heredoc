@@ -54,6 +54,8 @@ Ordinary `<<` heredocs and `<<<` here-strings are outside the managed scope and 
 
 The lexical scanner remains a bounded helper for recognising the current opener, delimiter, mode, and safe local boundaries. It is not a mandate to reconstruct the entire document's heredoc ownership or shell structure. Existing shell indentation machinery remains responsible for ordinary function and compound-command indentation wherever it can provide that context. Do not duplicate it with a general structural parser merely to place this local closer.
 
+An established heredoc body is also a lexical zone for syntax representation: the containing shell parser must not claim embedded payload constructs (including an inner heredoc `EOF`) as active syntax of the outer shell document. The scanner-established body boundary is authoritative for both editing and future syntax presentation. The current Tree-sitter Bash interpretation of an inner `EOF` as an outer-shell construct is a known mismatch with this policy. How payloads are eventually represented—contained-language parsing/injection or opaque content—remains future work; deferring that choice does not defer the boundary requirement.
+
 Typing the opener alone does not commit a closer; Return does. Existing-buffer recovery and other editing paths must not silently turn this into a general opener-time or document-wide tracking system.
 
 Paste handling must operate on the complete changed range and preserve existing bytes. If the range or region is ambiguous, the safe behaviour is to leave the text unchanged.
@@ -62,7 +64,7 @@ Formatting is separate from interactive editing. `shfmt` is for Bash and POSIX `
 
 ## Future development context
 
-The next-stage design concern around embedded heredoc payloads—including language identification, region-aware editor tooling, diagnostics/completion, and formatter isolation—is recorded in [future development context](docs/future-development-context.md). This is exploratory context, not a current implementation commitment.
+The adopted lexical-zone policy and remaining embedded-payload design questions are recorded in [future development context](docs/future-development-context.md). The current syntax-presentation mismatch and its bounded implementation work are tracked in [Task 002](tasks/active/002-syntax-presentation-lexical-zone-containment.md). Language identification, diagnostics/completion, and formatter isolation remain separate future integrations.
 
 ## Current status
 
