@@ -19,7 +19,7 @@ The adopted policy is recorded in [the design contract](../../docs/design.md) an
 
 ## Objective
 
-Resolve the observed mismatch in which the installed Tree-sitter Bash parser highlights/adopts an inner heredoc `EOF` as Bash syntax inside an already-established outer payload region. Ensure the containing shell parse does not claim that payload content as active shell syntax, while allowing ordinary shell syntax after the outer terminator to be represented normally.
+Determine whether the reported inner-heredoc highlighting behaviour persists when the inner heredoc uses a delimiter distinct from the enclosing heredoc. The same-delimiter case is a separate collision condition: under Bash `<<-` matching rules, a hard-left line matching the outer delimiter terminates the outer shell heredoc too. Do not treat that case alone as evidence of a parser defect. Establish the parser's behaviour on a non-colliding cargo fixture, while preserving the distinction between editor-established range, shell-delivered body, and containing-shell syntax representation.
 
 The first implementation target is the reproduced Bash case. Do not claim equivalent behaviour for POSIX sh or Zsh until their parsers and fixtures are independently assessed.
 
@@ -36,7 +36,7 @@ This establishes that the standard Bash injection query consumes the Bash parser
 
 ## Required investigation
 
-1. Reproduce the exact current behaviour with a minimal fixture containing an outer heredoc, embedded script text with an inner heredoc opener and `EOF` terminator, and shell syntax after the outer terminator. Record the exact outer and inner delimiters; distinguish a parser capture on the inner line from an actual truncation/misparse of the outer heredoc body.
+1. Reproduce the behaviour with two deliberately distinct fixtures. (a) A non-colliding cargo fixture: use different outer and inner delimiter values (for example outer `EOF`, inner `FOE`) and record exact bytes, including TAB indentation. This is the primary fixture for testing lexical containment/highlighting of embedded heredoc cargo. (b) A same-delimiter collision fixture matching the reported `<<-'EOF'` / inner `<<'EOF'` case. Record that the first hard-left `EOF` matches and terminates the outer Bash heredoc under `<<-` semantics. Distinguish editor-established range, shell-delivered body, parser nodes, and query captures; do not infer a parser defect from the collision case alone.
 2. Inspect the exact installed Neovim, nvim-treesitter, and Bash parser revisions used by the target environment. Identify which parser nodes/captures cover the outer opener, body, inner opener, inner `EOF`, outer terminator, and following shell code.
 3. Establish whether the current parser's behaviour is caused by the Bash grammar/external scanner, highlight query captures, or both. Do not infer parse structure from `:Inspect` captures alone.
 4. Inspect supported Neovim Tree-sitter APIs for representing scanner-derived included regions or contained-language regions. Verify actual APIs at the pinned target revision; do not rely on undocumented or guessed methods.
@@ -68,8 +68,8 @@ This establishes that the standard Bash injection query consumes the Bash parser
 Create a minimal fixture and tests that establish all of the following:
 
 1. The outer opener and its actual terminator define one complete payload region.
-2. An inner heredoc opener and inner `EOF` line remain inside that region and are not represented as active constructs/terminators of the containing Bash document.
-3. The outer terminator remains the only boundary that closes the containing heredoc.
+2. In the non-colliding fixture, the inner heredoc opener and its distinct terminator remain inside the outer payload region and are not represented as active constructs/terminators of the containing Bash document.
+3. In the non-colliding fixture, the outer terminator remains the only boundary that closes the containing heredoc. The collision fixture separately records Bash's first-matching-delimiter behaviour and must not be assigned the same expected shell-delivery range.
 4. Shell syntax immediately following the outer terminator is parsed/highlighted as shell syntax.
 5. An unknown payload remains opaque; no fallback to Bash parsing is silently applied.
 6. Edits before, within, and after the body update the represented range without stale offsets or leakage.
