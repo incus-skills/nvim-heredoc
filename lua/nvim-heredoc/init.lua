@@ -158,6 +158,12 @@ local function insert_return_local_closers(buf, changed_range)
     return nil
   end
 
+  -- The line before the cursor is the candidate opener for this Return
+  -- transition. If it is already inside another heredoc body, it is payload.
+  if cursor_in_heredoc_payload(buf, cursor_row - 1) then
+    return nil
+  end
+
   local lines = get_lines(buf)
   local opener_line = lines[cursor_row]
   local body_line = lines[cursor_row + 1]
