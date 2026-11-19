@@ -73,6 +73,28 @@ do
 end
 
 do
+  -- A first body line containing literal TABs is whitespace-only too.
+  -- Return-local recovery must recognise it just as it recognises spaces.
+  local buf = set_buffer({
+    "  cat <<-'TAB_BODY'",
+    "\t\t",
+    "later_function() {",
+    "}",
+  })
+  vim.bo[buf].tabstop = 2
+  vim.api.nvim_set_current_buf(buf)
+  vim.api.nvim_win_set_cursor(0, { 2, 0 })
+  assert(plugin.process_buffer(buf, { start_row = 0, end_row = 1 }, false),
+    "Return-local recognition should accept a TAB-indented first body line")
+  local actual = lines(buf)
+  assert(actual[1] == "  cat <<-'TAB_BODY'")
+  assert(actual[2] == "\t\t", "the existing TAB-only body prefix should be preserved")
+  assert(actual[3] == "\tTAB_BODY", "the closer should be inserted after the TAB-only body line")
+  assert(actual[4] == "later_function() {"
+    and actual[5] == "}", "following structure should remain unchanged")
+end
+
+do
   local original = { "cat <<-A <<-B", "", "}" }
   local buf = set_buffer(original)
   vim.api.nvim_set_current_buf(buf)
