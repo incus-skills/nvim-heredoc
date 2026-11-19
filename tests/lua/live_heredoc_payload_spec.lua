@@ -114,7 +114,7 @@ do
   end, "third payload line should not staircase", buf)
 
   local actual = lines(buf)
-  assert(actual[2] == "\\t\\t" .. original[2],
+  assert(actual[2] == "\t\t" .. original[2],
     "the ordinary embedded opener must remain literal after the fixed outer structural prefix")
   assert(actual[3] == "\t\thello1"
     and actual[4] == "\t\thello2"
