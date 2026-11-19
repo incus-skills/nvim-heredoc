@@ -17,6 +17,10 @@ echo "===== Live Blink completion acceptance through the Return wrapper ====="
 nvim --headless -u ci/lazyvim/init.lua \
   -c 'lua local ok, err = pcall(dofile, "tests/lua/live_blink_return_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
 
+echo "===== Live heredoc payload Return remains opaque ====="
+nvim --headless -u ci/lazyvim/init.lua \
+  -c 'lua local ok, err = pcall(dofile, "tests/lua/live_heredoc_payload_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
+
 echo "===== Live function-boundary insertion with MiniPairs ====="
 NVIM_HEREDOC_FUNCTION_BOUNDARY=1 nvim --headless -u ci/lazyvim/init.lua \
   -c 'lua local ok, err = pcall(dofile, "tests/lua/live_insert_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'

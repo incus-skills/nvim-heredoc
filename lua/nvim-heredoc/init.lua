@@ -28,6 +28,31 @@ local function active_cursor_row(buf)
   return vim.api.nvim_win_get_cursor(win)[1] - 1
 end
 
+-- Heredoc bodies are lexical payload, including lines that resemble shell
+-- commands or further heredoc openers. Use the scanner's existing lexical
+-- boundary to prevent Return from interpreting payload as active shell code.
+local function cursor_in_heredoc_payload(buf, row)
+  local result = scanner.scan(get_source(get_lines(buf)), { tabstop = vim.bo[buf].tabstop })
+  local line = row + 1
+  for _, heredoc in ipairs(result.heredocs) do
+    if line >= heredoc.body_start_line
+      and (not heredoc.terminator_line or line < heredoc.terminator_line) then
+      return true
+    end
+  end
+  return false
+end
+
+-- Split payload literally. Do not delegate to shell indentexpr, autoindent,
+-- or pair plugins: the containing heredoc must not format embedded content.
+local function split_payload_line(buf, win, row, col, line)
+  vim.api.nvim_buf_set_lines(buf, row, row + 1, false, {
+    line:sub(1, col),
+    line:sub(col + 1),
+  })
+  vim.api.nvim_win_set_cursor(win, { row + 2, 0 })
+end
+
 local function position_insert_cursor(buf, row, col)
   if active_cursor_row(buf) ~= row or vim.api.nvim_get_mode().mode ~= "i" then
     return
@@ -130,6 +155,12 @@ local function insert_return_local_closers(buf, changed_range)
     or changed_range.start_row ~= cursor_row - 1
     or changed_range.end_row < cursor_row
     or changed_range.end_row > cursor_row + 1 then
+    return nil
+  end
+
+  -- The line before the cursor is the candidate opener for this Return
+  -- transition. If it is already inside another heredoc body, it is payload.
+  if cursor_in_heredoc_payload(buf, cursor_row - 1) then
     return nil
   end
 
@@ -537,6 +568,20 @@ local function return_key(buf)
   local cursor = vim.api.nvim_win_get_cursor(win)
   local row, col = cursor[1] - 1, cursor[2]
   local line = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1] or ""
+
+  if cursor_in_heredoc_payload(buf, row) then
+    -- Keep Blink's explicit completion acceptance, but do not pass payload
+    -- Return through shell indentation or MiniPairs.
+    local blink = package.loaded["blink.cmp"]
+    if blink and type(blink.is_menu_visible) == "function"
+      and blink.is_menu_visible() and type(blink.accept) == "function"
+      and blink.accept() then
+      return
+    end
+    split_payload_line(buf, win, row, col, line)
+    return
+  end
+
   if col == #line then
     local openers = scanner.parse_openers(line, { tabstop = vim.bo[buf].tabstop })
     if openers and #openers == 1 then
