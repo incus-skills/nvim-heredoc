@@ -60,6 +60,10 @@ Paste handling must operate on the complete changed range and preserve existing 
 
 Formatting is separate from interactive editing. `shfmt` is for Bash and POSIX `sh` only, not Zsh. Its effect on heredoc payload bytes must be tested rather than assumed.
 
+## Collaboration and session ingress
+
+The repository's collaboration principles and session-continuity requirements are recorded in [the collaboration model](docs/collaboration-model.md). New sessions should begin with the repository instructions in [AGENTS.md](AGENTS.md), then reconstruct the relevant task and technical position from repository evidence. Session handoffs must preserve the current position, evidence, adopted decisions, unresolved questions, and next action rather than relying on conversational context.
+
 ## Future development context
 
 The next-stage design concern around embedded heredoc payloads—including language identification, region-aware editor tooling, diagnostics/completion, and formatter isolation—is recorded in [future development context](docs/future-development-context.md). This is exploratory context, not a current implementation commitment.
