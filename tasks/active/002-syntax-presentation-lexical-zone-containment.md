@@ -23,6 +23,17 @@ Resolve the observed mismatch in which the installed Tree-sitter Bash parser hig
 
 The first implementation target is the reproduced Bash case. Do not claim equivalent behaviour for POSIX sh or Zsh until their parsers and fixtures are independently assessed.
 
+## Initial source inspection
+
+The pinned nvim-treesitter revision recorded in the project compatibility inventory is `19bdfc04f40ed2ccb3340591d125f759b0406875`. At that revision:
+
+- `runtime/queries/bash/highlights.scm` captures both `(heredoc_start)` and `(heredoc_end)` as `@label`, and captures `(heredoc_body)` as `@string`.
+- `runtime/queries/bash/injections.scm` uses the parser-produced `(heredoc_body)` as `@injection.content` and the parser-produced `(heredoc_end)` as `@injection.language`.
+- `lua/nvim-treesitter/parsers.lua` pins Bash to `tree-sitter/tree-sitter-bash` revision `a06c2e4415e9bc0346c6b86d401879ffb44058f7`.
+- That Bash grammar uses an external scanner in `src/scanner.c` to recognise heredoc start/body/end tokens. Its heredoc scanner maintains delimiter state and returns `HEREDOC_END` when the current line matches the active delimiter.
+
+This establishes that the standard Bash injection query consumes the Bash parser's own heredoc boundary; it does not consume the nvim-heredoc plugin's scanner-derived body range. It also establishes that the heredoc terminator capture is a standard Bash highlight. It does **not** yet establish why the target buffer's inner `EOF` is being captured or whether the outer parse is actually truncated: that requires the exact minimal buffer and its parse tree from the target Neovim installation. Do not change the upstream grammar, query, or plugin integration based on this source inspection alone.
+
 ## Required investigation
 
 1. Reproduce the exact current behaviour with a minimal fixture containing an outer heredoc, embedded script text with an inner heredoc opener and `EOF` terminator, and shell syntax after the outer terminator. Record the exact outer and inner delimiters; distinguish a parser capture on the inner line from an actual truncation/misparse of the outer heredoc body.
