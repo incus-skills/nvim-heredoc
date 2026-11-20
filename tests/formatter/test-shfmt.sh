@@ -43,6 +43,17 @@ SCRIPT
   fi
 done
 
+# Formatting must preserve a payload that itself contains heredoc syntax.
+cp tests/fixtures/heredoc-cargo-distinct-delimiters.sh "$tmp/cargo.sh"
+bash "$tmp/cargo.sh" > "$tmp/cargo.before"
+shfmt -i 0 -p -w "$tmp/cargo.sh"
+bash "$tmp/cargo.sh" > "$tmp/cargo.after"
+if ! cmp -s "$tmp/cargo.before" "$tmp/cargo.after"; then
+  echo "shfmt changed the delivered heredoc-cargo payload" >&2
+  diff -u "$tmp/cargo.before" "$tmp/cargo.after" || true
+  exit 1
+fi
+
 echo "formatter tests: PASS (Bash and POSIX sh payload bytes preserved)"
 
 bash tests/expect-failure.sh "shfmt payload negative control" \

@@ -31,6 +31,25 @@ bash "$tmp/nested.sh" > "$tmp/nested.out"
 printf 'alpha\n  beta\n' > "$tmp/nested.expected"
 cmp "$tmp/nested.expected" "$tmp/nested.out"
 
+# Embedded heredoc cargo must use a delimiter distinct from the outer heredoc.
+# The inner opener and closer are literal payload; only the outer EOF ends cat's input.
+bash tests/fixtures/heredoc-cargo-distinct-delimiters.sh > "$tmp/cargo-bash.out"
+dash tests/fixtures/heredoc-cargo-distinct-delimiters.sh > "$tmp/cargo-dash.out"
+cat > "$tmp/cargo.expected" <<'EXPECTED'
+cat <<-'FOE'
+here1
+here2
+here3
+here4
+FOE
+EXPECTED
+cmp "$tmp/cargo.expected" "$tmp/cargo-bash.out"
+cmp "$tmp/cargo.expected" "$tmp/cargo-dash.out"
+if command -v zsh >/dev/null 2>&1; then
+  zsh tests/fixtures/heredoc-cargo-distinct-delimiters.sh > "$tmp/cargo-zsh.out"
+  cmp "$tmp/cargo.expected" "$tmp/cargo-zsh.out"
+fi
+
 # An empty quoted delimiter is a valid delimiter word.
 printf 'cat <<-""\n\tempty-delimiter-body\n\t\n' > "$tmp/empty.sh"
 bash "$tmp/empty.sh" > "$tmp/empty-bash.out"

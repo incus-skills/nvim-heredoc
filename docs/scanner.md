@@ -77,6 +77,15 @@ The interactive editing commitment occurs on **Return after a completed managed 
 
 The scanner may still recognise ordinary heredoc bodies so their payload is not misread as shell syntax in the supported lexical subset. It may also retain declaration-order handling for multiple heredocs on one command as a shell-language fact. Neither capability authorises a general document-wide tracking architecture for the Return-local path.
 
+
+## Lexical-zone boundary for syntax consumers
+
+The scanner's completed heredoc records expose `body_start_line`, `body_end_line`, and `terminator_line`. These are the current scanner-derived line boundaries for consumers that need to reason about payload regions. The `heredocs` collection includes ordinary `<<` and managed `<<-` regions; `regions` remains the managed `<<-` subset used by editing.
+
+The adopted project policy requires future syntax-presentation consumers to respect these established boundaries. They must not infer a competing payload boundary from Tree-sitter Bash nodes or delimiter-looking text inside a body. This scanner interface is line-based and currently recomputes from source; it does not yet provide a Tree-sitter included-range adapter, incremental region lifecycle, or payload-language classification. Those are implementation questions tracked in [Task 002](../tasks/active/002-syntax-presentation-lexical-zone-containment.md).
+
+This does not make Tree-sitter a dependency for scanning or editing. The scanner remains the structural source of truth, and unknown payloads must not be silently parsed as Bash.
+
 ## Editing integration status
 
 The current production integration has evolved through several approaches, including retained scan snapshots, transition reconciliation, and Return-local insertion. Those mechanisms are implementation history, not all architectural requirements. The governing question for future changes is whether a mechanism is strictly necessary to fulfil the Return-local bounded-scope contract.
