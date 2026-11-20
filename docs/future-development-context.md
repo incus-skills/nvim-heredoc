@@ -4,6 +4,14 @@
 
 This note records both the adopted boundary policy and the still-open design questions for embedded payload support. It is intended to survive context changes and help a fresh contributor or AI session distinguish settled requirements from unresolved implementation choices.
 
+## Project phase: pre-release field validation
+
+The core objective—usable heredoc editing and autoformatting in the LazyVim workflow—has, in large part, been achieved. The project is moving toward a pre-release that can serve as a stable baseline for field testing. Field testing is intended to expose remaining edge cases, differences across real configurations, efficiency problems, and opportunities to simplify the implementation.
+
+Nested heredoc handling and embedded-language presentation, including possible Tree-sitter injection, are stretch goals. They go beyond the native Bash heredoc metaphor and are not prerequisites for the core pre-release. They should remain separate investigations and must not delay field validation of the existing editing behaviour.
+
+The pre-release is a testing baseline, not a declaration that every shell grammar form, Neovim configuration, or formatter interaction is supported. Continue to distinguish the five-layer hosted CI evidence from live workstation and field results.
+
 ## Adopted project policy: lexical-zone boundary
 
 An established heredoc body is a lexical zone distinct from the active syntax of its containing shell document. This boundary is authoritative for both editing behaviour and syntax representation.
