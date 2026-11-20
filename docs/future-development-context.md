@@ -49,26 +49,34 @@ This is a precedent to study, not a design to copy wholesale. In particular:
 - The supplied excerpt is TOML-specific. Do not infer from it that the same configuration already handles every mise file format.
 - A heredoc delimiter usually does not identify the payload language as directly as a mise `run` field's shebang can. Language identification may need a separate mechanism or may remain unknown.
 
-## Observed payload conventions in the user's scripts
+## Payload declarations and language identity
 
-The user's predominant heredoc use is provisioning files for installations and sending messages to the terminal. In these workflows, payload language is generally indicated by one of two contextual signals:
+The heredoc delimiter is structural only: it identifies the shell boundary and must not be overloaded to imply a payload filename, filetype, interpreter, or presentation mode.
 
-1. **Explicit signal — a shebang in the payload.** Provisioning heredocs may contain scripts with a shebang, which can identify the intended interpreter/language. This is analogous to the shebang-based language selection in the mise configuration.
-2. **Implicit signal — the receiving command in the shell command/pipeline.** A heredoc may be supplied to a consumer that establishes how its input is interpreted or rendered. For example:
+Payload language identity should preferably come from a declaration in, or explicitly associated with, the payload. Recognition of existing conventions is preferred over inventing a new in-body syntax:
 
-   ```sh
-   cat <<'EOF' | glow -
-   # Installation notes
+1. **Shebangs:** a leading shebang such as `#!/usr/bin/env bash` is an explicit declaration of script interpreter/language. It is genuine script content and remains part of the delivered payload.
+2. **Editor modelines:** an applicable modeline may declare a filetype. It is editor metadata expressed using the target language's comment syntax where available. Modeline recognition must be associated with the particular heredoc region; Neovim's buffer-level `filetype` is not a substitute for per-region language identity.
+3. **Filename or path metadata:** an explicitly supplied filename or path with an extension can identify the intended file and language. Do not heuristically interpret an arbitrary first line such as `# config.yaml` as a filename declaration; that is not a standardised convention.
+4. **Unknown or unsupported declarations:** retain an unknown/opaque payload rather than guessing. A narrow explicit fallback may be considered later for formats without a natural declaration, but its syntax and delivery semantics are not decided.
 
-   This is **Markdown** rendered in the terminal.
-   EOF
-   ```
+A shell-looking comment marker inside an established heredoc body is payload, not a shell comment: the shell delivers it to the receiving command. Any future fallback marker must therefore specify whether it is real payload content or editor-side metadata, and how it is excluded from or retained in shell-delivered bytes. Do not assume that a line resembling a shell comment is automatically harmless.
 
-   Here, `glow -` is the downstream consumer of standard input and provides evidence that the heredoc payload is Markdown.
+The declaration travels with the payload, so language identity need not depend on whether content arrived through `:r! cat`, another import operation, paste, or manual editing. Import provenance may still provide useful explicit metadata, but it is not the only source of language identity and must not be confused with the structural boundary.
 
-These are complementary signals: a shebang describes the intended script interpreter, while a downstream consumer can describe the payload's input format or presentation. Language classification should therefore consider the complete shell command relationship, including the command receiving the heredoc and its pipeline/redirection context, rather than inspecting only the opener, delimiter, or body.
+The preferred policy is to recognise existing declarations where valid and supported, with conservative handling when none is available. Do not infer language from the delimiter. Do not treat the downstream command as a general language declaration: consumer context can be supplementary evidence in a future classification model, but it is not the primary declaration policy and must not override an explicit payload declaration without a separately specified conflict rule.
 
-The consumer signal needs semantic knowledge of the command and its input convention. A generic command such as `cat` does not, by itself, identify a language; in the example, the useful signal is `glow -`. If the consumer is unknown, ambiguous, or does not imply a specific format, classification should remain unknown rather than guess. This is an observed usage pattern and a promising source of classification evidence, not yet an implemented rule or a complete command-to-language mapping.
+## Initial syntax-presentation case: Bash scripts
+
+The first concrete payload-language case selected for future syntax presentation is a Bash script whose body begins with:
+
+```bash
+#!/usr/bin/env bash
+```
+
+This is a deliberately narrow starting case. The shebang is an existing, explicit declaration; it remains part of the script delivered by the shell. A future presentation mechanism may use it to select Bash parsing/highlighting for the scanner-established body region.
+
+This selection does not authorise implementation of a Tree-sitter query or injection yet. It does not establish how a region-specific language association is represented, how the declaration is recognised and kept in sync as the body changes, or how an injection API obtains that association. Those remain implementation questions for the broader embedded-language work. The containing buffer retains its shell filetype, and the heredoc delimiter remains purely structural.
 
 ## Architectural distinction to preserve
 
@@ -114,9 +122,11 @@ Parse-tree boundary analysis, query-capture inspection, parser/API compatibility
 These are deliberately unresolved:
 
 - Which editing and language-service integrations can reliably respect the established lexical-zone boundary for every supported heredoc body? The boundary itself is adopted policy; the scope and implementation details of individual tool integrations remain to be investigated.
-- How should the two observed contextual signals be resolved: an explicit shebang in the payload, and an implicit language/format indication from the downstream command consuming the heredoc (including pipeline and redirection context)? What command-to-language knowledge is needed, how should conflicting signals be handled, and what confidence threshold is required?
-- How should unknown or ambiguous payloads behave? Is opaque treatment the default, and how should users opt into a language?
-- Which Neovim/Tree-sitter APIs can consume scanner-derived ranges robustly as the buffer changes?
+- Which existing declaration conventions should be recognised initially, and what exact syntax/position/precedence rules apply to each? In particular, how should shebangs and modelines be detected without confusing buffer-level filetype with per-region language identity?
+- How should explicitly associated filename/path metadata be represented and maintained for an individual payload region?
+- What narrow fallback, if any, is appropriate for payload formats without a natural declaration, and how will its editor-metadata versus delivered-content semantics be made explicit?
+- How should conflicting or malformed declarations be handled? The conservative default is unknown/opaque rather than heuristic guessing.
+- Which Neovim/Tree-sitter APIs can consume scanner-derived ranges and region-specific language associations robustly as the buffer changes?
 - Which diagnostics, completion, LSP, lint, and formatter integrations can actually scope behaviour to a region rather than a whole buffer?
 - How should formatting be handled when a formatter cannot exclude heredoc payloads? Should formatting be skipped, selectively delegated, or made explicitly user-controlled?
 - How should nested or multiple heredocs with different payload languages be represented and tested?
