@@ -64,14 +64,21 @@ Formatting is separate from interactive editing. `shfmt` is for Bash and POSIX `
 
 ## Future development context
 
-The adopted lexical-zone policy and remaining embedded-payload design questions are recorded in [future development context](docs/future-development-context.md). The current syntax-presentation mismatch and its bounded implementation work are tracked in [Task 002](tasks/active/002-syntax-presentation-lexical-zone-containment.md). Language identification, diagnostics/completion, and formatter isolation remain separate future integrations.
+The adopted lexical-zone policy and remaining embedded-payload design questions are recorded in [future development context](docs/future-development-context.md). The current syntax-presentation mismatch and its bounded implementation work are tracked in [deferred syntax-presentation investigation](tasks/deferred/002-syntax-presentation-lexical-zone-containment.md). Language identification, diagnostics/completion, and formatter isolation remain separate future integrations.
 
-## Current status
+## Project status: pre-release field validation
 
-- Repository initialisation complete.
-- Architecture and indentation invariants recorded in [the design contract](docs/design.md).
-- A conservative Lua scanner, pure structural closer/paste helpers, and Neovim buffer integration with changed-range tracking are present under `lua/` and `tests/`.
-- [The CI workflow](.github/workflows/test.yml) runs core, headless buffer integration, shell-delivery, formatter, and pinned LazyVim/plugin coexistence jobs.
-- The LazyVim integration harness now loads the repository as a local lazy.nvim plugin using `dir`, `ft`, and `opts`, exercising the same setup lifecycle as the documented installation spec. See [the CI design](docs/ci.md).
-- [Task 001](tasks/active/001-core-design-and-prototype.md) remains active. Its governing direction is the Return-local bounded-scope contract in [the design contract](docs/design.md); existing tests remain regression evidence, not a requirement to expand into a general shell parser or document-wide heredoc tracker.
+The core heredoc editing and autoformatting objective has, in large part, been achieved. The implementation now provides automatic closer insertion, structural indentation, payload/paste preservation, and tested coexistence with the pinned LazyVim integration environment. The five-layer CI workflow covers the scanner, Neovim buffer integration, shell delivery, formatter behaviour, and LazyVim/plugin coexistence.
+
+The project is therefore moving from core implementation toward a **pre-release for field testing**. The pre-release should provide a stable, identifiable baseline that can be exercised in real LazyVim configurations. Field use should help expose remaining functional edge cases, runtime-specific behaviour, efficiency issues, and opportunities to simplify the implementation. Those findings should be evaluated against the original editing objective rather than treated as a mandate to expand the feature set.
+
+This is not a claim that every environment or heredoc form is already covered. In particular, [Task 001](tasks/active/001-core-design-and-prototype.md) retains the remaining verification and simplification work. Hosted CI evidence and live workstation/field observations must be reported separately.
+
+### Stretch goals
+
+Nested heredoc indentation and embedded-language presentation (including possible Tree-sitter injection) are stretch goals beyond the core pre-release objective. They explore editor behaviour that extends the native Bash heredoc metaphor: Bash does not maintain nested indentation levels for successive `<<-` processing, and embedded-language presentation introduces a separate interpretation of payload regions.
+
+These investigations must not block the pre-release or be presented as missing prerequisites for the core autoformatting objective. Keep them separately scoped until field testing of the core behaviour provides a reason to prioritise them.
+
+The adopted lexical-zone boundary and the exploratory syntax-presentation work are recorded in [future development context](docs/future-development-context.md); the deferred syntax-presentation investigation is tracked in [Task 002](tasks/deferred/002-syntax-presentation-lexical-zone-containment.md).
 
