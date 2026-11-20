@@ -4,6 +4,37 @@
 
 This note records both the adopted boundary policy and the still-open design questions for embedded payload support. It is intended to survive context changes and help a fresh contributor or AI session distinguish settled requirements from unresolved implementation choices.
 
+## Project-level design test and scope
+
+The project exists to provide proper, predictable heredoc editing and autoformatting in LazyVim, while remaining usable as a normal Neovim plugin. The governing design test is:
+
+**Is this how heredocs should behave in the editing experience?**
+
+Do not replace that question with either of these narrower tests:
+
+- Does the editor reproduce every native shell behaviour as its user experience?
+- Can the implementation extend the shell's own semantics to support an editor feature?
+
+Native shell semantics remain authoritative evidence about what a script means and what bytes the receiving command gets. They are constraints that editing, formatting, and delivery behaviour must respect; they are not, by themselves, the specification for the best editing experience. Where a useful editor behaviour differs from the shell's native behaviour, the distinction and any required representation or transformation must be explicit, tested, and must not silently change the script's delivered meaning.
+
+### Native `<<-` behaviour is not nested indentation accounting
+
+For a shell `<<-` heredoc, the shell strips all leading TAB bytes from each line of that heredoc body, and applies the same TAB-stripping rule when matching its terminator. It does not track nested heredoc depth, maintain relative indentation levels, or select a particular indentation index to strip. Text that will later become an inner heredoc is still just text in the outer heredoc body at this stage.
+
+Consequently, an outer `<<-` can remove TABs intended as indentation in a nested heredoc before the inner script is ever interpreted. Preserving those TABs for a later inner `<<-` requires an explicit representation or transformation; it cannot be obtained by asking Bash's outer `<<-` to recognise and exempt the inner lexical zone.
+
+This is a shell-delivery fact and a design constraint. It does not prescribe that the plugin should emulate Bash's stripping as its editing indentation model, nor does it establish placeholder substitution, expansion, or another encoding as project policy. Any proposed nested-heredoc behaviour must be assessed against the editing goal and verified at both stages: the bytes produced by outer processing, and the behaviour when the generated inner script is executed.
+
+### Keep extensions separate from the core editing test
+
+Nested heredoc indentation and embedded-language syntax presentation are related extensions, but neither should silently expand the acceptance criteria for the core heredoc editing and autoformatting work.
+
+- **Core editing and formatting:** establish predictable opener/closer handling, structural indentation, paste preservation, and formatter coexistence in the LazyVim workflow. Verify that the resulting shell source retains its intended delivery semantics.
+- **Nested heredoc handling:** investigate separately where the desired editing representation needs to preserve inner indentation across an outer shell's native TAB stripping. Do not assume the shell already provides nested indentation levels.
+- **Embedded-language presentation:** investigate separately how payload regions might be highlighted or parsed as another language. Tree-sitter injection is one possible mechanism, not a prerequisite for the core editing/formatting test and not an authority for shell-delivery semantics or region boundaries.
+
+The lexical-zone policy recorded below remains the project's intended boundary distinction. However, implementing a Tree-sitter injection, diagnosing every host parse-tree capture, or providing general embedded-language presentation is not a condition for considering the core heredoc editing behaviour successful. These investigations should remain explicitly scoped and should be promoted into implementation requirements only through a separate design decision.
+
 ## Adopted project policy: lexical-zone boundary
 
 An established heredoc body is a lexical zone distinct from the active syntax of its containing shell document. This boundary is authoritative for both editing behaviour and syntax representation.
