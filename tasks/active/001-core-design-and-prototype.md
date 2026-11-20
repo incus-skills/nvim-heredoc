@@ -1,6 +1,6 @@
 # Task 001 — Return-local bounded heredoc editing
 
-**Status:** active — functional Return-local checkpoint integrated; live workstation behaviour and architectural simplification still require verification  
+**Status:** pre-release field-validation stage — core functionality is substantially implemented; field verification, remaining edge cases, and opportunities for simplification remain open  
 **Priority:** foundational  
 **Scope:** validate and simplify the managed <<- editing path around the established Return-local bounded-scope contract. Do not expand this task into a general shell parser or document-wide heredoc tracking system.
 
@@ -24,7 +24,9 @@ The shell language's declaration-order semantics for multiple heredocs on one co
 
 ## Objective
 
-Validate the Return-local bounded-scope behaviour in Bash, POSIX sh, and Zsh buffers; preserve payload bytes and <<- TAB semantics; and remove or avoid implementation machinery that exists only to solve the superseded document-wide ownership problem.
+The core heredoc editing and autoformatting objective is substantially implemented and is approaching pre-release field validation. Use the pre-release as a stable baseline in real LazyVim configurations. Identify remaining functional edge cases, environment-specific behaviour, efficiency issues, and opportunities for simplification. Preserve the established Return-local editing contract, payload bytes, and shell-delivery semantics.
+
+This task is no longer a reason to hold the project in an open-ended core-development phase. Remaining work should be judged by whether it materially affects safe, predictable use of the existing feature. Nested heredoc indentation and embedded-language presentation/Tree-sitter injection are separate stretch goals and are not acceptance prerequisites for the pre-release.
 
 ## Required work
 
@@ -40,7 +42,8 @@ Validate the Return-local bounded-scope behaviour in Bash, POSIX sh, and Zsh buf
 10. Preserve existing managed <<- to << transition behaviour where it remains part of the supported contract, without allowing that compatibility path to dictate new-scope architecture.
 11. Keep the layered scanner, buffer, live Insert-mode, shell-delivery, formatter, and plugin-coexistence tests. Amend tests only when a case asserts a superseded implementation mechanism rather than observable behaviour.
 12. Record genuine lexical and editor-event limitations. Do not claim complete shell grammar support.
-13. Run the documented test commands and CI. Distinguish hosted fixture results from live workstation verification.
+13. Run the documented test commands and CI. Distinguish hosted fixture results from live workstation and field verification.
+14. Use pre-release field reports to prioritise genuine correctness defects, compatibility issues, performance concerns, and simplifications; avoid expanding scope merely because an adjacent capability is technically interesting.
 
 ## Acceptance criteria
 
