@@ -6,11 +6,13 @@ ENV XDG_CONFIG_HOME=/tmp/nvim-config
 ENV XDG_DATA_HOME=/tmp/nvim-data
 ENV XDG_STATE_HOME=/tmp/nvim-state
 ENV XDG_CACHE_HOME=/tmp/nvim-cache
+ENV NVIM_TREESITTER_RUNTIME=/opt/nvim-plugins/nvim-treesitter/runtime
+ENV NVIM_HEREDOC_BASH_PARSER=/opt/nvim-parsers/bash.so
 
 WORKDIR /workspace
 
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends ca-certificates curl git shfmt tar \
+    && apt-get install --yes --no-install-recommends build-essential ca-certificates curl git shfmt tar \
     && rm -rf /var/lib/apt/lists/*
 
 COPY ci/lazyvim/versions.env /tmp/versions.env
@@ -33,12 +35,22 @@ RUN set -eu; \
     clone_at nvim-mini/mini.pairs mini.pairs "${MINI_PAIRS_SHA}"; \
     clone_at saghen/blink.cmp blink.cmp "${BLINK_CMP_SHA}"; \
     clone_at stevearc/conform.nvim conform.nvim "${CONFORM_SHA}"; \
+    clone_at nvim-treesitter/nvim-treesitter nvim-treesitter "${NVIM_TREESITTER_SHA}"; \
+    clone_at tree-sitter/tree-sitter-bash bash-parser "${BASH_PARSER_SHA}"; \
+    mkdir -p /opt/nvim-parsers; \
+    cc -shared -fPIC \
+      -I /opt/nvim-plugins/bash-parser/src \
+      /opt/nvim-plugins/bash-parser/src/parser.c \
+      /opt/nvim-plugins/bash-parser/src/scanner.c \
+      -o /opt/nvim-parsers/bash.so; \
     /opt/nvim/bin/nvim --version | head -n 1; \
     git -C /opt/nvim-plugins/LazyVim rev-parse HEAD; \
     git -C /opt/nvim-plugins/mini.pairs rev-parse HEAD; \
     git -C /opt/nvim-plugins/blink.cmp rev-parse HEAD; \
     git -C /opt/nvim-plugins/conform.nvim rev-parse HEAD; \
     git -C /opt/nvim-plugins/lazy.nvim rev-parse HEAD; \
+    git -C /opt/nvim-plugins/nvim-treesitter rev-parse HEAD; \
+    git -C /opt/nvim-plugins/bash-parser rev-parse HEAD; \
     shfmt --version
 
 COPY . /workspace
