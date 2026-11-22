@@ -66,6 +66,12 @@ Formatting is separate from interactive editing. `shfmt` is for Bash and POSIX `
 
 The adopted lexical-zone policy and remaining embedded-payload design questions are recorded in [future development context](docs/future-development-context.md). The current syntax-presentation mismatch and its bounded implementation work are tracked in [deferred syntax-presentation investigation](tasks/deferred/002-syntax-presentation-lexical-zone-containment.md). Language identification, diagnostics/completion, and formatter isolation remain separate future integrations.
 
+## Review process and reusable skills
+
+Project reviews also develop reusable review capabilities. The [review process](docs/review-process.md) describes how architectural reassessment, necessity/evidence analysis, critique of review criteria, and reconstructability are considered without turning them into a fixed rubric.
+
+Emerging capabilities are collected as provisional candidates in [the review-skills space](skills/review/README.md). Each review cycle can draw on, challenge, and refine that collection; applying a candidate in another project is a further test of its transferability.
+
 ## Project status: pre-release field validation
 
 The core heredoc editing and autoformatting objective has, in large part, been achieved. The implementation now provides automatic closer insertion, structural indentation, payload/paste preservation, and tested coexistence with the pinned LazyVim integration environment. The five-layer CI workflow covers the scanner, Neovim buffer integration, shell delivery, formatter behaviour, and LazyVim/plugin coexistence.
