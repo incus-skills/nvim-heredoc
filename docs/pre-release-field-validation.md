@@ -13,6 +13,12 @@ The purpose of field testing is to discover:
 
 Field findings should be recorded with a reproducible example, expected editing behaviour, observed result, environment/version details, and whether shell-delivered bytes were affected. Prioritise correctness and usability defects before speculative capability expansion.
 
+## Review cycles and reusable review skills
+
+Field validation is one source of observations for the project's ongoing review cycles. Reviews may also examine architecture, implementation complexity, tests, documentation, workflow, and the criteria used to evaluate them. The [review process](review-process.md) records the current approach.
+
+Review cycles should capture potentially reusable capabilities in the [review-skills collection](../skills/review/README.md). The collection begins with provisional candidates; it is intended to evolve through application and critique in this project and others, not to impose a fixed checklist. Field observations and review findings remain grounded in their project context, and a candidate's transferability should be tested rather than assumed.
+
 ## What this pre-release is testing
 
 The existing core behaviour is the subject of field validation:
