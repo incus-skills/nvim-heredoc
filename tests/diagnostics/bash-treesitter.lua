@@ -131,8 +131,10 @@ for _, fixture in ipairs(fixtures) do
     fixture.name .. ": injection content range differs from heredoc_body")
 
   local injection_languages = find_capture(injections, "injection.language")
-  print("injection.language captures=" .. #injection_languages
-    .. " (the pinned query may leave language selection to a consumer)")
+  assert(#injection_languages == 1, fixture.name .. ": expected one @injection.language capture")
+  assert(node_range(injection_languages[1]) == node_range(ends[1]),
+    fixture.name .. ": injection language capture differs from heredoc_end")
+  print("injection.language captures=" .. #injection_languages)
 
   -- Ask Neovim's active highlighter for effective captures at payload and
   -- terminator positions. This is a headless capture diagnostic, not a
