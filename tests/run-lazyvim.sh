@@ -21,6 +21,10 @@ echo "===== Live heredoc payload Return remains opaque ====="
 nvim --headless -u ci/lazyvim/init.lua \
   -c 'lua local ok, err = pcall(dofile, "tests/lua/live_heredoc_payload_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
 
+echo "===== Bash Tree-sitter heredoc boundary diagnostic ====="
+nvim --headless -u NONE \
+  -c 'lua local ok, err = pcall(dofile, "tests/diagnostics/bash-treesitter.lua"); if not ok then print(err); vim.cmd("cquit 1") else vim.cmd("qa!") end'
+
 echo "===== Live function-boundary insertion with MiniPairs ====="
 NVIM_HEREDOC_FUNCTION_BOUNDARY=1 nvim --headless -u ci/lazyvim/init.lua \
   -c 'lua local ok, err = pcall(dofile, "tests/lua/live_insert_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
