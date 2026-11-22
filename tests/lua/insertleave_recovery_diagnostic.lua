@@ -38,7 +38,7 @@ end
 
 -- Type a managed opener during this Insert session, but deliberately do not
 -- press Return. The opener therefore has no Return-created body/closer.
-api.nvim_input("icat <<-SESSION_ONLY")
+api.nvim_input(api.nvim_replace_termcodes("icat <lt><lt>-SESSION_ONLY", true, false, true))
 defer(function()
   assert(vim.api.nvim_get_mode().mode == "i",
     "typing the incomplete opener should leave Neovim in Insert mode")
