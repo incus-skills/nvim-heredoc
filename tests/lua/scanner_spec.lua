@@ -288,7 +288,7 @@ end
 -- Command-group observations are passive scanner output. A checkpoint exists
 -- only after the complete heredoc queue has been consumed.
 do
-  local result = scanner.scan("cat <<EOF\\nbody\\nEOF\\necho after\\n")
+  local result = scanner.scan("cat <<EOF\nbody\nEOF\necho after\n")
   assert(result.complete and #result.checkpoints == 1)
   local region = result.heredocs[1]
   local checkpoint = result.checkpoints[1]
@@ -299,7 +299,7 @@ do
 end
 
 do
-  local result = scanner.scan("cat <<A <<B\\none\\nA\\ntwo\\nB\\necho after\\n")
+  local result = scanner.scan("cat <<A <<B\none\nA\ntwo\nB\necho after\n")
   assert(result.complete and #result.heredocs == 2 and #result.checkpoints == 1)
   local first, final = result.heredocs[1], result.heredocs[2]
   assert(first.command_start_line == 1 and final.command_start_line == 1)
@@ -311,7 +311,7 @@ do
 end
 
 do
-  local result = scanner.scan("cat <<A <<B\\none\\nA\\ntwo\\n")
+  local result = scanner.scan("cat <<A <<B\none\nA\ntwo\n")
   assert(not result.complete and #result.heredocs == 2)
   assert(result.heredocs[1].terminator_line == 3)
   assert(result.heredocs[2].terminator_line == nil)
@@ -320,7 +320,7 @@ do
 end
 
 do
-  local result = scanner.scan("cat <<A\\nx\\nA\\necho ok\\ncat <<B\\ny\\n")
+  local result = scanner.scan("cat <<A\nx\nA\necho ok\ncat <<B\ny\n")
   assert(not result.complete and #result.checkpoints == 1)
   assert(result.checkpoints[1].group_key == result.heredocs[1].command_end_line)
   assert(result.checkpoints[1].pos == 4,
@@ -329,7 +329,7 @@ do
 end
 
 do
-  local source = "cat <<A\\nx\\nA\\necho " .. string.char(96) .. "unsupported" .. string.char(96) .. "\\n"
+  local source = "cat <<A\nx\nA\necho " .. string.char(96) .. "unsupported" .. string.char(96) .. "\n"
   local result = scanner.scan(source)
   assert(not result.complete and #result.checkpoints == 1)
   assert(result.checkpoints[1].pos == 4,
@@ -337,7 +337,7 @@ do
 end
 
 do
-  local source = table.concat({ "prefix", "cat \\", "<<-X", "body", "X", "" }, "\\n")
+  local source = table.concat({ "prefix", "cat \\", "<<-X", "body", "X", "" }, "\n")
   local result = scanner.scan(source)
   assert(result.complete and #result.heredocs == 1 and #result.checkpoints == 1)
   local region, checkpoint = result.heredocs[1], result.checkpoints[1]
