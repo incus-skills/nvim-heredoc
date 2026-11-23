@@ -428,9 +428,10 @@ function M.scan(source, opts)
     end
 
     local group_complete = true
+    local command_end_line = i - 1
     for q, item in ipairs(queue) do
       item.queue_position = q
-      item.command_end_line = i - 1
+      item.command_end_line = command_end_line
       local opener = lines[item.opener_line] or ""
       local prefix = opener:match("^([ \t]*)") or ""
       item.opener_prefix = prefix
