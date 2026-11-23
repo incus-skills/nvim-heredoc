@@ -1,5 +1,9 @@
 # Design contract
 
+**Status convention:** Statements about mechanisms are qualified as **Current contract**, **Current implementation**, **Transitional**, or **Potential capability**. The first occurrence establishes the authoritative status; later references should identify the specific responsibility or mechanism rather than restating or redefining its status. Use section numbers only as supplementary navigation because they may change.
+
+The classifications distinguish two kinds of change: **ownership corrections fix where an operation executes; capability replacements fix how a responsibility is fulfilled.** An ownership correction assigns an existing operation to its proper execution context and is enforced structurally. A capability replacement retains the responsibility while replacing the mechanism that currently fulfils it; its exit condition is a test of the replacement capability.
+
 ## 1. Scope
 
 The managed construct is a shell `<<-` heredoc. The implementation must not manage ordinary `<<` heredocs or here-strings (`<<<`).
@@ -57,6 +61,8 @@ The interactive contract is deliberately local.
 
 The plugin does not need to recognise and maintain an opener lifecycle character-by-character while the delimiter is being typed. Nor does it need a document-wide ledger of heredocs, stable identities for every opener, or a search through later candidate terminators to discover which closer belongs to the newly opened heredoc. The closer is created at the commitment point; it is not discovered later.
 
+**Current contract — commitment ownership:** Return is the sole authority for committing a new heredoc scope. The first-body-row closer-insertion operation belongs exclusively to the synchronous Return commitment path; deferred processing must not reach it. This is an ownership correction, not a transitional mechanism: the operation is valid, but executing it from deferred processing is not. Issue #50 tracks enforcement of this boundary. No exit condition applies; the required result is that the operation is structurally unreachable from deferred paths.
+
 An opener-looking line inside the established body is payload, not a competing shell command or heredoc declaration. A delimiter-looking line is governed by the shell's actual delimiter matching rules; it does not acquire ownership of the new scope merely because it appears later in the document. Other heredocs elsewhere in the buffer are outside the scope-establishment decision.
 This opacity applies recursively to interpretation, not to shell execution: the editor does not parse embedded script text as active shell syntax. A Return pressed on any line inside an existing heredoc body must remain a payload edit, even when that line contains a valid-looking managed opener. The containing heredoc must not create a nested closer or impose its shell indentation rules on the embedded script.
 
@@ -84,20 +90,32 @@ Editing responsibilities are correspondingly narrow:
 - **Structural placement:** put the closer inside an already-present enclosing boundary when that is the correct local placement; do not invent or recreate a function/compound-command closer.
 - **Body indentation:** add the managed body TAB prefix while preserving payload spaces and relative indentation.
 - **Terminator indentation:** align the closer with the opener using literal TAB bytes that <<- will strip.
-- **Existing managed transition:** preserve the established behaviour for changing an already-managed opener between <<- and <<, but do not let this compatibility path define the architecture of new Return-local scope creation.
+- **Transitional — managed-opener reconciliation:** the current `reconcile_managed_transition()` mechanism preserves behaviour when an already-managed opener changes between `<<-` and `<<`. It is retained while maintained snapshot knowledge and merge reconciliation acquire the capability to distinguish the managed and ordinary forms at the relevant cursor location, accounting for pending edit history. Its exit condition is that the maintained snapshot can make that distinction correctly without reconstructing it through this compatibility path. The capability replacement, rather than the compatibility mechanism, defines the intended responsibility.
 - **Paste preservation:** operate on the actual changed range and preserve existing bytes. This is a separate buffer-editing concern, not a reason to build a global heredoc identity system.
 
 Ordinary << heredocs and here-strings (<<<) remain unmanaged. They must not be modified by managed editing actions.
+
+**Responsibility dependency — not a temporal pipeline:** The scanner observes shell structure and reports uncertainty conservatively. The merge mechanism maintains current region knowledge by reconciling observations with prior state, including invalidation and per-group salvage. The containment query consumes that maintained knowledge, and the synchronous Return path commits only when the query establishes that commitment is safe. These are responsibility dependencies, not a strictly sequential execution pipeline: scanner observation and merge maintenance may be asynchronous relative to containment queries and Return. Return does not wait for the merge to complete; it queries the current snapshot, which may lag the latest edit, and the validity-aware containment query's affected-region rescan catches up when relevant boundaries have been invalidated.
+
+**Transitional — whole-buffer containment scan:** the current containment path uses a whole-buffer scan to establish whether the cursor is inside an existing heredoc payload. This is a mechanism retained until the validity-aware snapshot query can answer from maintained state or rescan only the affected region. Its exit condition is correct containment without a whole-buffer scan, including positive membership in ordinary `<<` and managed `<<-` payloads and negative membership on opener, terminator, structural/continuation, and intervening shell-source lines.
+
+**Current contract — validity-aware containment:** if the relevant snapshot boundaries are valid, answer from the maintained snapshot. If relevant boundaries were invalidated, rescan the affected region. If that rescan cannot establish containment because the region is damaged or lexically uncertain, return an uncertain result and decline the edit.
+
+**Containment soundness:** An uncertain containment result is not a negative containment result. The Return path must treat uncertainty as "cannot determine" and decline the edit. It must not treat uncertainty as "cursor is outside payload" and proceed to commit.
 
 ## 5. Interactive event handling and paste preservation
 
 The Return event is the semantic commitment point. Buffer-change callbacks are deferred and may coalesce a rapid sequence of Returns and payload keystrokes into one range; they are therefore not a reliable source of the individual commitment events.
 
+**Current contract — deferred-event ownership:** deferred events maintain existing state and may invalidate snapshot knowledge when relevant boundaries change, but they must never commit a new scope. The first-body-row closer-insertion operation is exclusive to synchronous Return; issue #50 tracks the structural correction that prevents deferred processing from reaching that branch. This does not prohibit sharing other maintenance operations, such as payload-range prefixing, where their responsibilities are valid in both paths.
+
+**Current implementation — InsertLeave recovery:** the current `InsertLeave` callback invokes broad buffer processing, including a bounded retry loop. This records present implementation behaviour, not a required recovery architecture. The retry loop is part of the broad document-processing path; scoped processing removes the need for that broad recovery behaviour. It is an ownership/scope correction, not a capability-replacement transition.
+
 The interactive path uses a buffer-local, non-expression Insert-mode <CR> mapping. Expression mappings run under Neovim's textlock and cannot perform the required buffer edit. Before recognising an opener, the mapping uses the scanner's bounded lexical result to determine whether the cursor is already inside an existing heredoc body (managed <<- or ordinary <<). If it is, Return is a literal line split: the plugin does not parse that line as shell syntax and does not delegate indentation to the shell indentexpr, autoindent, or MiniPairs. Blink may still consume Return for an explicitly visible completion menu. The containing heredoc may contribute its fixed structural TAB prefix, which <<- strips, but that prefix must not be derived cumulatively from preceding payload lines or alter the payload's relative spaces.
 
 Outside an existing payload, the mapping examines only the current line when the cursor is at its end. For exactly one safe managed <<- opener, it synchronously inserts the first body line and matching closer in one edit, then places the Insert-mode cursor after the body prefix. The new closer immediately bounds the body. It does not wait for on_lines, a scheduled scan, or a later candidate terminator.
 
-For non-payload, non-managed Return, the wrapper delegates to Blink's accept action when its completion menu is visible, then to MiniPairs' Return behaviour when available, and otherwise feeds native Return ahead of the remaining typeahead. This delegation is part of plugin coexistence, not a second heredoc parser. The deferred changed-range path must apply the same payload exclusion before attempting Return-local opener recognition.
+For non-payload, non-managed Return, the wrapper delegates to Blink's accept action when its completion menu is visible, then to MiniPairs' Return behaviour when available, and otherwise feeds native Return ahead of the remaining typeahead. This delegation is part of plugin coexistence, not a second heredoc parser. The deferred changed-range path must apply the same payload exclusion before attempting Return-local opener recognition. This is a current implementation constraint on deferred maintenance, not permission for deferred events to create a scope; Return remains the sole commitment authority.
 
 - Distinguish Return immediately after the completed opener from ordinary later body edits. Do not use a broad changed-range coincidence as a substitute for the event's meaning.
 - Insert the closer before the existing enclosing structural closer when that is the correct local placement. Do not synthesize a missing function brace or other enclosing construct.
@@ -146,6 +164,8 @@ Treesitter may be used as an optional cross-check or structural aid when a parse
 
 For syntax presentation, optional parser use must not override the established payload boundary: the containing shell parse must not claim payload content as active shell syntax. A future injection or other region-aware presentation mechanism may assign a contained language, or leave the region opaque, but it must consume the established body range. Parser availability remains optional for structural recognition and editing; this does not make incorrect outer-shell interpretation of payload an accepted visual result.
 
+**Current contract — scanner observation:** the scanner observes supported shell structure and records unsupported or ambiguous grammar cases conservatively. It does not maintain region state, decide containment, or commit edits. Snapshot maintenance belongs to the merge mechanism; see the responsibility dependency and the status of whole-buffer containment and managed-opener reconciliation described by those mechanism names above.
+
 The first implementation in `lua/nvim-heredoc/scanner.lua` is a deliberately bounded lexical prototype. It handles simple command lines, line continuations, comments, quotes, escaped operators, ordinary heredoc body skipping, declaration-order queues, arithmetic expansions, and ordinary command substitutions without nested heredocs. A heredoc redirection inside command substitution, backtick substitution, multiline quoted commands, and other unsupported contexts remain uncertain and must not be edited. It does not claim complete shell grammar coverage. The supported subset and diagnostics must expand only alongside regression tests.
 
 ## 8. Validation contract
@@ -192,6 +212,20 @@ Run generated scripts through the relevant shells and compare captured payload b
 Run the configured `shfmt -i 0 -p` command on representative Bash and POSIX `sh` fixtures. Compare payload bytes before and after formatting, and verify opener/body/terminator structure. Confirm that Zsh is not assigned to `shfmt`.
 
 A visually correct buffer is not sufficient evidence that the shell receives the intended payload.
+
+### Containment and commitment tests
+
+The containment contract has three distinguishable outcomes:
+
+- A valid snapshot establishes containment; answer from maintained state.
+- Relevant boundaries are invalidated, but an affected-region rescan establishes containment; answer from the rescan.
+- Relevant boundaries are invalidated and the affected-region rescan cannot establish containment; return uncertainty and decline editing.
+
+Tests must verify both positive and negative containment. Positive cases include payload under ordinary `<<` and managed `<<-`; negative cases include opener lines, terminators, command-structure and continuation lines, and shell source between regions. In particular, a terminator must not be misclassified as payload, because doing so would incorrectly suppress Return commitment.
+
+**Containment soundness test:** construct a state in which the snapshot is invalidated and the affected-region rescan fails, trigger Return, and assert that no closer is inserted. Keep this test distinct from the positive-membership test in which the cursor is established to be inside payload. Both produce no edit, but the former proves that uncertainty is not treated as a negative containment result.
+
+**Deferred commitment ownership test (#50):** trigger deferred `TextChanged` processing with the cursor and changed range matching the first-body-row closer-insertion condition, and assert that no closer is inserted. The operation must be reachable only through synchronous Return. Also verify the Return path declines commitment when its containment precondition is uncertain.
 
 ## 9. Delivery
 
