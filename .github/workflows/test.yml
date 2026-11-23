@@ -84,7 +84,19 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       - name: Build pinned integration container
-        run: docker build --file ci/lazyvim/Dockerfile --tag nvim-heredoc-lazyvim-test .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ci/lazyvim/Dockerfile
+          push: false
+          load: true
+          tags: nvim-heredoc-lazyvim-test
+          cache-from: type=gha
+          # Forked PRs may receive a cold cache; cache export is optional and
+          # must not affect whether the integration tests run.
+          cache-to: type=gha,mode=max,ignore-error=true
       - name: Run headless LazyVim/plugin tests
         run: docker run --rm nvim-heredoc-lazyvim-test
