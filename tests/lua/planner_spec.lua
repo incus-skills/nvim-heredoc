@@ -47,6 +47,19 @@ do
   assert(contains(result.R, 1))
 end
 
+-- Later events use the coordinate space produced by earlier events in the batch.
+do
+  local old = snapshot({ region() }, { checkpoint(5, 1) })
+  local result = plan(old, {
+    { firstline = 0, lastline = 0, new_lastline = 1 },
+    { firstline = 4, lastline = 5, new_lastline = 5 },
+  }, { "prefix", "cat <<-EOF", "payload", "more", "changed terminator" })
+  local mapped = result.mapped_snapshot.heredocs[1]
+  assert(mapped.opener_line == 2 and mapped.terminator_line == nil)
+  assert(result.mapped_snapshot.checkpoints[1].pos == 6)
+  assert(#result.I == 1 and contains(result.R_structural, 5))
+end
+
 -- Deletion before a region shifts its line coordinates in the opposite direction.
 do
   local old = snapshot({ region({
