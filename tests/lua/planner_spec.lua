@@ -179,9 +179,9 @@ do
   })
   local second = region({
     delimiter = "SECOND", command_start_line = 6, command_end_line = 6,
-    opener_line = 6, body_start_line = 7, body_end_line = 8, terminator_line = 9,
+    opener_line = 6, body_start_line = 7, body_end_line = 7, terminator_line = 8,
   })
-  local old = snapshot({ first, second }, { checkpoint(6, 1), checkpoint(10, 6) })
+  local old = snapshot({ first, second }, { checkpoint(6, 1), checkpoint(9, 6) })
   local result = plan(old, {
     { firstline = 2, lastline = 2, new_lastline = 3 },
   }, {
@@ -219,17 +219,17 @@ do
     body_start_line = 2, body_end_line = 2, terminator_line = 3,
   })
   local b = region({
-    command_start_line = 5, command_end_line = 5, opener_line = 5,
-    body_start_line = 6, body_end_line = 6, terminator_line = 7,
+    command_start_line = 7, command_end_line = 7, opener_line = 7,
+    body_start_line = 8, body_end_line = 8, terminator_line = 9,
   })
-  local old = snapshot({ a, b }, { checkpoint(4, 1), checkpoint(8, 5) })
+  local old = snapshot({ a, b }, { checkpoint(4, 1), checkpoint(10, 7) })
   local result = plan(old, {
     { firstline = 4, lastline = 5, new_lastline = 5 },
   }, {
     "cat <<-EOF", "body", "EOF", "echo before",
     "changed shell line", "echo after", "cat <<-EOF", "body", "EOF",
   })
-  assert(result.S == 4 and result.E == 8)
+  assert(result.S == 4 and result.E == 10)
 end
 
 -- An incomplete snapshot with a mapped checkpoint at or beyond E requires
