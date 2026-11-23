@@ -42,6 +42,8 @@ end
 
 -- Payload intervals are half-open. Start uses before affinity and end uses
 -- after affinity, so insertions at either edge are included as payload.
+-- If a replacement consumes an interval boundary, move that boundary outside
+-- the replacement: changed lines are then treated conservatively as source.
 local function map_payload_boundary(pos, edit, affinity)
   if type(pos) ~= "number" then return nil end
   local boundary = pos - 1
@@ -53,8 +55,8 @@ local function map_payload_boundary(pos, edit, affinity)
   end
   if boundary <= edit.firstline then return pos end
   if boundary >= edit.lastline then return pos + change end
-  if affinity == "after" then return edit.new_lastline + 1 end
-  return edit.firstline + 1
+  if affinity == "after" then return edit.firstline + 1 end
+  return edit.new_lastline + 1
 end
 
 local function delimiter_matches(line, payload)
