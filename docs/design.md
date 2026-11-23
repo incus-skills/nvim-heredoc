@@ -239,3 +239,117 @@ See [the CI design](ci.md) for job boundaries, dependency policy, container
 role, and test-command prerequisites. CI invokes the same local test
 commands. Hosted success establishes the repository fixture results only;
 live workstation verification remains separate.
+
+## 11. Implementation status: editing responsibilities and current event paths
+
+This section separates the intended interaction contract from the behaviour of the
+current implementation. The design sections above define the responsibilities the
+plugin is intended to satisfy; they must not be read as evidence that every event
+path already satisfies them.
+
+### 11.1 Responsibility boundaries
+
+The intended responsibilities are:
+
+- **Return — scope creation.** Return after one safe, completed managed
+  `<<-` opener is the commitment event. The plugin creates the body and
+  matching closer synchronously, establishing the new payload boundary. This
+  is the authority to create a new managed scope.
+- **TextChanged — changed-content processing.** Deferred buffer notifications
+  describe edits, not semantic commitment events. They may be coalesced and
+  must be interpreted as one ordered edit batch. Processing may update the
+  interpretation and formatting associated with that batch, but must not
+  acquire document-wide mutation authority merely because the scanner can
+  discover other regions.
+- **InsertLeave — local finalisation.** Leaving Insert mode is not permission
+  to format or recover every managed heredoc in the buffer. Its intended role
+  is a final local pass over the edit context owned by the current Insert
+  session. It must not mutate unrelated regions or close an incomplete
+  heredoc elsewhere in the document.
+- **Explicit document-wide operation — document-wide scope.** A deliberate
+  whole-buffer formatting or recovery operation may use a whole-buffer scan
+  because the document itself is its declared subject. Such an operation is
+  distinct from Return, TextChanged, and InsertLeave.
+
+The scanner reports lexical observations. Discovery of a region, including
+discovery during a whole-buffer scan, does not by itself grant a consumer
+authority to mutate that region. Mutation scope comes from the event's
+responsibility and its relevant edit evidence.
+
+### 11.2 Current implementation behaviour
+
+The following describes the implementation on the current `main` branch; it
+is an empirical status record, not the intended contract above.
+
+- The Return mapping handles one safe managed `<<-` opener at the cursor
+  synchronously by inserting the body prefix and closer. The Return-local
+  path is separate from later document scans. Multiple queued heredocs are
+  left conservative in this path.
+- The buffer attachment records ordered `on_lines` edits and coalesces
+  non-empty changed ranges for deferred processing. The current pending
+  processor invokes `M.process_buffer()` separately for each pending range,
+  rather than committing one atomic snapshot transaction for the batch.
+- Each `M.process_buffer()` invocation performs a whole-buffer scanner pass.
+  When the result is complete, an un-ranged invocation may prefix every
+  editable managed region; a ranged invocation limits prefixing to its
+  supplied range. The current implementation refreshes its scan snapshot
+  after each successful invocation.
+- The current `InsertLeave` autocmd calls `M.process_buffer(buf)` without
+  a changed range. Consequently, it performs a whole-buffer scan and may
+  prefix complete managed regions outside the cursor's local context.
+- If that whole-buffer scan finds an incomplete but opener-safe managed
+  heredoc, the current un-ranged recovery path may append its closer at EOF.
+  This can affect a different region from the one in which the user was
+  editing.
+- The pending-range processor also has an un-ranged fallback when it finds
+  no pending range. An empty changed-range queue therefore does not currently
+  guarantee that no processing occurs.
+
+These behaviours are relevant when interpreting existing tests and diagnostic
+PRs. In particular, the cross-region effects demonstrated by diagnostic PRs
+[#44](https://github.com/incus-skills/nvim-heredoc/pull/44) and
+[#45](https://github.com/incus-skills/nvim-heredoc/pull/45) are evidence of
+the current event-path gap, not acceptance criteria for the intended
+InsertLeave contract.
+
+### 11.3 Intended local recovery and transaction boundary
+
+The intended InsertLeave path must be constrained by local edit evidence and
+the relevant lexical context. Cursor position can help identify the active
+context, but cursor position alone is not a substitute for the history of
+changes made during an Insert session: one session may edit multiple or
+disjoint ranges.
+
+In particular:
+
+- An empty pending-range queue must not trigger un-ranged processing as a
+  fallback.
+- InsertLeave must not append a closer to an incomplete heredoc merely
+  because a whole-buffer scan discovers it.
+- A pre-existing incomplete heredoc may be considered for recovery only
+  when the user is in its relevant context or invokes an explicit recovery
+  operation.
+- Complete regions outside the local mutation scope must not be formatted
+  as a side effect of leaving Insert mode.
+- Ownership of a pending edit batch, coordinate mapping, bounded rescanning,
+  and snapshot publication must be treated as one transaction. A lost or
+  superseded batch must not publish partial state.
+
+The snapshot transaction and bounded-rescan semantics are specified
+separately in [the incremental scan and snapshot-merge contract](incremental-scan-merge.md).
+This design section establishes the event responsibilities and the boundary
+between observation and mutation; it does not restate the merge algorithm.
+
+### 11.4 Scope of document-wide processing
+
+The current attachment path performs an initial scan when a supported buffer
+is attached, and subsequent scans through the Return, TextChanged, and
+InsertLeave paths described above. It does not currently register a dedicated
+managed-heredoc BufRead or BufWrite handler. The existence of a whole-buffer
+scanner does not imply that automatic open-time or save-time recovery is part
+of the event contract.
+
+Any future document-wide operation must be explicit about its trigger,
+mutation authority, and treatment of incomplete or uncertain regions. It must
+not be introduced by broadening an interactive event's scope.
+
