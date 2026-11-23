@@ -96,6 +96,8 @@ local function make_groups(snapshot, old_line_count)
         group = {
           old_group_key = key,
           current_group_key = key,
+          command_start_line = nil,
+          command_end_line = nil,
           structural_lines = {},
           payloads = {},
         }
@@ -105,6 +107,10 @@ local function make_groups(snapshot, old_line_count)
       local first = region.command_start_line or region.opener_line
       local last = region.command_end_line or region.opener_line
       if first and last then
+        group.command_start_line = group.command_start_line
+          and math.min(group.command_start_line, first) or first
+        group.command_end_line = group.command_end_line
+          and math.max(group.command_end_line, last) or last
         for line = math.min(first, last), math.max(first, last) do
           group.structural_lines[line] = true
         end
@@ -152,6 +158,8 @@ end
 local function map_groups(groups, edit)
   for _, group in pairs(groups) do
     group.current_group_key = map_line(group.current_group_key, edit)
+    group.command_start_line = map_line(group.command_start_line, edit)
+    group.command_end_line = map_line(group.command_end_line, edit)
     local structural = {}
     for line in pairs(group.structural_lines) do
       local mapped = map_line(line, edit)
@@ -222,6 +230,19 @@ function M.plan(snapshot, edits, current_lines)
             add_reason(reasons, group.old_group_key, "structural-coordinate")
             break
           end
+        end
+      end
+    elseif edit.firstline == edit.lastline then
+      -- A line insertion between physical lines of a continued command
+      -- changes the logical command structure even though no old line is
+      -- consumed. The boundary after the final command line is the payload
+      -- start, not an internal command-structure boundary.
+      for _, group in pairs(groups) do
+        if group.command_start_line and group.command_end_line
+          and edit.firstline >= group.command_start_line
+          and edit.firstline < group.command_end_line then
+          touched_structural = true
+          add_reason(reasons, group.old_group_key, "structural-insertion")
         end
       end
     end

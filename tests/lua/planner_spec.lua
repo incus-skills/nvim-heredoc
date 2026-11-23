@@ -122,6 +122,20 @@ do
   assert(#result.I == 0)
 end
 
+-- Inserting between physical lines of a continued command invalidates its
+-- group; insertion at the completed group's checkpoint does not.
+do
+  local continued = region({
+    command_start_line = 1, command_end_line = 2, opener_line = 2,
+    body_start_line = 3, body_end_line = 3, terminator_line = 4,
+  })
+  local old = snapshot({ continued }, { checkpoint(5, 2) })
+  local result = plan(old, {
+    { firstline = 1, lastline = 1, new_lastline = 2 },
+  }, { "cat \\", "inserted command line", "<<-EOF", "body", "EOF" })
+  assert(#result.I == 1 and contains(result.R_structural, 2))
+end
+
 -- Replacing opener, terminator, or command-structure lines invalidates the group.
 do
   local cases = {
