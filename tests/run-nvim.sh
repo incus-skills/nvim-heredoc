@@ -9,6 +9,7 @@ nvim --headless -u NONE -c 'lua local ok, err = pcall(dofile, "tests/lua/live_sp
 nvim --headless -u NONE -c 'lua local ok, err = pcall(dofile, "tests/lua/live_autoindent_tab_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
 nvim --headless -u NONE -c 'lua local ok, err = pcall(dofile, "tests/lua/live_autoindent_burst_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
 nvim --headless -u NONE -c 'lua local ok, err = pcall(dofile, "tests/lua/insertleave_recovery_diagnostic.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
+nvim --headless -u NONE -c 'lua local ok, err = pcall(dofile, "tests/lua/insertleave_cursor_elsewhere_diagnostic.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
 bash tests/expect-failure.sh "buffer integration negative control" \
   "NEGATIVE_CONTROL: ordinary heredoc was unexpectedly left unchanged" \
   nvim --headless -u NONE -c 'lua local ok, err = pcall(dofile, "tests/negative/buffer.lua"); if ok then vim.cmd("qa!") else print(err); vim.cmd("cquit 1") end'
