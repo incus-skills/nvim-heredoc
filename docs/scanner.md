@@ -16,7 +16,8 @@ The scanner is buffer-independent and does not mutate its input. It normalises C
 - `complete`: whether the source was scanned without a lexical ambiguity or unresolved heredoc;
 - `regions`: managed `<<-` heredoc regions only;
 - `heredocs`: all recognised heredoc regions, including ordinary `<<`, used to detect operator transitions;
-- `diagnostics`: line-associated reasons why the scan is incomplete or uncertain.
+- `diagnostics`: line-associated reasons why the scan is incomplete or uncertain;
+- `checkpoints`: completed heredoc command-group boundaries, as described below.
 
 A completed region currently contains:
 
@@ -24,8 +25,10 @@ A completed region currently contains:
 |---|---|
 | `operator` | Always `<<-` for a returned managed region |
 | `opener_line` | 1-based physical line containing the operator |
-| `command_end_line` | Last physical line of the logical command |
+| `command_start_line` | First physical line of the logical command |
+| `command_end_line` | Last physical line of the logical command; also the generation-local command-group key |
 | `queue_position` | Heredoc declaration order on that command |
+| `is_final_in_queue` | Whether this is the final heredoc declaration in the command queue |
 | `delimiter_original` | Delimiter spelling as written, including quotes/escapes |
 | `delimiter` | Quote-removed delimiter used for terminator matching |
 | `delimiter_quoted` | Whether quoting/escaping suppresses body expansion |
