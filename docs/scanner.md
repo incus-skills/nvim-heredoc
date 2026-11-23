@@ -16,7 +16,8 @@ The scanner is buffer-independent and does not mutate its input. It normalises C
 - `complete`: whether the source was scanned without a lexical ambiguity or unresolved heredoc;
 - `regions`: managed `<<-` heredoc regions only;
 - `heredocs`: all recognised heredoc regions, including ordinary `<<`, used to detect operator transitions;
-- `diagnostics`: line-associated reasons why the scan is incomplete or uncertain.
+- `diagnostics`: line-associated reasons why the scan is incomplete or uncertain;
+- `checkpoints`: completed heredoc command-group boundaries, as described below.
 
 A completed region currently contains:
 
@@ -24,8 +25,10 @@ A completed region currently contains:
 |---|---|
 | `operator` | Always `<<-` for a returned managed region |
 | `opener_line` | 1-based physical line containing the operator |
-| `command_end_line` | Last physical line of the logical command |
+| `command_start_line` | First physical line of the logical command |
+| `command_end_line` | Last physical line of the logical command; also the generation-local command-group key |
 | `queue_position` | Heredoc declaration order on that command |
+| `is_final_in_queue` | Whether this is the final heredoc declaration in the command queue |
 | `delimiter_original` | Delimiter spelling as written, including quotes/escapes |
 | `delimiter` | Quote-removed delimiter used for terminator matching |
 | `delimiter_quoted` | Whether quoting/escaping suppresses body expansion |
@@ -43,45 +46,37 @@ A completed region currently contains:
 
 An unterminated managed heredoc is returned with `confidence = "incomplete"`, no body end/terminator line, and `editable = false`. Its opener may still be marked safe for closer insertion when its visual indentation column can be represented exactly by a TAB-only prefix. If lexical state becomes ambiguous, scanning stops rather than treating possible heredoc payload as subsequent shell source. Any uncertainty disables editing for all regions returned by that scan.
 
-## Planned: Command-group checkpoint observations
+## Command-group checkpoint observations
 
-**Status: planned; not part of the current scanner return contract.**
+**Status: current scanner observations.** These fields are additive observations of the scanner's existing queue-consumption process. They do not change shell recognition, document-level completeness, or editing authority.
 
-The current scanner does not emit per-command-group completion records or checkpoint positions. Its `complete` flag describes the document-level scan result only. Current region records do not contain `command_start_line` or `is_final_in_queue`, and consumers must not assume those fields are available today.
+### Region observations
 
-This is not a deficiency in the existing scanner contract. It is an additional observation required by the planned incremental scan and snapshot-merge mechanism. The observations record state the scanner already reaches while consuming a command's heredoc queue; they do not change how the scanner recognises shell syntax or establish a new editing responsibility.
+Each recognised heredoc region includes:
 
-### Planned region observations
-
-The planned additive region fields are:
-
-| Field | Planned meaning |
+| Field | Meaning |
 |---|---|
-| `command_start_line` | 1-based physical line at which the logical command begins. Every heredoc region discovered from that command carries the same value. |
-| `is_final_in_queue` | True only for the final heredoc declaration in that command's queue; false for earlier queue members. |
+| `command_start_line` | 1-based physical line at which the logical command begins. All regions from that command share the value. |
+| `is_final_in_queue` | True only for the final heredoc declaration in that command's queue. |
 
-The existing `command_end_line` value serves as the command group's generation-local `group_key`. All regions in the same command group therefore share that key. It remains a coordinate-derived association, not a persistent command identity.
+The existing `command_end_line` value serves as the command group's generation-local `group_key`. All regions in the same command group therefore share that key. It is a coordinate-derived association, not a persistent command identity.
 
-### Planned checkpoint observations
+### Checkpoint observations
 
-The scanner will additionally return checkpoint observations for command groups whose complete heredoc queue has been consumed. A checkpoint observation records:
+The scan result includes a `checkpoints` collection. Each checkpoint records:
 
 - `pos`: the 1-based boundary position immediately after the final heredoc terminator;
-- `group_key`: the same command-group key carried by that group's region records.
+- `group_key`: the command-group key shared by that group's region records.
 
-The observation is emitted only at the existing state transition where the final queue member's terminator has been consumed and the scanner index `i` has advanced to the following line position. A terminator found for an earlier queue member is not a checkpoint while later members remain pending. A command group with no heredoc queue does not produce a heredoc-queue checkpoint through this observation.
+A checkpoint is emitted only after the entire heredoc queue has been consumed and the scanner index has advanced to the following line position. A terminator found for an earlier queue member is not a checkpoint while later members remain pending. A command group with no heredoc queue does not produce a checkpoint.
 
-These records are passive observations of queue exhaustion and the resulting between-command boundary. They do not alter the existing region records' meaning, the document-level `complete` flag, or the scanner's conservative handling of lexical uncertainty.
-
-### Coordinates
-
-All planned observation coordinates use the same scanner-local convention as existing region line numbers: 1-based indices into the line array supplied to the scan. The checkpoint `pos` is a 1-based boundary position, not the line number of the terminator itself. The incremental merge consumer translates region coordinates, group keys, and checkpoint positions into full-buffer coordinates using the bounded attempt's starting offset.
+All observation coordinates use scanner-local, 1-based line positions. The incremental merge consumer translates region coordinates, group keys, and checkpoint positions into full-buffer coordinates using the bounded attempt's starting offset.
 
 ### Relationship to conservative downgrade
 
-The scanner's existing policy of downgrading all regions when `complete = false` remains the scanner's own contract. The scanner's downgrade is authoritative for consumers that do not perform merge-level salvage. The merge mechanism (see [Incremental scan and snapshot-merge contract](incremental-scan-merge.md)) uses checkpoint observations to recover per-group validity from a downgraded result.
+The scanner's existing policy of downgrading all regions when `complete = false` remains authoritative for consumers that do not perform merge-level salvage. Checkpoint observations do not change the document-level `complete` flag or that downgrade policy.
 
-The merge consumer, not the scanner, decides how those observations affect preservation and salvage. This document specifies only the observations the scanner will provide; it does not duplicate the consumer's merge rules.
+The merge consumer, not the scanner, decides how observations affect preservation and salvage. These records report only which command groups the scanner actually completed; they do not themselves make a partial document snapshot trusted.
 
 ## Current supported lexical subset
 

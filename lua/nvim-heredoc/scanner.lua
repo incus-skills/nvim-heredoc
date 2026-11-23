@@ -394,7 +394,7 @@ function M.scan(source, opts)
   local tabstop = tonumber(opts.tabstop) or 2
   if tabstop < 1 then tabstop = 2 end
   local lines = split_lines(source or "")
-  local result = { regions = {}, heredocs = {}, diagnostics = {}, complete = true }
+  local result = { regions = {}, heredocs = {}, diagnostics = {}, checkpoints = {}, complete = true }
   local i = 1
 
   while i <= #lines do
@@ -427,9 +427,11 @@ function M.scan(source, opts)
       return result
     end
 
+    local group_complete = true
+    local command_end_line = i - 1
     for q, item in ipairs(queue) do
       item.queue_position = q
-      item.command_end_line = i - 1
+      item.command_end_line = command_end_line
       local opener = lines[item.opener_line] or ""
       local prefix = opener:match("^([ \t]*)") or ""
       item.opener_prefix = prefix
@@ -453,8 +455,10 @@ function M.scan(source, opts)
         operator = item.operator,
         opener_line = item.opener_line,
         opener_text = opener,
+        command_start_line = first,
         command_end_line = item.command_end_line,
         queue_position = q,
+        is_final_in_queue = q == #queue,
         delimiter_original = item.delimiter_original,
         delimiter = item.delimiter,
         delimiter_quoted = item.delimiter_quoted,
@@ -477,6 +481,7 @@ function M.scan(source, opts)
       end
 
       if not terminator then
+        group_complete = false
         result.complete = false
         result.diagnostics[#result.diagnostics + 1] = {
           line = item.opener_line,
@@ -485,6 +490,16 @@ function M.scan(source, opts)
         break
       end
       i = terminator + 1
+    end
+
+    -- A command group is complete only after its entire heredoc queue has
+    -- been consumed. The checkpoint is the between-command boundary after
+    -- the final terminator, in this scan attempt coordinates.
+    if group_complete and #queue > 0 then
+      result.checkpoints[#result.checkpoints + 1] = {
+        pos = i,
+        group_key = queue[#queue].command_end_line,
+      }
     end
   end
 

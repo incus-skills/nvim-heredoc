@@ -284,4 +284,67 @@ do
     "the outer EOF alone should close the non-colliding cargo fixture")
 end
 
+
+-- Command-group observations are passive scanner output. A checkpoint exists
+-- only after the complete heredoc queue has been consumed.
+do
+  local result = scanner.scan("cat <<EOF\nbody\nEOF\necho after\n")
+  assert(result.complete and #result.checkpoints == 1)
+  local region = result.heredocs[1]
+  local checkpoint = result.checkpoints[1]
+  assert(region.command_start_line == 1)
+  assert(region.command_end_line == 1 and region.is_final_in_queue)
+  assert(checkpoint.group_key == region.command_end_line)
+  assert(checkpoint.pos == 4, "checkpoint is the boundary after the terminator")
+end
+
+do
+  local result = scanner.scan("cat <<A <<B\none\nA\ntwo\nB\necho after\n")
+  assert(result.complete and #result.heredocs == 2 and #result.checkpoints == 1)
+  local first, final = result.heredocs[1], result.heredocs[2]
+  assert(first.command_start_line == 1 and final.command_start_line == 1)
+  assert(first.command_end_line == final.command_end_line)
+  assert(first.command_end_line == result.checkpoints[1].group_key)
+  assert(not first.is_final_in_queue and final.is_final_in_queue)
+  assert(result.checkpoints[1].pos == 6,
+    "a multi-heredoc group checkpoints only after its final terminator")
+end
+
+do
+  local result = scanner.scan("cat <<A <<B\none\nA\ntwo\n")
+  assert(not result.complete and #result.heredocs == 2)
+  assert(result.heredocs[1].terminator_line == 3)
+  assert(result.heredocs[2].terminator_line == nil)
+  assert(#result.checkpoints == 0,
+    "a completed earlier queue member must not checkpoint an incomplete group")
+end
+
+do
+  local result = scanner.scan("cat <<A\nx\nA\necho ok\ncat <<B\ny\n")
+  assert(not result.complete and #result.checkpoints == 1)
+  assert(result.checkpoints[1].group_key == result.heredocs[1].command_end_line)
+  assert(result.checkpoints[1].pos == 4,
+    "a later incomplete group must preserve an earlier completed group's checkpoint")
+  assert(result.heredocs[2].terminator_line == nil)
+end
+
+do
+  local source = "cat <<A\nx\nA\necho " .. string.char(96) .. "unsupported" .. string.char(96) .. "\n"
+  local result = scanner.scan(source)
+  assert(not result.complete and #result.checkpoints == 1)
+  assert(result.checkpoints[1].pos == 4,
+    "lexical early return must retain checkpoints from earlier completed groups")
+end
+
+do
+  local source = table.concat({ "prefix", "cat \\", "<<-X", "body", "X", "" }, "\n")
+  local result = scanner.scan(source)
+  assert(result.complete and #result.heredocs == 1 and #result.checkpoints == 1)
+  local region, checkpoint = result.heredocs[1], result.checkpoints[1]
+  assert(region.command_start_line == 2 and region.opener_line == 3)
+  assert(region.command_end_line == 3 and region.is_final_in_queue)
+  assert(checkpoint.group_key == 3 and checkpoint.pos == 6,
+    "group keys and checkpoint positions remain scan-local, 1-based coordinates")
+end
+
 print("scanner tests: PASS")
