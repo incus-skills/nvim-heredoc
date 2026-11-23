@@ -239,14 +239,19 @@ do
     command_start_line = 1, command_end_line = 1, opener_line = 1,
     body_start_line = 2, body_end_line = 2, terminator_line = 3,
   })
-  local old = snapshot({ a }, { checkpoint(4, 1), checkpoint(7, 5) }, false)
+  local b = region({
+    command_start_line = 8, command_end_line = 8, opener_line = 8,
+    body_start_line = 9, body_end_line = 9, terminator_line = 10,
+  })
+  local old = snapshot({ a, b }, { checkpoint(4, 1), checkpoint(11, 8) }, false)
   local result = plan(old, {
     { firstline = 4, lastline = 5, new_lastline = 5 },
   }, {
     "cat <<-EOF", "body", "EOF", "echo before",
     "changed shell line", "echo after", "tail",
+    "cat <<-EOF", "body", "EOF",
   })
-  assert(result.E == 7 and result.fallback_required)
+  assert(result.E == 11 and result.fallback_required)
 end
 
 print("snapshot planner tests: PASS")
