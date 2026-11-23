@@ -198,6 +198,12 @@ do
   }, { "cat <<-EOF", "payload", "\tEOF", "more", "EOF" })
   assert(contains(result.R_content, 3) and #result.I == 1)
 
+  local managed_spaces = plan(managed, {
+    { firstline = 2, lastline = 2, new_lastline = 3 },
+  }, { "cat <<-EOF", "payload", " EOF", "more", "EOF" })
+  assert(#managed_spaces.I == 0,
+    "<<- must not strip leading spaces when matching a delimiter")
+
   local ordinary = snapshot({ region({ operator = "<<" }) }, { checkpoint(5, 1) })
   local exact = plan(ordinary, {
     { firstline = 2, lastline = 2, new_lastline = 3 },
