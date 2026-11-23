@@ -140,6 +140,41 @@ These are deliberately unresolved:
 - How should nested or multiple heredocs with different payload languages be represented and tested?
 - What is the appropriate minimum Neovim and plugin API support for any such integration?
 
+## Review #39: incremental snapshot maintenance and event ownership
+
+**Status:** Review #39 is specification-closed. The contract is recorded in [the incremental scan and snapshot-merge contract](incremental-scan-merge.md), with the scanner's additive, planned observations described separately in [the scanner interface](scanner.md). The implementation work below remains unauthorised. These documents define intended behaviour; they do not grant implementation permission.
+
+The architectural responsibility split is:
+
+- **Scanner observation:** report supported shell structure and passive command-group completion observations. The scanner remains conservative at document level; it does not maintain region state, decide containment, or commit edits.
+- **Edit mapping and rescan planning:** map the previous snapshot through the ordered edit history, invalidate affected checkpoints, and calculate the bounded footprint requiring interpretation. Checkpoint invalidation and rescan footprint are distinct results.
+- **Bounded scan and snapshot merge:** scan candidate ranges from a surviving start checkpoint, confirm the candidate end in between-command state, and publish one final snapshot transaction. Attempt-local observations are joined to attempt-local regions using their own full-buffer group keys; old mapped snapshot group keys remain solely for old-record preservation and invalidation.
+- **Event-batch integration:** consume the ordered `on_lines` history once per owned batch, rather than refreshing the snapshot once per pending range. A committed batch publishes once and advances the generation once; stale or unowned work is discarded, while an owned batch that cannot use bounded merge follows the specified full-buffer fallback.
+- **InsertLeave locality:** keep deferred maintenance separate from synchronous Return commitment. InsertLeave must not become a second authority for creating a scope, nor mutate unrelated complete or incomplete regions. If the relevant local context cannot be established safely, leave the buffer unchanged.
+
+The dependency structure is deliberate:
+
+| Issue | Responsibility | Dependency |
+| --- | --- | --- |
+| [#46 — Scanner checkpoint observations](https://github.com/incus-skills/nvim-heredoc/issues/46) | Expose passive per-command-group completion observations and generation-local group keys without changing scanner recognition or its conservative document-level result. | Independent. |
+| [#47 — Edit mapping and rescan planning](https://github.com/incus-skills/nvim-heredoc/issues/47) | Pure coordinate mapping, checkpoint invalidation, structural/content footprint calculation, and bounded scan-window selection. | Independent of #46. |
+| [#48 — Bounded scan and atomic merge](https://github.com/incus-skills/nvim-heredoc/issues/48) | Consume scanner observations and planner output to confirm candidate boundaries, salvage complete command groups, and publish atomically. | Depends on #46 and #47. |
+| [#49 — One transaction per `on_lines` batch](https://github.com/incus-skills/nvim-heredoc/issues/49) | Connect the merge to Neovim's real event history and scheduled processing path, with one transaction per batch. | Depends on #46, #47, and #48. |
+| [#50 — InsertLeave local recovery](https://github.com/incus-skills/nvim-heredoc/issues/50) | Constrain InsertLeave to relevant local maintenance and prevent cross-region mutation or deferred scope creation. | The responsibility decision is independent; coordinate with #49 where pending edit history is consumed. |
+
+Issues #46 and #47 can be developed and validated independently. #48 is the convergence point for their outputs. #49 is the event-path integration after the bounded merge capability exists. #50 is a distinct event-ownership correction, not a prerequisite for the scanner/planner decomposition; its interaction with pending edit history must nevertheless be reconciled with #49.
+
+**Diagnostic evidence is not acceptance behaviour.** Draft PRs [#44](https://github.com/incus-skills/nvim-heredoc/pull/44) and [#45](https://github.com/incus-skills/nvim-heredoc/pull/45) record current InsertLeave effects, including closing an opener without Return and cross-region formatting/recovery. They remain unmerged diagnostics. Their observed outcomes explain the problem but must not be copied into the desired-behaviour tests. Issue #50's tests assert the adopted local ownership and no-cross-region-mutation requirements.
+
+The five issues remain open as of this context update. No runtime, scanner, test, or CI implementation is authorised by Review #39's specification closure or by these documentation updates. In particular:
+
+- Do not treat the planned checkpoint fields as part of the scanner's current emitted interface.
+- Do not infer that scanner document-level `complete` is a per-command-group completion signal.
+- Do not conflate old-snapshot group-key associations with new-attempt group-key associations.
+- Do not turn the responsibility dependency into a synchronous temporal pipeline: scanner observation and merge maintenance may lag the latest edit; Return queries current maintained knowledge and may use an affected-region rescan when relevant boundaries are invalidated.
+- Preserve the three containment outcomes: valid snapshot answer, successful affected-region rescan, or uncertainty that declines the edit. Uncertainty is not a negative containment result.
+- Keep synchronous Return-local closer creation exclusive to Return. Deferred `on_lines` and InsertLeave paths maintain existing state but do not commit a new scope.
+
 ## Guidance for the next session
 
 Treat this as future-development context, not a task already authorised for implementation. First inspect the current scanner/region interface, current design contract, and installed integration APIs. Separate observed capabilities from proposals. Do not infer that Tree-sitter injection alone solves diagnostics, completion, linting, or formatting. Any implementation proposal should identify its structural source of truth, region scope, unknown-language fallback, mutation risks, and regression tests before changing behaviour.

@@ -86,3 +86,24 @@ The initial formatter test command combined `-p` with `-ln`, which shfmt rejects
 The local integration spec exercises lazy.nvim itself rather than adding the repository to `runtimepath` or calling `setup_buffer()` from generated ftplugins. The local harness uses `dir = "/workspace"`, `ft = { "bash", "sh", "zsh" }`, and `opts = {}`; the user-facing GitHub spec uses the same fields without `dir`. Both paths rely on lazy.nvim's normal filetype-triggered load and automatic invocation of `setup()`. The first supported `FileType` event is checked for both lazy loading and buffer attachment. The negative control also enters through this loading path before asserting that an ordinary `<<` heredoc remains untouched.
 
 This loading-path test passed in [workflow run 43639754356](https://github.com/incus-skills/nvim-heredoc/actions/runs/43639754356). The legacy provisioner has now been removed; the lazy.nvim loading path is the documented installation and the one exercised by the integration fixture.
+
+## Planned incremental snapshot validation
+
+The Review #39 snapshot-maintenance work adds validation to the existing scanner and Neovim buffer layers. It does not require a sixth CI job or combine these responsibilities with shell-delivery, formatter, or LazyVim integration.
+
+**This is a planned coverage map, not a description of tests already present.** The current workflow still runs the five jobs and commands described above. The implementation issues remain open, and this documentation does not authorise implementation.
+
+| Existing job | Planned coverage | Source of the obligation |
+| --- | --- | --- |
+| `core` / `bash tests/run-core.sh` | Scanner command-group checkpoint observations: one checkpoint after a group's final heredoc terminator; no checkpoint for a group whose queue does not complete; earlier completed groups remain observable after a later incomplete or uncertain group; scanner-local coordinates and generation-local group keys. | #46 |
+| `buffer-integration` / `bash tests/run-nvim.sh` | Pure edit-coordinate and rescan-footprint planning, including before-affinity checkpoints, structural invalidation, zero-width anchors, and the distinction between invalidated checkpoints and positions requiring rescan. | #47 |
+| `buffer-integration` / `bash tests/run-nvim.sh` | Bounded candidate rescanning, confirmation of a between-command boundary, attempt-local observations, per-command-group salvage, coordinate offsetting, suffix-completeness fallback, and atomic snapshot publication. | #48 |
+| `buffer-integration` / `bash tests/run-nvim.sh` | Real `nvim_buf_attach(... on_lines ...)` notifications and scheduled batch processing: the six Review #39 edit cases, multiple ranges, rebasing, stale-batch discard, full-rescan fallback, and exactly one publication/generation advance per committed batch. | #49 |
+| `buffer-integration` / `bash tests/run-nvim.sh` | Live Insert-mode InsertLeave ownership and locality: no second scope-creation authority, no unrelated-region formatting or recovery, and conservative no-op when local scope cannot be established. | #50 |
+
+The planner and merge tests may use Lua-only runners within the Neovim buffer-integration job; their placement there is a validation boundary, not a claim that they require interactive Neovim APIs. The scanner observation tests belong in the core job so scanner behaviour remains independently testable without Neovim.
+
+The issue dependencies are not a reason to create separate CI jobs: #46 and #47 are independently testable; #48 consumes both; #49 wires the merge into the actual event path; and #50 defines the separate InsertLeave responsibility while coordinating with #49 where pending edit history is consumed. Keep the existing five job reports independent.
+
+The diagnostic PRs #44 and #45 are not acceptance tests for this work. They record observed InsertLeave behaviour; the new #50 tests must assert the adopted local-ownership contract rather than preserve the diagnostic outcomes.
+
