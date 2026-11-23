@@ -59,6 +59,21 @@ local function map_payload_boundary(pos, edit, affinity)
   return edit.new_lastline + 1
 end
 
+
+-- Structural anchors are positions, not checkpoint identities. If a later
+-- edit consumes an anchor, retain it at that edit's first resulting position.
+local function map_anchor(pos, edit)
+  if type(pos) ~= "number" then return nil end
+  local boundary = pos - 1
+  if edit.firstline == edit.lastline then
+    if boundary <= edit.firstline then return pos end
+    return pos + delta(edit)
+  end
+  if boundary <= edit.firstline then return pos end
+  if boundary >= edit.lastline then return pos + delta(edit) end
+  return edit.firstline + 1
+end
+
 local function delimiter_matches(line, payload)
   if line == nil then return false end
   if payload.operator == "<<-" then
@@ -256,7 +271,7 @@ function M.plan(snapshot, edits, current_lines)
 
     local moved_anchors = {}
     for _, pos in ipairs(structural_anchors) do
-      local mapped_pos = map_checkpoint(pos, edit)
+      local mapped_pos = map_anchor(pos, edit)
       if mapped_pos then moved_anchors[#moved_anchors + 1] = mapped_pos end
     end
     structural_anchors = moved_anchors

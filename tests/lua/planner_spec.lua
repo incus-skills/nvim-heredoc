@@ -176,6 +176,19 @@ do
   assert(#result.I == 1)
 end
 
+-- A later edit that consumes an earlier structural anchor relocates the
+-- anchor to its own first resulting position instead of dropping R_structural.
+do
+  local old = snapshot({ region() }, { checkpoint(5, 1) })
+  local result = plan(old, {
+    { firstline = 3, lastline = 4, new_lastline = 5 },
+    { firstline = 2, lastline = 5, new_lastline = 2 },
+  }, { "cat <<-EOF", "payload" })
+  assert(#result.R_content == 0)
+  assert(contains(result.R_structural, 3))
+  assert(#result.I == 1)
+end
+
 -- Matching delimiters inside payload invalidate the owning group. <<- strips
 -- leading TABs only; ordinary << requires an exact line match.
 do
