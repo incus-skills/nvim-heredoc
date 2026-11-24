@@ -1,5 +1,7 @@
 local scanner = require("nvim-heredoc.scanner")
 local editing = require("nvim-heredoc.editing")
+local planner = require("nvim-heredoc.planner")
+local merge = require("nvim-heredoc.merge")
 
 local M = {}
 local group_name = "NvimHeredoc"
@@ -408,7 +410,9 @@ function M.process_buffer(buf, changed_range, close_incomplete, edits)
   processing[buf] = nil
   if success then
     local snapshot_lines = get_lines(buf)
-    scan_snapshots[buf] = scanner.scan(get_source(snapshot_lines), { tabstop = vim.bo[buf].tabstop })
+    local snapshot = scanner.scan(get_source(snapshot_lines), { tabstop = vim.bo[buf].tabstop })
+    snapshot.generation = ((previous_scan and previous_scan.generation) or 0) + 1
+    scan_snapshots[buf] = snapshot
   end
   if not success then
     vim.notify("nvim-heredoc: " .. tostring(err), vim.log.levels.WARN)
@@ -498,16 +502,81 @@ local function add_changed_range(ranges, firstline, lastline, new_lastline)
   end
 end
 
-local function process_pending_ranges(buf, close_incomplete)
+local function process_pending_ranges(buf)
   local pending = pending_ranges[buf]
-  pending_ranges[buf] = nil
   if not pending then
-    M.process_buffer(buf, nil, close_incomplete)
-    return
+    -- TextChanged/other deferred callbacks are not permission to perform an
+    -- un-ranged whole-buffer scan when there is no owned on_lines batch.
+    return false
   end
-  for index, range in ipairs(pending.ranges) do
-    M.process_buffer(buf, range, close_incomplete, index == 1 and pending.edits or nil)
+  if not vim.api.nvim_buf_is_valid(buf) or not vim.api.nvim_buf_is_loaded(buf)
+    or not supported(vim.bo[buf].filetype) then
+    if pending_ranges[buf] == pending then pending_ranges[buf] = nil end
+    return false
   end
+
+  local snapshot = scan_snapshots[buf]
+  if not snapshot then
+    snapshot = scanner.scan(get_source(get_lines(buf)), { tabstop = vim.bo[buf].tabstop })
+    snapshot.generation = 0
+    scan_snapshots[buf] = snapshot
+    pending.base_generation = 0
+  end
+
+  local current_lines = get_lines(buf)
+  local plan = planner.plan(snapshot, pending.edits, current_lines)
+  local result = merge.transact({
+    snapshot = snapshot,
+    plan = plan,
+    lines = current_lines,
+    scan = scanner.scan,
+    scan_opts = { tabstop = vim.bo[buf].tabstop },
+    base_generation = pending.base_generation,
+    owner = pending,
+    is_entitled = function(base_generation, owner)
+      local current = scan_snapshots[buf]
+      return pending_ranges[buf] == owner
+        and current ~= nil
+        and (current.generation or 0) == base_generation
+    end,
+    publish = function(next_snapshot)
+      scan_snapshots[buf] = next_snapshot
+    end,
+    clear_pending = function(owner)
+      if pending_ranges[buf] == owner then
+        pending_ranges[buf] = nil
+      end
+    end,
+  })
+
+  if result.outcome ~= "commit" then
+    -- A stale batch must not publish, but it must also not remain queued
+    -- indefinitely. Clear only this batch; a newer owner is untouched.
+    if pending_ranges[buf] == pending then pending_ranges[buf] = nil end
+    return false
+  end
+
+  -- Apply payload prefixing from the single committed snapshot. These edits
+  -- are presentation/maintenance only: they do not create heredoc scopes,
+  -- and their on_lines notifications are suppressed while this batch owns
+  -- the buffer.
+  processing[buf] = true
+  local ok, err = pcall(function()
+    for _, region in ipairs(result.snapshot.heredocs or {}) do
+      if region.editable
+        and (region.body_prefix or ((region.structural_prefix or "") .. "\\t")) ~= "" then
+        for _, range in ipairs(pending.ranges) do
+          prefix_region_range(buf, region, range)
+        end
+      end
+    end
+  end)
+  processing[buf] = nil
+  if not ok then
+    vim.notify("nvim-heredoc: " .. tostring(err), vim.log.levels.WARN)
+    return false
+  end
+  return true
 end
 
 local function schedule_changed_range(buf, firstline, lastline, new_lastline)
@@ -516,7 +585,11 @@ local function schedule_changed_range(buf, firstline, lastline, new_lastline)
   end
   local pending = pending_ranges[buf]
   if not pending then
-    pending = { ranges = {}, edits = {} }
+    pending = {
+      ranges = {},
+      edits = {},
+      base_generation = (scan_snapshots[buf] and scan_snapshots[buf].generation) or 0,
+    }
     pending_ranges[buf] = pending
   end
   pending.edits[#pending.edits + 1] = {
@@ -537,7 +610,7 @@ local function schedule_changed_range(buf, firstline, lastline, new_lastline)
     end
     if vim.api.nvim_buf_is_valid(buf) and vim.api.nvim_buf_is_loaded(buf)
       and supported(vim.bo[buf].filetype) then
-      process_pending_ranges(buf, false)
+      process_pending_ranges(buf)
     else
       pending_ranges[buf] = nil
     end
@@ -548,7 +621,7 @@ local function process_text_changed(buf)
   -- TextChanged is not a commitment event for an incomplete opener. Only
   -- Return may create a new heredoc scope; generic text changes must not
   -- append a closer before the user has completed the opener and pressed CR.
-  process_pending_ranges(buf, false)
+  process_pending_ranges(buf)
 end
 
 -- Insert-mode Return is the commitment event. Buffer-change notifications are
