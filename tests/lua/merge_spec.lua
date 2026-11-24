@@ -119,13 +119,18 @@ end
 -- A lexical early return salvages earlier checkpointed groups only.
 do
   local lines = {
+    "prefix", "prefix",
     "cat <<-A", "body", "A",
     "echo " .. string.char(96) .. "unsupported" .. string.char(96),
   }
-  local result = run(result_plan({ E = 5 }), lines)
+  local result = run(result_plan({ S = 3, E = 7 }), lines)
   assert(not result.confirmed and #result.snapshot.heredocs == 1)
   assert(result.snapshot.heredocs[1].confidence == "lexical")
+  assert(result.snapshot.heredocs[1].command_end_line == 3)
   assert(#result.snapshot.checkpoints == 1)
+  assert(result.snapshot.checkpoints[1].pos == 6)
+  assert(result.snapshot.diagnostics[1].line == 6,
+    "attempt-local diagnostic coordinates must be offset into the full buffer")
   assert(result.snapshot.complete == false)
 end
 
