@@ -66,6 +66,9 @@ local function position_insert_cursor(buf, row, col)
 end
 
 local function prefix_region_range(buf, region, changed_range)
+  if type(region.body_start_line) ~= "number" or type(region.body_end_line) ~= "number" then
+    return false
+  end
   local first_row = region.body_start_line - 1
   local last_row = region.body_end_line
   if last_row <= first_row then
