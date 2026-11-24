@@ -303,6 +303,8 @@ do
   vim.api.nvim_exec_autocmds("InsertEnter", { buffer = buf })
   vim.api.nvim_exec_autocmds("InsertLeave", { buffer = buf })
   local actual = lines(buf)
+  assert(actual[2] == "\t\t",
+    "local recovery should format only the existing incomplete body")
   assert(actual[3] == "\tAUTO",
     "InsertLeave in the body of a pre-existing incomplete region should recover locally")
 end
@@ -350,14 +352,17 @@ do
   plugin.setup()
   vim.api.nvim_win_set_cursor(0, { 2, 0 })
   vim.api.nvim_exec_autocmds("InsertEnter", { buffer = buf })
+  local before_generation = plugin._snapshot_for_test(buf).generation
   vim.api.nvim_buf_set_lines(buf, 1, 2, false, { "  changed" })
   assert(vim.wait(1000, function()
-    return lines(buf)[2] == "\t\t  changed"
+    return plugin._snapshot_for_test(buf).generation > before_generation
   end, 10), "the scheduled payload batch should complete before InsertLeave")
+  assert(lines(buf)[2] == "  changed",
+    "an incomplete region must not be formatted by generic deferred processing")
   vim.api.nvim_exec_autocmds("InsertLeave", { buffer = buf })
   local actual = lines(buf)
   assert(actual[2] == "\t\t  changed" and actual[3] == "\tLOCAL",
-    "local recovery should use retained session history after batch consumption")
+    "local recovery should format and close only its region using retained session history")
 end
 
 do
