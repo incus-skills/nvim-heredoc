@@ -81,15 +81,19 @@ do
   local plan = result_plan({ E = 6 })
   local result = run(plan, {
     "cat <<-A", "first body", "A",
-    "cat <<-B", "second body",
+    "cat <<-C", "second complete body", "C",
+    "cat <<-B", "third incomplete body",
   })
-  assert(not result.confirmed and #result.snapshot.heredocs == 2)
+  assert(not result.confirmed and #result.snapshot.heredocs == 3)
   assert(result.snapshot.heredocs[1].confidence == "lexical")
   assert(result.snapshot.heredocs[1].editable)
-  assert(result.snapshot.heredocs[2].confidence == "uncertain")
-  assert(not result.snapshot.heredocs[2].editable)
-  assert(#result.snapshot.checkpoints == 1)
+  assert(result.snapshot.heredocs[2].confidence == "lexical")
+  assert(result.snapshot.heredocs[2].editable)
+  assert(result.snapshot.heredocs[3].confidence == "uncertain")
+  assert(not result.snapshot.heredocs[3].editable)
+  assert(#result.snapshot.checkpoints == 2)
   assert(result.snapshot.checkpoints[1].pos == 4)
+  assert(result.snapshot.checkpoints[2].pos == 7)
   assert(result.snapshot.complete == false)
 end
 
