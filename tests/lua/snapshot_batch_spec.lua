@@ -135,18 +135,22 @@ do
     "an empty pending queue must not publish a fallback scan")
 end
 
--- A batch superseded by a newer full-scan publication before its scheduled
--- callback runs must be discarded without a second generation advance.
+-- InsertLeave no longer performs a full-buffer publication. It must not
+-- consume or supersede an independently owned on_lines batch; that batch
+-- publishes once through its scheduled snapshot transaction.
 do
   local buf = set_buffer({ "cat <<-EOF", "\tbody", "EOF" })
   local before = snapshot(buf).generation
   vim.api.nvim_buf_set_lines(buf, 1, 2, false, { "\tnew body" })
+  vim.api.nvim_exec_autocmds("InsertEnter", { buffer = buf })
   vim.api.nvim_exec_autocmds("InsertLeave", { buffer = buf })
+  assert(snapshot(buf).generation == before,
+    "InsertLeave must not consume or replace the pending snapshot batch")
+  assert(vim.wait(1000, function()
+    return snapshot(buf).generation == before + 1
+  end, 10), "the scheduled batch should publish exactly once after InsertLeave")
   assert(snapshot(buf).generation == before + 1,
-    "InsertLeave's existing full scan should supersede the queued batch")
-  vim.wait(100, function() return false end, 10)
-  assert(snapshot(buf).generation == before + 1,
-    "the superseded scheduled batch must not publish")
+    "the scheduled batch must not publish a second generation")
 end
 
 -- Insertion before a later edit in the same batch must preserve the second
