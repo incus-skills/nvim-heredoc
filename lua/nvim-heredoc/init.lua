@@ -812,9 +812,6 @@ function M._snapshot_for_test(buf)
   return scan_snapshots[buf or vim.api.nvim_get_current_buf()]
 end
 
-function M._pending_for_test(buf)
-  return pending_ranges[buf or vim.api.nvim_get_current_buf()]
-end
 
 function M.setup_buffer(buf)
   buf = buf or vim.api.nvim_get_current_buf()
