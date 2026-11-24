@@ -1,6 +1,5 @@
 -- Bounded scan attempts and atomic scan-snapshot reconciliation.
 -- This module deliberately does not own event routing or buffer callbacks.
-local planner = require("nvim-heredoc.planner")
 local M = {}
 
 local line_fields = {
@@ -217,12 +216,12 @@ function M.reconcile(opts)
 
   local candidates = plan.surviving_checkpoints or {}
   local end_pos = plan.E or eof
-  local attempts, final_result, final_scope, confirmed = 0, nil, nil, false
+  local attempts, final_result, confirmed = 0, nil, false
 
   while true do
     attempts = attempts + 1
     local result, scope = scan_scope(opts.scan, all_lines, start_pos, end_pos, scan_opts)
-    final_result, final_scope = result, scope
+    final_result = result
     confirmed = attempt_confirmed(result, scope)
     if confirmed or end_pos == eof then break end
     end_pos = next_candidate(candidates, end_pos, eof)
