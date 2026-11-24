@@ -136,4 +136,45 @@ do
     "the superseded scheduled batch must not publish")
 end
 
+-- Insertion before a later edit in the same batch must preserve the second
+-- notification's post-edit coordinate space.
+do
+  local buf = set_buffer({ "cat <<-EOF", "\tbody", "EOF", "echo after" })
+  local before = snapshot(buf).generation
+  vim.api.nvim_buf_set_lines(buf, 0, 0, false, { "# inserted before" })
+  vim.api.nvim_buf_set_lines(buf, 2, 3, false, { "\tshifted payload" })
+  assert_one_batch(buf, before)
+  assert(snapshot(buf).heredocs[1].opener_line == 2)
+  assert(snapshot(buf).heredocs[1].terminator_line == 4)
+end
+
+-- An incomplete later group makes a bounded prefix edit require the merge's
+-- full-buffer fallback; the fallback must retain the whole-buffer uncertainty.
+do
+  local buf = set_buffer({
+    "cat <<-A", "\ta", "A",
+    "cat <<-B", "\tb",
+  })
+  assert(snapshot(buf).complete == false)
+  local before = snapshot(buf).generation
+  vim.api.nvim_buf_set_lines(buf, 1, 2, false, { "\tchanged a" })
+  assert_one_batch(buf, before)
+  assert(#snapshot(buf).heredocs == 2,
+    "fallback must reconstruct both the edited prefix and incomplete suffix")
+  assert(snapshot(buf).complete == false)
+  assert(snapshot(buf).heredocs[2].terminator_line == nil)
+end
+
+-- Deferred reconciliation is not a second scope-creation authority: editing
+-- the first body row of an incomplete opener must not append a closer.
+do
+  local buf = set_buffer({ "cat <<-EOF", "first body" })
+  local before = snapshot(buf).generation
+  vim.api.nvim_buf_set_lines(buf, 1, 2, false, { "first body changed" })
+  assert_one_batch(buf, before)
+  local actual = lines(buf)
+  assert(#actual == 2 and actual[2] == "first body changed",
+    "deferred on_lines reconciliation must not create a closer")
+end
+
 print("snapshot batch integration tests: PASS")
