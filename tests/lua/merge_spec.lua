@@ -103,7 +103,8 @@ do
   local result = merge.reconcile({
     snapshot = old, plan = plan, lines = lines, scan = scanner.scan,
   })
-  assert(result.confirmed and result.snapshot.complete)
+  assert(result.confirmed, "bounded suffix attempt was not confirmed: " .. vim.inspect(result))
+  assert(result.snapshot.complete, "complete old suffix should preserve document completeness")
   assert(#result.snapshot.heredocs == 3)
   assert(result.snapshot.heredocs[1].delimiter == "PRE")
   assert(result.snapshot.heredocs[2].delimiter == "NEW")
