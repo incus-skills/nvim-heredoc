@@ -695,6 +695,12 @@ end
 -- present) or native Return behaviour.
 local function return_trace(label, fields)
   if vim.env.NVIM_HEREDOC_RETURN_TRACE == "1" then
+    -- Keep a same-process trace sink as well as stdout: headless Neovim's
+    -- message output is not a reliable way to prove callback dispatch in CI.
+    local trace = rawget(_G, "__nvim_heredoc_return_trace")
+    if type(trace) == "table" then
+      trace[#trace + 1] = { label = label, fields = fields or {} }
+    end
     print("[nvim-heredoc Return] " .. label .. ": " .. vim.inspect(fields or {}))
   end
 end
