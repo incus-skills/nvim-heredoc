@@ -22,11 +22,15 @@ local escape = vim.api.nvim_replace_termcodes("<Esc>", true, false, true)
 do
   local buf = attach({ "" })
   vim.api.nvim_win_set_cursor(0, { 1, 0 })
-  vim.api.nvim_input("Acat <<-NEW" .. escape)
+  vim.api.nvim_input("Acat <<-NEW")
+  assert(vim.wait(1500, function()
+    return vim.api.nvim_get_mode().mode:sub(1, 1) == "i"
+      and lines(buf)[1] == "cat <<-NEW"
+  end, 10), "the opener should be typed in real Insert mode")
+  vim.api.nvim_input(escape)
   assert(vim.wait(1500, function()
     return vim.api.nvim_get_mode().mode:sub(1, 1) ~= "i"
-      and lines(buf)[1] == "cat <<-NEW"
-  end, 10), "the typed opener should be entered and Insert mode should end")
+  end, 10), "Escape should trigger the real InsertLeave event")
   vim.wait(100, function() return false end, 10)
   local actual = lines(buf)
   assert(#actual == 1 and actual[1] == "cat <<-NEW",
@@ -38,7 +42,12 @@ end
 do
   local buf = attach({ "cat <<-LOCAL", "body" })
   vim.api.nvim_win_set_cursor(0, { 2, 0 })
-  vim.api.nvim_input("A!" .. escape)
+  vim.api.nvim_input("A!")
+  assert(vim.wait(1500, function()
+    return vim.api.nvim_get_mode().mode:sub(1, 1) == "i"
+      and lines(buf)[2] == "body!"
+  end, 10), "the body edit should occur in real Insert mode")
+  vim.api.nvim_input(escape)
   assert(vim.wait(1500, function()
     local actual = lines(buf)
     return vim.api.nvim_get_mode().mode:sub(1, 1) ~= "i"
