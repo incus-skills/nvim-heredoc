@@ -20,16 +20,16 @@ local escape = vim.api.nvim_replace_termcodes("<Esc>", true, false, true)
 -- A genuinely typed opener that is abandoned without Return must remain
 -- incomplete after the real InsertLeave event.
 do
-  local buf = attach({ "echo before" })
+  local buf = attach({ "" })
   vim.api.nvim_win_set_cursor(0, { 1, 0 })
   vim.api.nvim_input("Acat <<-NEW" .. escape)
   assert(vim.wait(1500, function()
     return vim.api.nvim_get_mode().mode:sub(1, 1) ~= "i"
-      and lines(buf)[1] == "echo beforecat <<-NEW"
+      and lines(buf)[1] == "cat <<-NEW"
   end, 10), "the typed opener should be entered and Insert mode should end")
   vim.wait(100, function() return false end, 10)
   local actual = lines(buf)
-  assert(#actual == 1 and actual[1] == "echo beforecat <<-NEW",
+  assert(#actual == 1 and actual[1] == "cat <<-NEW",
     "real InsertLeave must not commit an opener typed during the same session")
 end
 
