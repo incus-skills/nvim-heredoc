@@ -344,6 +344,25 @@ do
 end
 
 do
+  -- If a batch from before InsertEnter is still pending, the committed
+  -- snapshot is not a trustworthy session baseline. Recovery must fail closed.
+  local buf = set_buffer({ "cat <<-STALE", "body" })
+  vim.api.nvim_set_current_buf(buf)
+  plugin.setup()
+  local before_generation = plugin._snapshot_for_test(buf).generation
+  vim.api.nvim_buf_set_lines(buf, 1, 2, false, { "changed before InsertEnter" })
+  vim.api.nvim_win_set_cursor(0, { 2, 0 })
+  vim.api.nvim_exec_autocmds("InsertEnter", { buffer = buf })
+  vim.api.nvim_exec_autocmds("InsertLeave", { buffer = buf })
+  assert(vim.wait(1000, function()
+    return plugin._snapshot_for_test(buf).generation > before_generation
+  end, 10), "the pre-session batch should still be processed")
+  local actual = lines(buf)
+  assert(#actual == 2 and actual[1] == "cat <<-STALE",
+    "a stale pre-session snapshot must not authorise InsertLeave recovery")
+end
+
+do
   -- A local edit in the pre-existing incomplete body remains eligible even
   -- when the scheduled batch has already consumed pending_ranges. The
   -- Insert-session history must outlive that batch queue.
