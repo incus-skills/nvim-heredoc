@@ -89,7 +89,7 @@ do
     "cat <<-PRE", "prefix body", "PRE",
     "cat <<-OLD", "old body", "OLD",
     "cat <<-SUF", "suffix body", "SUF",
-  }, "\\n"))
+  }, "\n"))
   local lines = {
     "cat <<-PRE", "prefix body", "PRE",
     "cat <<-NEW", "new body", "NEW",
