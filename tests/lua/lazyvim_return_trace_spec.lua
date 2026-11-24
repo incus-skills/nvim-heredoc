@@ -34,6 +34,12 @@ end
 local function finish(ok, err)
   if finished then return end
   finished = true
+  local dispatch_trace = rawget(_G, "__nvim_heredoc_return_trace") or {}
+  add("dispatch_trace_count", #dispatch_trace)
+  for index, entry in ipairs(dispatch_trace) do
+    add("dispatch_trace[" .. index .. "]",
+      tostring(entry.label) .. ": " .. vim.inspect(entry.fields))
+  end
   add("trace_result", ok and "PASS" or "ABORTED")
   if not ok then add("trace_error", err) end
   print(table.concat(report, "\n"))
@@ -45,6 +51,7 @@ local function finish(ok, err)
 end
 
 local function run()
+  _G.__nvim_heredoc_return_trace = {}
   vim.cmd("filetype plugin indent on")
 
   buf = api.nvim_create_buf(true, false)
