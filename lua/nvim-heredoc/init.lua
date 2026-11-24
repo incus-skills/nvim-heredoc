@@ -564,7 +564,7 @@ local function process_pending_ranges(buf)
   local ok, err = pcall(function()
     for _, region in ipairs(result.snapshot.heredocs or {}) do
       if region.editable
-        and (region.body_prefix or ((region.structural_prefix or "") .. "\\t")) ~= "" then
+        and (region.body_prefix or ((region.structural_prefix or "") .. "\t")) ~= "" then
         for _, range in ipairs(pending.ranges) do
           prefix_region_range(buf, region, range)
         end
@@ -755,6 +755,11 @@ local function attach(buf)
       end
     end,
   })
+end
+
+-- Read-only snapshot access for diagnostics and integration tests.
+function M._snapshot_for_test(buf)
+  return scan_snapshots[buf or vim.api.nvim_get_current_buf()]
 end
 
 function M.setup_buffer(buf)
