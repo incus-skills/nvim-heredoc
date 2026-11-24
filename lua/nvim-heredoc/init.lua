@@ -774,9 +774,37 @@ local function finish_insert_session(buf)
     return false
   end
 
-  -- This is local recovery only: no whole-buffer formatting, reconciliation,
-  -- or recovery of any other incomplete region is performed here.
-  return insert_closer(buf, pending, vim.api.nvim_buf_line_count(buf))
+  -- This is local recovery only: close and format this one established
+  -- region. Suppress its own on_lines notifications, then publish the
+  -- resulting snapshot so an older scheduled batch cannot replay stale work.
+  processing[buf] = true
+  local success, err = pcall(function()
+    assert(insert_closer(buf, pending, vim.api.nvim_buf_line_count(buf)),
+      "could not insert the locally authorised heredoc closer")
+    local recovered_lines = get_lines(buf)
+    local recovered = scanner.scan(get_source(recovered_lines), { tabstop = vim.bo[buf].tabstop })
+    for _, region in ipairs(recovered.regions or {}) do
+      if region.opener_line == candidate.opener_line
+        and region.opener_text == candidate.opener_text
+        and region.delimiter == candidate.delimiter
+        and region.terminator_line then
+        prefix_region_range(buf, region, nil)
+        break
+      end
+    end
+    local final_lines = get_lines(buf)
+    local final_snapshot = scanner.scan(get_source(final_lines), { tabstop = vim.bo[buf].tabstop })
+    final_snapshot.tabstop = vim.bo[buf].tabstop
+    final_snapshot.generation = ((scan_snapshots[buf] and scan_snapshots[buf].generation) or 0) + 1
+    scan_snapshots[buf] = final_snapshot
+    pending_ranges[buf] = nil
+  end)
+  processing[buf] = nil
+  if not success then
+    vim.notify("nvim-heredoc: " .. tostring(err), vim.log.levels.WARN)
+    return false
+  end
+  return true
 end
 
 -- Insert-mode Return is the commitment event. Buffer-change notifications are
