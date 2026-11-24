@@ -103,6 +103,7 @@ local function run()
   end
 
   local cr_mapping = vim.fn.maparg("<CR>", "i", false, true)
+  add("simulated_return_key", vim.inspect("\\r"))
   add("scenario", (column_zero and "column-zero opener; " or "")
     .. (native_cr and "native Return; MiniPairs bypassed; " or "Return wrapper delegates MiniPairs; ")
     .. (sync_feedkeys and "synchronous feedkeys; " or "queued nvim_input; ")
@@ -138,25 +139,25 @@ local function run()
   snapshot("before first Return")
 
   local steps = {
-    { "after first Return", "\n", function(lines)
+    { "after first Return", "\r", function(lines)
         assert(#lines >= 4, "first Return did not create a body line")
       end },
     { "after first payload", "hello1", function(lines)
         assert((lines[4] or ""):find("hello1", 1, true), "hello1 missing")
       end },
-    { "after second Return", "\n", function(lines)
+    { "after second Return", "\r", function(lines)
         assert(#lines >= 5, "second Return did not create a body line")
       end },
     { "after second payload", "hello2", function(lines)
         assert((lines[5] or ""):find("hello2", 1, true), "hello2 missing")
       end },
-    { "after third Return", "\n", function(lines)
+    { "after third Return", "\r", function(lines)
         assert(#lines >= 6, "third Return did not create a body line")
       end },
     { "after third payload", "hello3", function(lines)
         assert((lines[6] or ""):find("hello3", 1, true), "hello3 missing")
       end },
-    { "after fourth Return", "\n", function(lines)
+    { "after fourth Return", "\r", function(lines)
         assert(#lines >= 7, "fourth Return did not create a body line")
       end },
     { "after fourth payload", "hello4", function(lines)
