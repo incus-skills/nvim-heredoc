@@ -95,11 +95,19 @@ local function group_invalidated(plan, key)
   return false
 end
 
-local function records_for_scope(records, lower, upper, side, plan)
+local function surviving_old_group_keys(plan)
+  local keys = {}
+  for _, checkpoint in ipairs(plan.surviving_checkpoints or {}) do
+    if checkpoint.group_key ~= nil then keys[checkpoint.group_key] = true end
+  end
+  return keys
+end
+
+local function records_for_scope(records, lower, upper, side, plan, valid_keys)
   local result = {}
   for _, record in ipairs(records or {}) do
     local key = group_key(record)
-    local keep = key ~= nil
+    local keep = key ~= nil and valid_keys[key] == true
       and not group_invalidated(plan, record.old_group_key or key)
     if keep then
       if side == "prefix" then
@@ -115,8 +123,9 @@ end
 
 local function merge_records(old, fresh, start_pos, end_pos, plan)
   local old_heredocs = old.heredocs or old.regions or {}
-  local prefix = records_for_scope(old_heredocs, start_pos, nil, "prefix", plan)
-  local suffix = records_for_scope(old_heredocs, nil, end_pos, "suffix", plan)
+  local valid_keys = surviving_old_group_keys(plan)
+  local prefix = records_for_scope(old_heredocs, start_pos, nil, "prefix", plan, valid_keys)
+  local suffix = records_for_scope(old_heredocs, nil, end_pos, "suffix", plan, valid_keys)
   local heredocs = {}
   for _, region in ipairs(prefix) do heredocs[#heredocs + 1] = region end
   for _, region in ipairs(fresh.heredocs or {}) do
@@ -126,17 +135,10 @@ local function merge_records(old, fresh, start_pos, end_pos, plan)
 
   local checkpoints = {}
   for _, checkpoint in ipairs(old.checkpoints or {}) do
-    if checkpoint.pos <= start_pos then
-      local invalid = false
-      for _, item in ipairs(plan.invalidated_checkpoints or {}) do
-        if item.old_pos == checkpoint.old_pos or item.pos == checkpoint.pos then
-          invalid = true
-          break
-        end
+    if valid_keys[checkpoint.group_key] then
+      if checkpoint.pos <= start_pos or (end_pos and checkpoint.pos > end_pos) then
+        checkpoints[#checkpoints + 1] = copy(checkpoint)
       end
-      if not invalid then checkpoints[#checkpoints + 1] = copy(checkpoint) end
-    elseif end_pos and checkpoint.pos > end_pos then
-      checkpoints[#checkpoints + 1] = copy(checkpoint)
     end
   end
   for _, checkpoint in ipairs(fresh.checkpoints or {}) do
