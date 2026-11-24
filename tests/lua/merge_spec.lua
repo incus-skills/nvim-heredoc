@@ -100,6 +100,14 @@ do
     "cat <<-OLD", "old body", "OLD",
     "cat <<-SUF", "suffix body", "SUF",
   }, "\n"))
+  for _, region in ipairs(old.heredocs) do
+    region.old_group_key = region.command_end_line
+  end
+  for _, checkpoint in ipairs(old.checkpoints) do
+    checkpoint.old_pos = checkpoint.pos
+    checkpoint.old_group_key = checkpoint.group_key
+    checkpoint.invalidated = false
+  end
   local lines = {
     "cat <<-PRE", "prefix body", "PRE",
     "cat <<-NEW", "new body", "NEW",
@@ -123,6 +131,12 @@ do
   assert(result.snapshot.heredocs[1].delimiter == "PRE")
   assert(result.snapshot.heredocs[2].delimiter == "NEW")
   assert(result.snapshot.heredocs[3].delimiter == "SUF")
+  assert(result.snapshot.heredocs[1].old_group_key == nil
+    and result.snapshot.heredocs[3].old_group_key == nil,
+    "old-generation group-key metadata must not enter the new snapshot")
+  assert(result.snapshot.checkpoints[1].old_pos == nil
+    and result.snapshot.checkpoints[3].old_group_key == nil,
+    "old-generation checkpoint metadata must not enter the new snapshot")
   assert(#result.snapshot.checkpoints == 3)
 end
 
