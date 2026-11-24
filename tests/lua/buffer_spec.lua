@@ -138,7 +138,8 @@ do
   vim.api.nvim_buf_set_lines(buf, 2, 3, false, { "  changed by API" })
   assert(vim.wait(1000, function()
     return lines(buf)[3] == "\t\t  changed by API"
-  end, 10), "on_lines should schedule prefixing for the changed body range")
+  end, 10), "on_lines should schedule prefixing for the changed body range; snapshot="
+    .. vim.inspect(plugin._snapshot_for_test(buf)))
   local actual = lines(buf)
   assert(actual[2] == "\tuntouched", "on_lines must not rewrite an unchanged body line")
 end
