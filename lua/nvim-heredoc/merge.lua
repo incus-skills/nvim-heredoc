@@ -224,7 +224,18 @@ function M.reconcile(opts)
   local fresh = offset_attempt(final_result, start_pos)
   local observed = checkpoint_keys(fresh)
   for _, region in ipairs(fresh.heredocs or {}) do
-    if not observed[group_key(region)] then mark_uncertain(region) end
+    if not observed[group_key(region)] then
+      mark_uncertain(region)
+    else
+      -- scanner.scan() conservatively downgrades every region when a later
+      -- group fails. The attempt-local checkpoint restores confidence only
+      -- for groups independently observed as complete.
+      region.opener_safe = region.structural_tabs_only == true
+      region.editable = region.terminator_line ~= nil and region.structural_tabs_only == true
+      region.confidence = region.terminator_line
+        and (region.structural_tabs_only and "lexical" or "unsupported-indent")
+        or "incomplete"
+    end
   end
 
   local regions, heredocs, checkpoints = merge_records(
@@ -234,8 +245,8 @@ function M.reconcile(opts)
 
   local merged_complete
   if confirmed then
-    merged_complete = (plan.mapped_snapshot or old).complete == true
-      and ((plan.mapped_snapshot or old).complete == true)
+    merged_complete = end_pos == eof
+      or (plan.mapped_snapshot or old).complete == true
   else
     merged_complete = false
   end
