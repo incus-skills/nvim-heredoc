@@ -83,6 +83,30 @@ local function mark_uncertain(region)
   region.confidence = "uncertain"
 end
 
+local function strip_old_metadata(record)
+  record.old_group_key = nil
+  record.old_pos = nil
+  record.invalidated = nil
+  return record
+end
+
+local function clean_mapped_snapshot(snapshot)
+  local cleaned = copy(snapshot)
+  local heredocs = cleaned.heredocs or cleaned.regions or {}
+  cleaned.heredocs = heredocs
+  cleaned.regions = {}
+  for _, region in ipairs(heredocs) do
+    strip_old_metadata(region)
+    if region.operator == "<<-" then
+      cleaned.regions[#cleaned.regions + 1] = region
+    end
+  end
+  for _, checkpoint in ipairs(cleaned.checkpoints or {}) do
+    strip_old_metadata(checkpoint)
+  end
+  return cleaned
+end
+
 local function group_key(region)
   return region.command_end_line or region.group_key
 end
@@ -115,7 +139,7 @@ local function records_for_scope(records, lower, upper, side, plan, valid_keys)
         keep = upper ~= nil and key >= upper
       end
     end
-    if keep then result[#result + 1] = copy(record) end
+    if keep then result[#result + 1] = strip_old_metadata(copy(record)) end
   end
   return result
 end
@@ -136,7 +160,7 @@ local function merge_records(old, fresh, start_pos, end_pos, plan)
   for _, checkpoint in ipairs(old.checkpoints or {}) do
     if valid_keys[checkpoint.group_key] then
       if checkpoint.pos <= start_pos or (end_pos and checkpoint.pos > end_pos) then
-        checkpoints[#checkpoints + 1] = copy(checkpoint)
+        checkpoints[#checkpoints + 1] = strip_old_metadata(copy(checkpoint))
       end
     end
   end
@@ -192,7 +216,7 @@ function M.reconcile(opts)
   local start_pos = plan.S or 1
 
   if not plan.requires_rescan then
-    local unchanged = copy(plan.mapped_snapshot or old)
+    local unchanged = clean_mapped_snapshot(plan.mapped_snapshot or old)
     unchanged.complete = old.complete
     return {
       outcome = "commit",
