@@ -535,6 +535,22 @@ local function process_pending_ranges(buf)
 
   local current_lines = get_lines(buf)
   local plan = planner.plan(snapshot, pending.edits, current_lines)
+  -- Body bounds are derivable from surviving opener/terminator lines. A
+  -- payload-line replacement can consume the old body-line coordinate while
+  -- leaving both structural boundaries intact; restore those derived fields
+  -- before this mapped snapshot becomes the next transaction's base state.
+  local mapped_records = plan.mapped_snapshot.heredocs
+  if type(mapped_records) ~= "table" or #mapped_records == 0 then
+    mapped_records = plan.mapped_snapshot.regions or {}
+  end
+  for _, region in ipairs(mapped_records) do
+    if region.body_start_line == nil and type(region.opener_line) == "number" then
+      region.body_start_line = region.opener_line + 1
+    end
+    if region.body_end_line == nil and type(region.terminator_line) == "number" then
+      region.body_end_line = region.terminator_line - 1
+    end
+  end
   local result = merge.transact({
     snapshot = snapshot,
     plan = plan,
