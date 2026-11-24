@@ -565,6 +565,9 @@ local function process_pending_ranges(buf)
   -- the buffer.
   processing[buf] = true
   local ok, err = pcall(function()
+    -- Preserve the existing managed << / <<- compatibility transition as
+    -- part of this owned batch; it does not create a new scope.
+    reconcile_managed_transition(buf, snapshot, result.snapshot, pending.edits)
     for _, region in ipairs(result.snapshot.heredocs or {}) do
       if region.editable
         and (region.body_prefix or ((region.structural_prefix or "") .. "\t")) ~= "" then
