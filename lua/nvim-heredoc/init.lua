@@ -421,6 +421,7 @@ function M.process_buffer(buf, changed_range, close_incomplete, edits)
   if success then
     local snapshot_lines = get_lines(buf)
     local snapshot = scanner.scan(get_source(snapshot_lines), { tabstop = vim.bo[buf].tabstop })
+    snapshot.tabstop = vim.bo[buf].tabstop
     snapshot.generation = ((previous_scan and previous_scan.generation) or 0) + 1
     scan_snapshots[buf] = snapshot
   end
@@ -529,12 +530,21 @@ local function process_pending_ranges(buf)
   if not snapshot then
     snapshot = scanner.scan(get_source(get_lines(buf)), { tabstop = vim.bo[buf].tabstop })
     snapshot.generation = 0
+    snapshot.tabstop = vim.bo[buf].tabstop
     scan_snapshots[buf] = snapshot
     pending.base_generation = 0
   end
 
   local current_lines = get_lines(buf)
+  local current_tabstop = vim.bo[buf].tabstop
   local plan = planner.plan(snapshot, pending.edits, current_lines)
+  if snapshot.tabstop ~= current_tabstop then
+    -- A buffer-local indentation-option change invalidates the scanner's
+    -- structural-prefix observations even when no source boundary changed.
+    -- Rebuild the current post-edit buffer as this owned batch's fallback.
+    plan.requires_rescan = true
+    plan.fallback_required = true
+  end
   -- Body bounds are derivable from surviving opener/terminator lines. A
   -- payload-line replacement can consume the old body-line coordinate while
   -- leaving both structural boundaries intact; restore those derived fields
@@ -566,6 +576,7 @@ local function process_pending_ranges(buf)
         and (current.generation or 0) == base_generation
     end,
     publish = function(next_snapshot)
+      next_snapshot.tabstop = current_tabstop
       scan_snapshots[buf] = next_snapshot
     end,
     clear_pending = function(owner)
@@ -762,6 +773,7 @@ local function attach(buf)
   vim.b[buf].nvim_heredoc_attached = true
   install_return_mapping(buf)
   scan_snapshots[buf] = scanner.scan(get_source(get_lines(buf)), { tabstop = vim.bo[buf].tabstop })
+  scan_snapshots[buf].tabstop = vim.bo[buf].tabstop
   scan_snapshots[buf].generation = 0
   vim.api.nvim_buf_attach(buf, false, {
     on_lines = function(_, changed_buf, _, firstline, lastline, new_lastline)
