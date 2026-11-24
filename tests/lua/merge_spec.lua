@@ -38,8 +38,8 @@ do
     end,
   })
   assert(result.attempts == 2, "the unconfirmed first candidate should be extended")
-  assert(inputs[1] == "cat <<-EOF\\npayload")
-  assert(inputs[2] == "cat <<-EOF\\npayload\\nEOF\\necho after",
+  assert(inputs[1] == "cat <<-EOF\npayload")
+  assert(inputs[2] == "cat <<-EOF\npayload\nEOF\necho after",
     "each candidate extension must rescan from the same original S")
   assert(result.confirmed and result.E == 5, "the extended candidate should be confirmed")
   assert(#result.snapshot.heredocs == 1)
