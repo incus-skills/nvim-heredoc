@@ -276,12 +276,15 @@ function M.reconcile(opts)
   }
 end
 
--- Execute the transaction around reconciliation. is_entitled is checked
--- before scanning and again immediately before the single publication.
+-- Execute the transaction around reconciliation. is_entitled must verify
+-- both base-generation equality and ownership of the pending batch. It is
+-- checked before scanning and again immediately before publication. The
+-- required callbacks publish the one snapshot and clear only the supplied owner.
 function M.transact(opts)
   assert(type(opts) == "table", "options are required")
   assert(type(opts.is_entitled) == "function", "is_entitled callback is required")
   assert(type(opts.publish) == "function", "publish callback is required")
+  assert(type(opts.clear_pending) == "function", "clear_pending callback is required")
   local function entitled()
     return opts.is_entitled(opts.base_generation, opts.owner)
   end
@@ -295,7 +298,7 @@ function M.transact(opts)
   local snapshot = copy(result.snapshot)
   snapshot.generation = next_generation
   opts.publish(snapshot, next_generation)
-  if opts.clear_pending then opts.clear_pending(opts.owner) end
+  opts.clear_pending(opts.owner)
 
   result.snapshot = snapshot
   result.generation = next_generation
