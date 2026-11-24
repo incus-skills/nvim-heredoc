@@ -195,6 +195,7 @@ do
     base_generation = 3, owner = "batch-a",
     is_entitled = function() return false end,
     publish = function() publishes = publishes + 1 end,
+    clear_pending = function() error("discarded batches must not clear pending state") end,
   })
   assert(result.outcome == "discard" and scans == 0 and publishes == 0)
 end
