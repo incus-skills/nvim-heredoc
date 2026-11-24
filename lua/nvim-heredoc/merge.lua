@@ -62,6 +62,11 @@ local function offset_attempt(result, start_pos)
     checkpoint.pos = checkpoint.pos + start_pos - 1
     checkpoint.group_key = checkpoint.group_key + start_pos - 1
   end
+  for _, diagnostic in ipairs(shifted.diagnostics or {}) do
+    if type(diagnostic.line) == "number" then
+      diagnostic.line = diagnostic.line + start_pos - 1
+    end
+  end
   return shifted
 end
 
@@ -257,6 +262,7 @@ function M.reconcile(opts)
       regions = regions,
       heredocs = heredocs,
       checkpoints = checkpoints,
+      diagnostics = copy(fresh.diagnostics or {}),
       complete = merged_complete,
     },
     attempts = attempts,
