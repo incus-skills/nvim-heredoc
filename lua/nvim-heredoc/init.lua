@@ -725,6 +725,7 @@ local function attach(buf)
   vim.b[buf].nvim_heredoc_attached = true
   install_return_mapping(buf)
   scan_snapshots[buf] = scanner.scan(get_source(get_lines(buf)), { tabstop = vim.bo[buf].tabstop })
+  scan_snapshots[buf].generation = 0
   vim.api.nvim_buf_attach(buf, false, {
     on_lines = function(_, changed_buf, _, firstline, lastline, new_lastline)
       schedule_changed_range(changed_buf, firstline, lastline, new_lastline)
