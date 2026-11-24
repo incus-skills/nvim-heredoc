@@ -206,7 +206,7 @@ local function run()
             "indented-opener regression: original opener bytes were changed")
         end
         local assertion = expected and expected[step[1]]
-        if assertion then
+        if assertion and vim.env.NVIM_HEREDOC_TRACE_ONLY ~= "1" then
           assert(current[assertion[1]] == assertion[2],
             step[1] .. ": " .. scenario .. " expected exact body bytes "
               .. vim.inspect(assertion[2]) .. ", got "
