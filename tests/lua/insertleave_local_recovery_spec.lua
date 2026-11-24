@@ -52,7 +52,9 @@ assert(#initial == 1 and initial[1] == "",
 -- nvim_input queues keys for Neovim's normal input loop. Do not call
 -- vim.wait() here: this startup Lua command must return before the input loop
 -- can consume the queued keys. The deferred assertion runs after that turn.
-vim.api.nvim_input("Acat <<-NEW")
+-- Use the same <lt> literal-key notation as the established live-input test:
+-- raw '<' characters are otherwise interpreted as key notation.
+vim.api.nvim_input("Acat <lt><lt>-NEW")
 
 defer(function()
   local mode = vim.api.nvim_get_mode()
