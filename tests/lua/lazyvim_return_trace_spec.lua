@@ -187,17 +187,34 @@ local function run()
         local expected
         local scenario
         if vim.env.NVIM_HEREDOC_ASSERT_COLUMN_ZERO == "1" then
-          scenario = "column-zero"
-          expected = {
-            ["after first Return"] = { 4, "\t" },
-            ["after first payload"] = { 4, "\thello1" },
-            ["after second Return"] = { 5, "\t" },
-            ["after second payload"] = { 5, "\thello2" },
-            ["after third Return"] = { 6, "\t" },
-            ["after third payload"] = { 6, "\thello3" },
-            ["after fourth Return"] = { 7, "\t" },
-            ["after fourth payload"] = { 7, "\thello4" },
-          }
+          scenario = native_cr and "column-zero native Return control"
+            or "column-zero plugin Return"
+          if native_cr then
+            -- This control deliberately shadows the plugin's Return wrapper.
+            -- Native Neovim creates an unindented body row; the managed TAB
+            -- prefix is supplied by nvim-heredoc, not by native Return.
+            expected = {
+              ["after first Return"] = { 4, "" },
+              ["after first payload"] = { 4, "hello1" },
+              ["after second Return"] = { 5, "" },
+              ["after second payload"] = { 5, "hello2" },
+              ["after third Return"] = { 6, "" },
+              ["after third payload"] = { 6, "hello3" },
+              ["after fourth Return"] = { 7, "" },
+              ["after fourth payload"] = { 7, "hello4" },
+            }
+          else
+            expected = {
+              ["after first Return"] = { 4, "\t" },
+              ["after first payload"] = { 4, "\thello1" },
+              ["after second Return"] = { 5, "\t" },
+              ["after second payload"] = { 5, "\thello2" },
+              ["after third Return"] = { 6, "\t" },
+              ["after third payload"] = { 6, "\thello3" },
+              ["after fourth Return"] = { 7, "\t" },
+              ["after fourth payload"] = { 7, "\thello4" },
+            }
+          end
         elseif vim.env.NVIM_HEREDOC_ASSERT_INDENTED == "1" then
           scenario = "indented-opener"
           expected = {
