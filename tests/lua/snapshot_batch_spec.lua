@@ -177,4 +177,22 @@ do
     "deferred on_lines reconciliation must not create a closer")
 end
 
+-- Scanner observations are option-sensitive. If tabstop changes after
+-- attachment, the owned edit batch must full-scan with the current option
+-- rather than reuse structurally incompatible observations.
+do
+  local buf = set_buffer({ "  cat <<-EOF", "payload", "EOF" })
+  assert(snapshot(buf).tabstop == 8,
+    "fixture should begin with the default tabstop snapshot")
+  vim.bo[buf].tabstop = 2
+  local before = snapshot(buf).generation
+  vim.api.nvim_buf_set_lines(buf, 1, 2, false, { "changed payload" })
+  assert_one_batch(buf, before)
+  assert(snapshot(buf).tabstop == 2)
+  assert(snapshot(buf).heredocs[1].editable,
+    "the current tabstop should restore the safe structural prefix")
+  assert(lines(buf)[2] == "\t\tchanged payload",
+    "the batch fallback should apply the current structural prefix")
+end
+
 print("snapshot batch integration tests: PASS")
