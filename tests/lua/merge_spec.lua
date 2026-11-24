@@ -205,8 +205,10 @@ end
 do
   local published, cleared = {}, {}
   local result = merge.transact({
-    snapshot = { complete = true }, plan = result_plan({ E = 2 }),
-    lines = { "echo" }, scan = scanner.scan,
+    snapshot = { complete = true },
+    plan = result_plan({ E = 3, surviving_checkpoints = { { pos = 5 } } }),
+    lines = { "cat <<-EOF", "payload", "EOF", "echo after" },
+    scan = scanner.scan,
     base_generation = 9, owner = "batch-c",
     is_entitled = function() return true end,
     publish = function(snapshot, generation)
@@ -215,6 +217,7 @@ do
     clear_pending = function(owner) cleared[#cleared + 1] = owner end,
   })
   assert(result.outcome == "commit" and result.generation == 10)
+  assert(result.attempts == 2, "the transaction should have extended and rescanned")
   assert(#published == 1 and published[1].generation == 10)
   assert(published[1].snapshot.generation == 10)
   assert(#cleared == 1 and cleared[1] == "batch-c")
