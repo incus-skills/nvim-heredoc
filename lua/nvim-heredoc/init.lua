@@ -66,11 +66,18 @@ local function position_insert_cursor(buf, row, col)
 end
 
 local function prefix_region_range(buf, region, changed_range)
-  if type(region.body_start_line) ~= "number" or type(region.body_end_line) ~= "number" then
+  -- The planner may invalidate a body-line coordinate when that exact line
+  -- was replaced. The stable opener/terminator still delimit the body, so
+  -- recover its half-open range from those surviving structural boundaries.
+  local body_start = region.body_start_line
+    or (type(region.opener_line) == "number" and region.opener_line + 1)
+  local body_end = region.body_end_line
+    or (type(region.terminator_line) == "number" and region.terminator_line - 1)
+  if type(body_start) ~= "number" or type(body_end) ~= "number" then
     return false
   end
-  local first_row = region.body_start_line - 1
-  local last_row = region.body_end_line
+  local first_row = body_start - 1
+  local last_row = body_end
   if last_row <= first_row then
     return false
   end
