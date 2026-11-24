@@ -212,7 +212,8 @@ local function run()
               .. vim.inspect(assertion[2]) .. ", got "
               .. vim.inspect(current[assertion[1]]))
         end
-        if step[1] == "after fourth payload" and scenario == "indented-opener" then
+        if step[1] == "after fourth payload" and scenario == "indented-opener"
+          and vim.env.NVIM_HEREDOC_TRACE_ONLY ~= "1" then
           assert(current[8] == "\tTRACE",
             "indented-opener regression: closer must use one structural TAB, got "
               .. vim.inspect(current[8]))
