@@ -4,7 +4,7 @@ command -v nvim >/dev/null 2>&1 || {
   echo "Neovim is required for buffer integration tests" >&2
   exit 2
 }
-nvim --headless -u NONE -c 'lua local ok, err = pcall(dofile, "tests/lua/buffer_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") else local live_ok, live_err = pcall(dofile, "tests/lua/live_insert_spec.lua"); if not live_ok then print(live_err); vim.cmd("cquit 1") end end'
+nvim --headless -u NONE -c 'lua local ok, err = pcall(dofile, "tests/lua/planner_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") else local buffer_ok, buffer_err = pcall(dofile, "tests/lua/buffer_spec.lua"); if not buffer_ok then print(buffer_err); vim.cmd("cquit 1") else local live_ok, live_err = pcall(dofile, "tests/lua/live_insert_spec.lua"); if not live_ok then print(live_err); vim.cmd("cquit 1") end end end'
 nvim --headless -u NONE -c 'lua local ok, err = pcall(dofile, "tests/lua/live_space_indent_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
 nvim --headless -u NONE -c 'lua local ok, err = pcall(dofile, "tests/lua/live_autoindent_tab_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
 nvim --headless -u NONE -c 'lua local ok, err = pcall(dofile, "tests/lua/live_autoindent_burst_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
