@@ -49,20 +49,21 @@ local initial = lines(first)
 assert(#initial == 1 and initial[1] == "",
   "unexpected initial buffer: " .. vim.inspect(initial))
 
+-- nvim_input queues keys for Neovim's normal input loop. Do not call
+-- vim.wait() here: this startup Lua command must return before the input loop
+-- can consume the queued keys. The deferred assertion runs after that turn.
 vim.api.nvim_input("Acat <<-NEW")
-local delivered = vim.wait(1000, function()
-  return lines(first)[1] == "cat <<-NEW"
-end, 10)
-local actual = lines(first)
-assert(delivered,
-  "input delivery failed; mode=" .. vim.inspect(vim.api.nvim_get_mode())
-    .. "; current_buf=" .. vim.api.nvim_get_current_buf()
-    .. "; window_buf=" .. vim.api.nvim_win_get_buf(0)
-    .. "; lines=" .. vim.inspect(actual))
 
 defer(function()
-  assert_mode("i", "the opener should be typed in real Insert mode")
-  assert(lines(first)[1] == "cat <<-NEW", "the typed opener should be present")
+  local mode = vim.api.nvim_get_mode()
+  local actual = lines(first)
+  assert(mode.mode:sub(1, 1) == "i",
+    "input did not enter Insert mode; mode=" .. vim.inspect(mode)
+      .. "; current_buf=" .. vim.api.nvim_get_current_buf()
+      .. "; window_buf=" .. vim.api.nvim_win_get_buf(0)
+      .. "; lines=" .. vim.inspect(actual))
+  assert(actual[1] == "cat <<-NEW",
+    "the typed opener should be present; lines=" .. vim.inspect(actual))
   vim.api.nvim_input(escape)
   defer(function()
     assert_mode("n", "Escape should trigger the real InsertLeave event")
