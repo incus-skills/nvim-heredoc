@@ -40,7 +40,26 @@ local escape = vim.api.nvim_replace_termcodes("<Esc>", true, false, true)
 -- incomplete after the real InsertLeave event.
 local first = attach({ "" })
 vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+assert(vim.api.nvim_get_current_buf() == first,
+  "unexpected current buffer before live input")
+assert(vim.api.nvim_win_get_buf(0) == first,
+  "test buffer is not displayed in the current window")
+local initial = lines(first)
+assert(#initial == 1 and initial[1] == "",
+  "unexpected initial buffer: " .. vim.inspect(initial))
+
 vim.api.nvim_input("Acat <<-NEW")
+local delivered = vim.wait(1000, function()
+  return lines(first)[1] == "cat <<-NEW"
+end, 10)
+local actual = lines(first)
+assert(delivered,
+  "input delivery failed; mode=" .. vim.inspect(vim.api.nvim_get_mode())
+    .. "; current_buf=" .. vim.api.nvim_get_current_buf()
+    .. "; window_buf=" .. vim.api.nvim_win_get_buf(0)
+    .. "; lines=" .. vim.inspect(actual))
+
 defer(function()
   assert_mode("i", "the opener should be typed in real Insert mode")
   assert(lines(first)[1] == "cat <<-NEW", "the typed opener should be present")
