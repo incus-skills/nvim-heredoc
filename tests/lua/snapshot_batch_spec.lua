@@ -112,6 +112,19 @@ do
   assert(#snapshot(buf).heredocs == 2)
 end
 
+-- Repeated edits to the same payload row retain their ordered raw history
+-- while the aggregate formatting footprint remains a single range.
+do
+  local buf = set_buffer({ "cat <<-EOF", "\tinitial", "EOF" })
+  local before = snapshot(buf).generation
+  vim.api.nvim_buf_set_lines(buf, 1, 2, false, { "\tintermediate" })
+  vim.api.nvim_buf_set_lines(buf, 1, 2, false, { "  final payload" })
+  assert_one_batch(buf, before)
+  assert(lines(buf)[2] == "\t  final payload",
+    "overlapping edits must format the final contents, not an intermediate version")
+  assert(#snapshot(buf).heredocs == 1)
+end
+
 -- An empty TextChanged callback cannot trigger an un-ranged full-buffer scan.
 do
   local buf = set_buffer({ "echo unchanged" })
