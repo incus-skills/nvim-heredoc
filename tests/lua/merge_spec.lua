@@ -83,6 +83,47 @@ do
   assert(result.snapshot.complete == false)
 end
 
+-- Completed groups before and after the replaced scope remain independent.
+do
+  local old = scanner.scan(table.concat({
+    "cat <<-PRE", "prefix body", "PRE",
+    "cat <<-OLD", "old body", "OLD",
+    "cat <<-SUF", "suffix body", "SUF",
+  }, "\\n"))
+  local lines = {
+    "cat <<-PRE", "prefix body", "PRE",
+    "cat <<-NEW", "new body", "NEW",
+    "cat <<-SUF", "suffix body", "SUF",
+  }
+  local plan = result_plan({
+    S = 4, E = 7,
+    mapped_snapshot = old,
+    surviving_checkpoints = { { pos = 4 }, { pos = 7 }, { pos = 10 } },
+  })
+  local result = merge.reconcile({
+    snapshot = old, plan = plan, lines = lines, scan = scanner.scan,
+  })
+  assert(result.confirmed and result.snapshot.complete)
+  assert(#result.snapshot.heredocs == 3)
+  assert(result.snapshot.heredocs[1].delimiter == "PRE")
+  assert(result.snapshot.heredocs[2].delimiter == "NEW")
+  assert(result.snapshot.heredocs[3].delimiter == "SUF")
+  assert(#result.snapshot.checkpoints == 3)
+end
+
+-- A lexical early return salvages earlier checkpointed groups only.
+do
+  local lines = {
+    "cat <<-A", "body", "A",
+    "echo " .. string.char(96) .. "unsupported" .. string.char(96),
+  }
+  local result = run(result_plan({ E = 5 }), lines)
+  assert(not result.confirmed and #result.snapshot.heredocs == 1)
+  assert(result.snapshot.heredocs[1].confidence == "lexical")
+  assert(#result.snapshot.checkpoints == 1)
+  assert(result.snapshot.complete == false)
+end
+
 -- The planner's incomplete-snapshot suffix guard selects full-buffer fallback.
 do
   local old = {
