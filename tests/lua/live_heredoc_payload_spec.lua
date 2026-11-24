@@ -26,8 +26,7 @@ local function wait_for(predicate, message, buf)
     message .. "; lines=" .. vim.inspect(lines(buf))
       .. "; cursor=" .. vim.inspect(api.nvim_win_get_cursor(0))
       .. "; mode=" .. api.nvim_get_mode().mode
-      .. "; snapshot=" .. vim.inspect(plugin._snapshot_for_test(buf))
-      .. "; pending=" .. vim.inspect(plugin._pending_for_test(buf)))
+      .. "; snapshot=" .. vim.inspect(plugin._snapshot_for_test(buf)))
 end
 
 local function send(keys)
