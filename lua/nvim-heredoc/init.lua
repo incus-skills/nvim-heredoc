@@ -554,8 +554,13 @@ local function process_pending_ranges(buf)
     mapped_records = plan.mapped_snapshot.regions or {}
   end
   local previous_terminators = {}
-  for _, region in ipairs(mapped_records) do
+  for index, region in ipairs(mapped_records) do
+    -- Some transitional records have no surviving command/opener identity.
+    -- Keep those records isolated rather than indexing the grouping table
+    -- with nil; only records with a shared structural identity can contribute
+    -- predecessor terminators to one another.
     local group = region.command_end_line or region.group_key or region.opener_line
+      or ("unkeyed-region-" .. index)
     local queue = region.queue_position or 1
     local prior = previous_terminators[group]
     if queue > 1 and prior and prior[queue - 1] then
