@@ -48,9 +48,11 @@ end
 
 -- Attempt-local region, checkpoint, and group-key coordinates are all offset.
 do
-  local plan = result_plan({ S = 3, E = 7 })
+  local plan = result_plan({
+    S = 3, E = 7, surviving_checkpoints = { { pos = 7, group_key = 2 } },
+  })
   local result = run(plan, {
-    "prefix", "prefix", "echo start", "cat <<-EOF", "payload", "EOF",
+    "prefix", "prefix", "echo start", "cat <<-EOF", "payload", "EOF", "echo tail",
   })
   local region = result.snapshot.heredocs[1]
   local checkpoint = result.snapshot.checkpoints[1]
