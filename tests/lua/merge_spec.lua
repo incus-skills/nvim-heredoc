@@ -98,7 +98,11 @@ do
   local plan = result_plan({
     S = 4, E = 7,
     mapped_snapshot = old,
-    surviving_checkpoints = { { pos = 4 }, { pos = 7 }, { pos = 10 } },
+    surviving_checkpoints = {
+      { pos = 4, group_key = 1 },
+      { pos = 7, group_key = 4 },
+      { pos = 10, group_key = 7 },
+    },
   })
   local result = merge.reconcile({
     snapshot = old, plan = plan, lines = lines, scan = scanner.scan,
