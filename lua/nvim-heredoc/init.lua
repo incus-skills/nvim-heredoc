@@ -1,5 +1,7 @@
 local scanner = require("nvim-heredoc.scanner")
 local editing = require("nvim-heredoc.editing")
+local planner = require("nvim-heredoc.planner")
+local merge = require("nvim-heredoc.merge")
 
 local M = {}
 local group_name = "NvimHeredoc"
@@ -64,8 +66,18 @@ local function position_insert_cursor(buf, row, col)
 end
 
 local function prefix_region_range(buf, region, changed_range)
-  local first_row = region.body_start_line - 1
-  local last_row = region.body_end_line
+  -- The planner may invalidate a body-line coordinate when that exact line
+  -- was replaced. The stable opener/terminator still delimit the body, so
+  -- recover its half-open range from those surviving structural boundaries.
+  local body_start = region.body_start_line
+    or (type(region.opener_line) == "number" and region.opener_line + 1)
+  local body_end = region.body_end_line
+    or (type(region.terminator_line) == "number" and region.terminator_line - 1)
+  if type(body_start) ~= "number" or type(body_end) ~= "number" then
+    return false
+  end
+  local first_row = body_start - 1
+  local last_row = body_end
   if last_row <= first_row then
     return false
   end
@@ -408,7 +420,10 @@ function M.process_buffer(buf, changed_range, close_incomplete, edits)
   processing[buf] = nil
   if success then
     local snapshot_lines = get_lines(buf)
-    scan_snapshots[buf] = scanner.scan(get_source(snapshot_lines), { tabstop = vim.bo[buf].tabstop })
+    local snapshot = scanner.scan(get_source(snapshot_lines), { tabstop = vim.bo[buf].tabstop })
+    snapshot.tabstop = vim.bo[buf].tabstop
+    snapshot.generation = ((previous_scan and previous_scan.generation) or 0) + 1
+    scan_snapshots[buf] = snapshot
   end
   if not success then
     vim.notify("nvim-heredoc: " .. tostring(err), vim.log.levels.WARN)
@@ -498,25 +513,146 @@ local function add_changed_range(ranges, firstline, lastline, new_lastline)
   end
 end
 
-local function process_pending_ranges(buf, close_incomplete)
+local function process_pending_ranges(buf)
   local pending = pending_ranges[buf]
-  pending_ranges[buf] = nil
   if not pending then
-    M.process_buffer(buf, nil, close_incomplete)
-    return
+    -- TextChanged/other deferred callbacks are not permission to perform an
+    -- un-ranged whole-buffer scan when there is no owned on_lines batch.
+    return false
   end
-  for index, range in ipairs(pending.ranges) do
-    M.process_buffer(buf, range, close_incomplete, index == 1 and pending.edits or nil)
+  if not vim.api.nvim_buf_is_valid(buf) or not vim.api.nvim_buf_is_loaded(buf)
+    or not supported(vim.bo[buf].filetype) then
+    if pending_ranges[buf] == pending then pending_ranges[buf] = nil end
+    return false
   end
+
+  local snapshot = scan_snapshots[buf]
+  if not snapshot then
+    snapshot = scanner.scan(get_source(get_lines(buf)), { tabstop = vim.bo[buf].tabstop })
+    snapshot.generation = 0
+    snapshot.tabstop = vim.bo[buf].tabstop
+    scan_snapshots[buf] = snapshot
+    pending.base_generation = 0
+  end
+
+  local current_lines = get_lines(buf)
+  local current_tabstop = vim.bo[buf].tabstop
+  local plan = planner.plan(snapshot, pending.edits, current_lines)
+  if snapshot.tabstop ~= current_tabstop then
+    -- A buffer-local indentation-option change invalidates the scanner's
+    -- structural-prefix observations even when no source boundary changed.
+    -- Rebuild the current post-edit buffer as this owned batch's fallback.
+    plan.requires_rescan = true
+    plan.fallback_required = true
+  end
+  -- Body bounds are derivable from surviving opener/terminator lines. A
+  -- payload-line replacement can consume the old body-line coordinate while
+  -- leaving both structural boundaries intact; restore those derived fields
+  -- before this mapped snapshot becomes the next transaction's base state.
+  local mapped_records = plan.mapped_snapshot.heredocs
+  if type(mapped_records) ~= "table" or #mapped_records == 0 then
+    mapped_records = plan.mapped_snapshot.regions or {}
+  end
+  local previous_terminators = {}
+  for index, region in ipairs(mapped_records) do
+    -- Some transitional records have no surviving command/opener identity.
+    -- Keep those records isolated rather than indexing the grouping table
+    -- with nil; only records with a shared structural identity can contribute
+    -- predecessor terminators to one another.
+    local group = region.command_end_line or region.group_key or region.opener_line
+      or ("unkeyed-region-" .. index)
+    local queue = region.queue_position or 1
+    local prior = previous_terminators[group]
+    if queue > 1 and prior and prior[queue - 1] then
+      region.body_start_line = prior[queue - 1] + 1
+    elseif type(region.opener_line) == "number" then
+      region.body_start_line = region.opener_line + 1
+    end
+    if type(region.terminator_line) == "number" then
+      region.body_end_line = region.terminator_line - 1
+      previous_terminators[group] = prior or {}
+      previous_terminators[group][queue] = region.terminator_line
+    else
+      region.body_end_line = nil
+    end
+  end
+  local result = merge.transact({
+    snapshot = snapshot,
+    plan = plan,
+    lines = current_lines,
+    scan = scanner.scan,
+    scan_opts = { tabstop = vim.bo[buf].tabstop },
+    base_generation = pending.base_generation,
+    owner = pending,
+    is_entitled = function(base_generation, owner)
+      local current = scan_snapshots[buf]
+      return pending_ranges[buf] == owner
+        and current ~= nil
+        and (current.generation or 0) == base_generation
+    end,
+    publish = function(next_snapshot)
+      next_snapshot.tabstop = current_tabstop
+      scan_snapshots[buf] = next_snapshot
+    end,
+    clear_pending = function(owner)
+      if pending_ranges[buf] == owner then
+        pending_ranges[buf] = nil
+      end
+    end,
+  })
+
+  if result.outcome ~= "commit" then
+    -- A stale batch must not publish, but it must also not remain queued
+    -- indefinitely. Clear only this batch; a newer owner is untouched.
+    if pending_ranges[buf] == pending then pending_ranges[buf] = nil end
+    return false
+  end
+
+  -- Apply payload prefixing from the single committed snapshot. These edits
+  -- are presentation/maintenance only: they do not create heredoc scopes,
+  -- and their on_lines notifications are suppressed while this batch owns
+  -- the buffer.
+  processing[buf] = true
+  local ok, err = pcall(function()
+    -- Preserve the existing managed << / <<- compatibility transition as
+    -- part of this owned batch; it does not create a new scope.
+    reconcile_managed_transition(buf, snapshot, result.snapshot, pending.edits)
+    for _, region in ipairs(result.snapshot.heredocs or {}) do
+      if region.editable
+        and (region.body_prefix or ((region.structural_prefix or "") .. "\t")) ~= "" then
+        for _, range in ipairs(pending.ranges) do
+          prefix_region_range(buf, region, range)
+        end
+      end
+    end
+  end)
+  processing[buf] = nil
+  if not ok then
+    vim.notify("nvim-heredoc: " .. tostring(err), vim.log.levels.WARN)
+    return false
+  end
+  return true
 end
 
 local function schedule_changed_range(buf, firstline, lastline, new_lastline)
   if processing[buf] then
     return
   end
+  local current_generation = (scan_snapshots[buf] and scan_snapshots[buf].generation) or 0
   local pending = pending_ranges[buf]
+  if pending and pending.base_generation ~= current_generation then
+    -- A full-scan publication superseded the previous batch. Start a fresh
+    -- owner from that generation; the old scheduled closure will fail its
+    -- identity check and cannot consume the new event history.
+    pending_ranges[buf] = nil
+    pending = nil
+  end
   if not pending then
-    pending = { ranges = {}, edits = {} }
+    pending = {
+      ranges = {},
+      edits = {},
+      base_generation = current_generation,
+    }
     pending_ranges[buf] = pending
   end
   pending.edits[#pending.edits + 1] = {
@@ -537,7 +673,7 @@ local function schedule_changed_range(buf, firstline, lastline, new_lastline)
     end
     if vim.api.nvim_buf_is_valid(buf) and vim.api.nvim_buf_is_loaded(buf)
       and supported(vim.bo[buf].filetype) then
-      process_pending_ranges(buf, false)
+      process_pending_ranges(buf)
     else
       pending_ranges[buf] = nil
     end
@@ -548,7 +684,7 @@ local function process_text_changed(buf)
   -- TextChanged is not a commitment event for an incomplete opener. Only
   -- Return may create a new heredoc scope; generic text changes must not
   -- append a closer before the user has completed the opener and pressed CR.
-  process_pending_ranges(buf, false)
+  process_pending_ranges(buf)
 end
 
 -- Insert-mode Return is the commitment event. Buffer-change notifications are
@@ -652,6 +788,8 @@ local function attach(buf)
   vim.b[buf].nvim_heredoc_attached = true
   install_return_mapping(buf)
   scan_snapshots[buf] = scanner.scan(get_source(get_lines(buf)), { tabstop = vim.bo[buf].tabstop })
+  scan_snapshots[buf].tabstop = vim.bo[buf].tabstop
+  scan_snapshots[buf].generation = 0
   vim.api.nvim_buf_attach(buf, false, {
     on_lines = function(_, changed_buf, _, firstline, lastline, new_lastline)
       schedule_changed_range(changed_buf, firstline, lastline, new_lastline)
@@ -683,6 +821,12 @@ local function attach(buf)
     end,
   })
 end
+
+-- Read-only snapshot access for diagnostics and integration tests.
+function M._snapshot_for_test(buf)
+  return scan_snapshots[buf or vim.api.nvim_get_current_buf()]
+end
+
 
 function M.setup_buffer(buf)
   buf = buf or vim.api.nvim_get_current_buf()
