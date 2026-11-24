@@ -31,7 +31,7 @@ do
   local result = merge.reconcile({
     snapshot = plan.mapped_snapshot,
     plan = plan,
-    lines = { "cat <<-EOF", "payload", "EOF", "echo after" },
+    lines = { "cat <<-EOF", "payload", "EOF", "echo after", "echo tail" },
     scan = function(text, opts)
       inputs[#inputs + 1] = text
       return scanner.scan(text, opts)
@@ -222,7 +222,7 @@ do
   local result = merge.transact({
     snapshot = { complete = true },
     plan = result_plan({ E = 3, surviving_checkpoints = { { pos = 5 } } }),
-    lines = { "cat <<-EOF", "payload", "EOF", "echo after" },
+    lines = { "cat <<-EOF", "payload", "EOF", "echo after", "echo tail" },
     scan = scanner.scan,
     base_generation = 9, owner = "batch-c",
     is_entitled = function() return true end,
