@@ -553,12 +553,22 @@ local function process_pending_ranges(buf)
   if type(mapped_records) ~= "table" or #mapped_records == 0 then
     mapped_records = plan.mapped_snapshot.regions or {}
   end
+  local previous_terminators = {}
   for _, region in ipairs(mapped_records) do
-    if region.body_start_line == nil and type(region.opener_line) == "number" then
+    local group = region.command_end_line or region.group_key or region.opener_line
+    local queue = region.queue_position or 1
+    local prior = previous_terminators[group]
+    if queue > 1 and prior and prior[queue - 1] then
+      region.body_start_line = prior[queue - 1] + 1
+    elseif type(region.opener_line) == "number" then
       region.body_start_line = region.opener_line + 1
     end
-    if region.body_end_line == nil and type(region.terminator_line) == "number" then
+    if type(region.terminator_line) == "number" then
       region.body_end_line = region.terminator_line - 1
+      previous_terminators[group] = prior or {}
+      previous_terminators[group][queue] = region.terminator_line
+    else
+      region.body_end_line = nil
     end
   end
   local result = merge.transact({
