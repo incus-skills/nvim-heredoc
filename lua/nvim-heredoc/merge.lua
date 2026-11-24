@@ -83,6 +83,13 @@ local function mark_uncertain(region)
   region.confidence = "uncertain"
 end
 
+local function snapshot_heredocs(snapshot)
+  if type(snapshot.heredocs) == "table" and #snapshot.heredocs > 0 then
+    return snapshot.heredocs
+  end
+  return snapshot.regions or {}
+end
+
 local function strip_old_metadata(record)
   record.old_group_key = nil
   record.old_pos = nil
@@ -92,7 +99,7 @@ end
 
 local function clean_mapped_snapshot(snapshot)
   local cleaned = copy(snapshot)
-  local heredocs = cleaned.heredocs or cleaned.regions or {}
+  local heredocs = snapshot_heredocs(cleaned)
   cleaned.heredocs = heredocs
   cleaned.regions = {}
   for _, region in ipairs(heredocs) do
@@ -145,7 +152,7 @@ local function records_for_scope(records, lower, upper, side, plan, valid_keys)
 end
 
 local function merge_records(old, fresh, start_pos, end_pos, plan)
-  local old_heredocs = old.heredocs or old.regions or {}
+  local old_heredocs = snapshot_heredocs(old)
   local valid_keys = surviving_old_group_keys(plan)
   local prefix = records_for_scope(old_heredocs, start_pos, nil, "prefix", plan, valid_keys)
   local suffix = records_for_scope(old_heredocs, nil, end_pos, "suffix", plan, valid_keys)
