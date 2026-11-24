@@ -27,10 +27,20 @@ end
 -- Every extended candidate attempt starts again at the original S.
 do
   local plan = result_plan({ E = 3, surviving_checkpoints = { { pos = 5 } } })
-  local result = run(plan, {
-    "cat <<-EOF", "payload", "EOF", "echo after",
+  local inputs = {}
+  local result = merge.reconcile({
+    snapshot = plan.mapped_snapshot,
+    plan = plan,
+    lines = { "cat <<-EOF", "payload", "EOF", "echo after" },
+    scan = function(text, opts)
+      inputs[#inputs + 1] = text
+      return scanner.scan(text, opts)
+    end,
   })
   assert(result.attempts == 2, "the unconfirmed first candidate should be extended")
+  assert(inputs[1] == "cat <<-EOF\\npayload")
+  assert(inputs[2] == "cat <<-EOF\\npayload\\nEOF\\necho after",
+    "each candidate extension must rescan from the same original S")
   assert(result.confirmed and result.E == 5, "the extended candidate should be confirmed")
   assert(#result.snapshot.heredocs == 1)
   assert(result.snapshot.heredocs[1].opener_line == 1)
