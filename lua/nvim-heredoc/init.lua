@@ -693,10 +693,21 @@ end
 -- for one safe managed opener, create the first body line and closer before
 -- returning to Neovim's input loop. Other lines retain MiniPairs' mapping (when
 -- present) or native Return behaviour.
+local function return_trace(label, fields)
+  if vim.env.NVIM_HEREDOC_RETURN_TRACE == "1" then
+    print("[nvim-heredoc Return] " .. label .. ": " .. vim.inspect(fields or {}))
+  end
+end
+
 local function return_key(buf)
   local win = vim.api.nvim_get_current_win()
+  return_trace("entry", { buf = buf, win = win, mode = vim.api.nvim_get_mode().mode })
   if vim.api.nvim_win_get_buf(win) ~= buf
     or vim.api.nvim_get_mode().mode:sub(1, 1) ~= "i" then
+    return_trace("inactive-buffer-or-mode; native fallback", {
+      current_buf = vim.api.nvim_win_get_buf(win), expected_buf = buf,
+      mode = vim.api.nvim_get_mode().mode,
+    })
     vim.api.nvim_feedkeys("\r", "ni", false)
     return
   end
@@ -704,8 +715,11 @@ local function return_key(buf)
   local cursor = vim.api.nvim_win_get_cursor(win)
   local row, col = cursor[1] - 1, cursor[2]
   local line = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1] or ""
+  return_trace("cursor", { row = row, col = col, line = line, line_bytes = #line })
 
-  if cursor_in_heredoc_payload(buf, row) then
+  local in_payload = cursor_in_heredoc_payload(buf, row)
+  return_trace("payload-gate", { in_payload = in_payload })
+  if in_payload then
     -- Keep Blink's explicit completion acceptance, but do not pass payload
     -- Return through shell indentation or MiniPairs.
     local blink = package.loaded["blink.cmp"]
@@ -718,8 +732,18 @@ local function return_key(buf)
     return
   end
 
+  return_trace("eol-gate", { at_eol = col == #line, col = col, line_bytes = #line })
   if col == #line then
     local openers = scanner.parse_openers(line, { tabstop = vim.bo[buf].tabstop })
+    local first = openers and openers[1] or nil
+    return_trace("parser-result", {
+      count = openers and #openers or nil,
+      operator = first and first.operator or nil,
+      opener_safe = first and first.opener_safe or nil,
+      structural_prefix = first and first.structural_prefix or nil,
+      body_prefix = first and first.body_prefix or nil,
+      body_prefix_bytes = first and first.body_prefix and { string.byte(first.body_prefix, 1, #first.body_prefix) } or nil,
+    })
     if openers and #openers == 1 then
       local opener = openers[1]
       if opener.operator == "<<-" and opener.opener_safe then
@@ -733,6 +757,7 @@ local function return_key(buf)
             closer,
           })
           vim.api.nvim_win_set_cursor(win, { row + 2, #body_prefix })
+          return_trace("dedicated-managed-branch", { body_prefix = body_prefix, closer = closer })
           return
         end
       end
@@ -753,6 +778,8 @@ local function return_key(buf)
   -- used by LazyVim. Resolve it at invocation time because MiniPairs may load
   -- after this buffer's FileType event.
   local mini_pairs = rawget(_G, "MiniPairs")
+  return_trace("delegated-return", { mini_pairs_available = mini_pairs ~= nil,
+    mini_pairs_cr_available = mini_pairs and type(mini_pairs.cr) == "function" or false })
   local keys = "\r"
   if mini_pairs and type(mini_pairs.cr) == "function" then
     keys = mini_pairs.cr() or keys
