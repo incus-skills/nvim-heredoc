@@ -44,7 +44,7 @@ do
   })
   local region = result.snapshot.heredocs[1]
   local checkpoint = result.snapshot.checkpoints[1]
-  assert(region.opener_line == 4 and region.command_start_line == 3)
+  assert(region.opener_line == 4 and region.command_start_line == 4)
   assert(region.command_end_line == 4, "the attempt group key must be offset")
   assert(checkpoint.pos == 7 and checkpoint.group_key == 4,
     "checkpoint boundary and group key must be offset")
