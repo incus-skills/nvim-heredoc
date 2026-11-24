@@ -583,12 +583,20 @@ local function schedule_changed_range(buf, firstline, lastline, new_lastline)
   if processing[buf] then
     return
   end
+  local current_generation = (scan_snapshots[buf] and scan_snapshots[buf].generation) or 0
   local pending = pending_ranges[buf]
+  if pending and pending.base_generation ~= current_generation then
+    -- A full-scan publication superseded the previous batch. Start a fresh
+    -- owner from that generation; the old scheduled closure will fail its
+    -- identity check and cannot consume the new event history.
+    pending_ranges[buf] = nil
+    pending = nil
+  end
   if not pending then
     pending = {
       ranges = {},
       edits = {},
-      base_generation = (scan_snapshots[buf] and scan_snapshots[buf].generation) or 0,
+      base_generation = current_generation,
     }
     pending_ranges[buf] = pending
   end
