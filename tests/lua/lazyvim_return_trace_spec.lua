@@ -127,6 +127,54 @@ local function run()
       "MiniPairs' Return callback is unavailable for delegation")
   end
 
+
+  -- Investigation-only instrumentation: observe whether the installed callback
+  -- reaches the local parser/closer branch, without changing its behaviour.
+  local installed_callback = cr_mapping.callback
+  local scanner = require("nvim-heredoc.scanner")
+  local editing = require("nvim-heredoc.editing")
+  local original_scan = scanner.scan
+  local original_parse_openers = scanner.parse_openers
+  local original_closer_line = editing.closer_line
+
+  scanner.scan = function(source, opts)
+    local result = original_scan(source, opts)
+    local tail = result.heredocs and result.heredocs[#result.heredocs]
+    add("DIAG scanner.scan", vim.inspect({
+      complete = result.complete,
+      diagnostics = result.diagnostics,
+      last_heredoc = tail and {
+        operator = tail.operator,
+        opener_line = tail.opener_line,
+        body_start_line = tail.body_start_line,
+        terminator_line = tail.terminator_line,
+        opener_safe = tail.opener_safe,
+        confidence = tail.confidence,
+      } or nil,
+    }))
+    return result
+  end
+  scanner.parse_openers = function(source, opts)
+    add("DIAG parse_openers input", vim.inspect(source))
+    local result, err = original_parse_openers(source, opts)
+    add("DIAG parse_openers result", vim.inspect(result))
+    add("DIAG parse_openers error", vim.inspect(err))
+    return result, err
+  end
+  editing.closer_line = function(region)
+    local result, err = original_closer_line(region)
+    add("DIAG closer_line", vim.inspect({ result = result, error = err }))
+    return result, err
+  end
+  vim.keymap.set("i", "<CR>", function()
+    add("DIAG Return callback", "entered")
+    installed_callback()
+    add("DIAG Return callback immediate buffer",
+      vim.inspect(api.nvim_buf_get_lines(buf, 0, -1, false)))
+    add("DIAG Return callback immediate cursor",
+      vim.inspect(api.nvim_win_get_cursor(0)))
+  end, { buffer = buf, noremap = true, silent = true })
+
   api.nvim_win_set_cursor(0, { 3, #opener - 1 })
   snapshot("before first Return")
 
