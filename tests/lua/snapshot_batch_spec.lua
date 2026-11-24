@@ -1,0 +1,139 @@
+package.path = "./lua/?.lua;./lua/?/init.lua;" .. package.path
+local plugin = require("nvim-heredoc")
+
+local function set_buffer(lines)
+  local buf = vim.api.nvim_create_buf(true, false)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  vim.bo[buf].filetype = "bash"
+  assert(plugin.setup_buffer(buf), "the bash buffer should attach")
+  return buf
+end
+
+local function lines(buf)
+  return vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+end
+
+local function snapshot(buf)
+  return plugin._snapshot_for_test(buf)
+end
+
+local function wait_generation(buf, generation)
+  assert(vim.wait(1500, function()
+    return snapshot(buf).generation >= generation
+  end, 10), "scheduled on_lines batch did not publish generation " .. generation
+    .. "; actual=" .. tostring(snapshot(buf).generation))
+end
+
+local function assert_one_batch(buf, before)
+  wait_generation(buf, before + 1)
+  assert(snapshot(buf).generation == before + 1,
+    "one coalesced on_lines batch must publish exactly one generation")
+end
+
+-- Case 1: payload-only edit is observed through the real on_lines callback.
+do
+  local buf = set_buffer({ "cat <<-EOF", "\tpayload", "EOF", "echo after" })
+  local before = snapshot(buf).generation
+  vim.api.nvim_buf_set_lines(buf, 1, 2, false, { "\tchanged payload" })
+  assert_one_batch(buf, before)
+  assert(#snapshot(buf).heredocs == 1)
+  assert(snapshot(buf).heredocs[1].terminator_line == 3)
+end
+
+-- Case 2: opener and terminator edits in one event batch retain ordered history.
+do
+  local buf = set_buffer({ "cat <<-OLD", "\tbody", "OLD", "echo after" })
+  local before = snapshot(buf).generation
+  vim.api.nvim_buf_set_lines(buf, 0, 1, false, { "cat <<-NEW" })
+  vim.api.nvim_buf_set_lines(buf, 2, 3, false, { "NEW" })
+  assert_one_batch(buf, before)
+  assert(snapshot(buf).heredocs[1].delimiter == "NEW")
+  assert(snapshot(buf).heredocs[1].terminator_line == 3)
+end
+
+-- Case 3: deleting a terminator commits an incomplete, conservative snapshot.
+do
+  local buf = set_buffer({ "cat <<-EOF", "\tbody", "EOF", "echo after" })
+  local before = snapshot(buf).generation
+  vim.api.nvim_buf_set_lines(buf, 2, 3, false, {})
+  assert_one_batch(buf, before)
+  assert(snapshot(buf).complete == false)
+  assert(snapshot(buf).heredocs[1].terminator_line == nil)
+  assert(snapshot(buf).heredocs[1].confidence == "uncertain")
+end
+
+-- Case 4: a continuation-line edit is reconciled as part of the same batch.
+do
+  local buf = set_buffer({ "cat \\", "  <<-EOF", "\tbody", "EOF", "echo after" })
+  assert(#snapshot(buf).heredocs == 1, "fixture must begin with one continued heredoc")
+  local before = snapshot(buf).generation
+  vim.api.nvim_buf_set_lines(buf, 1, 2, false, { "    <<-EOF" })
+  assert_one_batch(buf, before)
+  assert(#snapshot(buf).heredocs == 1)
+  assert(snapshot(buf).heredocs[1].terminator_line == 4)
+end
+
+-- Case 5: inserting an earlier matching terminator inside payload moves the
+-- lexical boundary to that line; the former terminator becomes shell source.
+do
+  local buf = set_buffer({ "cat <<-EOF", "\tpayload", "\tmore", "EOF", "echo after" })
+  local before = snapshot(buf).generation
+  vim.api.nvim_buf_set_lines(buf, 2, 2, false, { "EOF" })
+  assert_one_batch(buf, before)
+  assert(snapshot(buf).heredocs[1].terminator_line == 3)
+end
+
+-- Case 6: insertion at a surviving checkpoint still creates a non-empty
+-- rescan footprint and discovers the newly inserted command group.
+do
+  local buf = set_buffer({ "cat <<-A", "\ta", "A", "echo tail" })
+  local before = snapshot(buf).generation
+  vim.api.nvim_buf_set_lines(buf, 3, 3, false, {
+    "cat <<-B", "\tb", "B",
+  })
+  assert_one_batch(buf, before)
+  assert(#snapshot(buf).heredocs == 2,
+    "a command inserted at a checkpoint must be discovered")
+  assert(snapshot(buf).heredocs[2].delimiter == "B")
+end
+
+-- Multiple disjoint edits in one event-loop turn form one owned batch and one
+-- snapshot publication, not one publication per aggregate range.
+do
+  local buf = set_buffer({
+    "cat <<-A", "\ta", "A",
+    "echo middle",
+    "cat <<-B", "\tb", "B",
+  })
+  local before = snapshot(buf).generation
+  vim.api.nvim_buf_set_lines(buf, 1, 2, false, { "\tfirst changed" })
+  vim.api.nvim_buf_set_lines(buf, 5, 6, false, { "\tsecond changed" })
+  assert_one_batch(buf, before)
+  assert(#snapshot(buf).heredocs == 2)
+end
+
+-- An empty TextChanged callback cannot trigger an un-ranged full-buffer scan.
+do
+  local buf = set_buffer({ "echo unchanged" })
+  local before = snapshot(buf).generation
+  vim.api.nvim_exec_autocmds("TextChanged", { buffer = buf })
+  vim.wait(50, function() return false end, 10)
+  assert(snapshot(buf).generation == before,
+    "an empty pending queue must not publish a fallback scan")
+end
+
+-- A batch superseded by a newer full-scan publication before its scheduled
+-- callback runs must be discarded without a second generation advance.
+do
+  local buf = set_buffer({ "cat <<-EOF", "\tbody", "EOF" })
+  local before = snapshot(buf).generation
+  vim.api.nvim_buf_set_lines(buf, 1, 2, false, { "\tnew body" })
+  vim.api.nvim_exec_autocmds("InsertLeave", { buffer = buf })
+  assert(snapshot(buf).generation == before + 1,
+    "InsertLeave's existing full scan should supersede the queued batch")
+  vim.wait(100, function() return false end, 10)
+  assert(snapshot(buf).generation == before + 1,
+    "the superseded scheduled batch must not publish")
+end
+
+print("snapshot batch integration tests: PASS")
