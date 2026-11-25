@@ -30,7 +30,7 @@ end, 10), "nvim-heredoc did not attach to the quoted shell buffer")
 -- opener-looking text, and deliver Return in one uninterrupted input batch.
 -- The initial "o" is the mode-entry keycode; explicit CR is the tested key.
 api.nvim_win_set_cursor(0, { 1, #original[1] })
-api.nvim_input("ocat <<-EOF\\r")
+api.nvim_input("ocat <<-EOF\r")
 
 local expected = {
   original[1],
