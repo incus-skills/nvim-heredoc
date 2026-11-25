@@ -27,11 +27,17 @@ assert(vim.wait(1000, function()
   return vim.b[buf].nvim_heredoc_attached == true
 end, 10), "nvim-heredoc did not attach to the quoted shell buffer")
 
+-- Place the cursor after the opener-looking text, then ask Neovim to enter
+-- Insert mode directly. This avoids testing Normal-mode A/append behaviour.
 api.nvim_win_set_cursor(0, { 2, #original[2] })
-api.nvim_input("A")
+vim.cmd("startinsert")
 assert(vim.wait(1000, function()
   return api.nvim_get_mode().mode == "i"
-end, 10), "could not enter Insert mode at the end of the quoted line")
+end, 10), "could not establish Insert mode at the end of the quoted line")
+local cursor = api.nvim_win_get_cursor(0)
+assert(cursor[1] == 2 and cursor[2] == #original[2],
+  "Insert mode must begin at the end of the opener-looking line; cursor="
+    .. vim.inspect(cursor))
 
 api.nvim_input(api.nvim_replace_termcodes("<CR>", true, false, true))
 assert(vim.wait(1000, function()
