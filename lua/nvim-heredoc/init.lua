@@ -9,6 +9,7 @@ local processing = {}
 local attached = {}
 local pending_ranges = {}
 local scan_snapshots = {}
+local insert_sessions = {}
 
 local function supported(ft)
   return ft == "bash" or ft == "sh" or ft == "zsh"
@@ -687,6 +688,125 @@ local function process_text_changed(buf)
   process_pending_ranges(buf)
 end
 
+-- InsertLeave recovery is limited to an incomplete managed region that was
+-- already present when this Insert session began. Keep its edit history
+-- independently of pending_ranges: scheduled batch processing may consume
+-- that queue before InsertLeave, but it must not erase the session's scope.
+local function begin_insert_session(buf)
+  local row = active_cursor_row(buf)
+  local snapshot = scan_snapshots[buf]
+  local candidate
+
+  -- A pending pre-session batch means the committed snapshot may not describe
+  -- the text at InsertEnter. Decline recovery rather than guessing its scope.
+  if row ~= nil and snapshot and not pending_ranges[buf] then
+    for _, region in ipairs(snapshot.regions or {}) do
+      if region.operator == "<<-" and region.opener_safe
+        and not region.terminator_line
+        and type(region.body_start_line) == "number"
+        and row + 1 >= region.body_start_line then
+        if candidate then
+          candidate = nil
+          break
+        end
+        candidate = {
+          opener_line = region.opener_line,
+          opener_text = region.opener_text,
+          delimiter = region.delimiter,
+          body_start_line = region.body_start_line,
+        }
+      end
+    end
+  end
+
+  insert_sessions[buf] = {
+    candidate = candidate,
+    edits = {},
+  }
+end
+
+local function finish_insert_session(buf)
+  local session = insert_sessions[buf]
+  insert_sessions[buf] = nil
+  local candidate = session and session.candidate
+  if not candidate then
+    return false
+  end
+
+  local cursor_row = active_cursor_row(buf)
+  local body_start_row = candidate.body_start_line - 1
+  if cursor_row == nil or cursor_row < body_start_row then
+    return false
+  end
+
+  -- Every user edit in this Insert session must remain inside the same
+  -- pre-existing incomplete body. In particular, an edit in another region
+  -- cannot be hidden by the final cursor position.
+  for _, edit in ipairs(session.edits) do
+    if edit.firstline < body_start_row or edit.lastline < edit.firstline then
+      return false
+    end
+  end
+
+  local lines = get_lines(buf)
+  if lines[candidate.opener_line] ~= candidate.opener_text then
+    return false
+  end
+
+  -- Re-observe current text before mutation. The original opener must still
+  -- be the same safe, incomplete managed region; a newly typed opener or an
+  -- opener completed by a delimiter line is not eligible for recovery.
+  local current = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
+  local pending
+  for _, region in ipairs(current.regions or {}) do
+    if region.operator == "<<-" and region.opener_safe
+      and region.opener_line == candidate.opener_line
+      and region.opener_text == candidate.opener_text
+      and region.delimiter == candidate.delimiter
+      and not region.terminator_line then
+      if pending then
+        return false
+      end
+      pending = region
+    end
+  end
+  if not pending then
+    return false
+  end
+
+  -- This is local recovery only: close and format this one established
+  -- region. Suppress its own on_lines notifications, then publish the
+  -- resulting snapshot so an older scheduled batch cannot replay stale work.
+  processing[buf] = true
+  local success, err = pcall(function()
+    assert(insert_closer(buf, pending, vim.api.nvim_buf_line_count(buf)),
+      "could not insert the locally authorised heredoc closer")
+    local recovered_lines = get_lines(buf)
+    local recovered = scanner.scan(get_source(recovered_lines), { tabstop = vim.bo[buf].tabstop })
+    for _, region in ipairs(recovered.regions or {}) do
+      if region.opener_line == candidate.opener_line
+        and region.opener_text == candidate.opener_text
+        and region.delimiter == candidate.delimiter
+        and region.terminator_line then
+        prefix_region_range(buf, region, nil)
+        break
+      end
+    end
+    local final_lines = get_lines(buf)
+    local final_snapshot = scanner.scan(get_source(final_lines), { tabstop = vim.bo[buf].tabstop })
+    final_snapshot.tabstop = vim.bo[buf].tabstop
+    final_snapshot.generation = ((scan_snapshots[buf] and scan_snapshots[buf].generation) or 0) + 1
+    scan_snapshots[buf] = final_snapshot
+    pending_ranges[buf] = nil
+  end)
+  processing[buf] = nil
+  if not success then
+    vim.notify("nvim-heredoc: " .. tostring(err), vim.log.levels.WARN)
+    return false
+  end
+  return true
+end
+
 -- Insert-mode Return is the commitment event. Buffer-change notifications are
 -- deferred and may coalesce several Returns with later typing into one range,
 -- so they cannot reliably identify this transition. Intercept Return itself:
@@ -792,22 +912,42 @@ local function attach(buf)
   scan_snapshots[buf].generation = 0
   vim.api.nvim_buf_attach(buf, false, {
     on_lines = function(_, changed_buf, _, firstline, lastline, new_lastline)
+      local session = insert_sessions[changed_buf]
+      if session then
+        session.edits[#session.edits + 1] = {
+          firstline = firstline,
+          lastline = lastline,
+          new_lastline = new_lastline,
+        }
+      end
       schedule_changed_range(changed_buf, firstline, lastline, new_lastline)
     end,
     on_detach = function(_, detached_buf)
       attached[detached_buf] = nil
       pending_ranges[detached_buf] = nil
       scan_snapshots[detached_buf] = nil
+      insert_sessions[detached_buf] = nil
     end,
   })
 
   local buffer_group = vim.api.nvim_create_augroup(group_name .. "Buffer" .. buf, { clear = true })
+  vim.api.nvim_create_autocmd("InsertEnter", {
+    group = buffer_group,
+    buffer = buf,
+    callback = function()
+      if supported(vim.bo[buf].filetype) then
+        begin_insert_session(buf)
+      end
+    end,
+  })
   vim.api.nvim_create_autocmd("InsertLeave", {
     group = buffer_group,
     buffer = buf,
     callback = function()
       if supported(vim.bo[buf].filetype) then
-        M.process_buffer(buf)
+        finish_insert_session(buf)
+      else
+        insert_sessions[buf] = nil
       end
     end,
   })

@@ -299,9 +299,109 @@ do
   local buf = set_buffer({ "\tcat <<-AUTO", "" })
   vim.api.nvim_set_current_buf(buf)
   plugin.setup()
+  vim.api.nvim_win_set_cursor(0, { 2, 0 })
+  vim.api.nvim_exec_autocmds("InsertEnter", { buffer = buf })
   vim.api.nvim_exec_autocmds("InsertLeave", { buffer = buf })
   local actual = lines(buf)
-  assert(actual[3] == "\tAUTO", "InsertLeave should invoke automatic closer placement")
+  assert(actual[2] == "\t\t",
+    "local recovery should format only the existing incomplete body")
+  assert(actual[3] == "\tAUTO",
+    "InsertLeave in the body of a pre-existing incomplete region should recover locally")
+end
+
+do
+  -- A new opener typed during this Insert session was not present in the
+  -- committed snapshot at InsertEnter, so InsertLeave must not commit it.
+  local buf = set_buffer({ "echo before" })
+  vim.api.nvim_set_current_buf(buf)
+  plugin.setup()
+  vim.api.nvim_win_set_cursor(0, { 1, 0 })
+  vim.api.nvim_exec_autocmds("InsertEnter", { buffer = buf })
+  vim.api.nvim_buf_set_lines(buf, 0, 1, false, { "cat <<-NEW" })
+  vim.api.nvim_exec_autocmds("InsertLeave", { buffer = buf })
+  vim.wait(100, function() return false end, 10)
+  local actual = lines(buf)
+  assert(#actual == 1 and actual[1] == "cat <<-NEW",
+    "InsertLeave must not create a scope for an opener typed in the current session")
+end
+
+do
+  -- The cursor is in a complete region, not the later incomplete region.
+  -- InsertLeave must neither format the complete region nor append a closer.
+  local original = {
+    "cat <<-COMPLETE", "payload", "COMPLETE",
+    "cat <<-LATER", "body",
+  }
+  local buf = set_buffer(original)
+  vim.api.nvim_set_current_buf(buf)
+  plugin.setup()
+  vim.api.nvim_win_set_cursor(0, { 2, 0 })
+  vim.api.nvim_exec_autocmds("InsertEnter", { buffer = buf })
+  vim.api.nvim_exec_autocmds("InsertLeave", { buffer = buf })
+  local actual = lines(buf)
+  assert(vim.deep_equal(actual, original),
+    "unrelated InsertLeave must leave complete and incomplete regions unchanged")
+end
+
+do
+  -- If a batch from before InsertEnter is still pending, the committed
+  -- snapshot is not a trustworthy session baseline. Recovery must fail closed.
+  local buf = set_buffer({ "cat <<-STALE", "body" })
+  vim.api.nvim_set_current_buf(buf)
+  plugin.setup()
+  local before_generation = plugin._snapshot_for_test(buf).generation
+  vim.api.nvim_buf_set_lines(buf, 1, 2, false, { "changed before InsertEnter" })
+  vim.api.nvim_win_set_cursor(0, { 2, 0 })
+  vim.api.nvim_exec_autocmds("InsertEnter", { buffer = buf })
+  vim.api.nvim_exec_autocmds("InsertLeave", { buffer = buf })
+  assert(vim.wait(1000, function()
+    return plugin._snapshot_for_test(buf).generation > before_generation
+  end, 10), "the pre-session batch should still be processed")
+  local actual = lines(buf)
+  assert(#actual == 2 and actual[1] == "cat <<-STALE",
+    "a stale pre-session snapshot must not authorise InsertLeave recovery")
+end
+
+do
+  -- A local edit in the pre-existing incomplete body remains eligible even
+  -- when the scheduled batch has already consumed pending_ranges. The
+  -- Insert-session history must outlive that batch queue.
+  local buf = set_buffer({ "\tcat <<-LOCAL", "\tinitial" })
+  vim.api.nvim_set_current_buf(buf)
+  plugin.setup()
+  vim.api.nvim_win_set_cursor(0, { 2, 0 })
+  vim.api.nvim_exec_autocmds("InsertEnter", { buffer = buf })
+  local before_generation = plugin._snapshot_for_test(buf).generation
+  vim.api.nvim_buf_set_lines(buf, 1, 2, false, { "  changed" })
+  assert(vim.wait(1000, function()
+    return plugin._snapshot_for_test(buf).generation > before_generation
+  end, 10), "the scheduled payload batch should complete before InsertLeave")
+  assert(lines(buf)[2] == "  changed",
+    "an incomplete region must not be formatted by generic deferred processing")
+  vim.api.nvim_exec_autocmds("InsertLeave", { buffer = buf })
+  local actual = lines(buf)
+  assert(actual[2] == "\t\t  changed" and actual[3] == "\tLOCAL",
+    "local recovery should format and close only its region using retained session history")
+end
+
+do
+  -- The final cursor is in the incomplete body, but this session also edited
+  -- a disjoint line before the region. Cursor position alone must not grant
+  -- recovery authority over that multi-range session.
+  local buf = set_buffer({ "echo before", "cat <<-LOCAL", "body" })
+  vim.api.nvim_set_current_buf(buf)
+  plugin.setup()
+  vim.api.nvim_win_set_cursor(0, { 3, 0 })
+  vim.api.nvim_exec_autocmds("InsertEnter", { buffer = buf })
+  vim.api.nvim_buf_set_lines(buf, 0, 1, false, { "echo changed" })
+  vim.api.nvim_buf_set_lines(buf, 2, 3, false, { "changed body" })
+  vim.api.nvim_exec_autocmds("InsertLeave", { buffer = buf })
+  vim.wait(100, function() return false end, 10)
+  local actual = lines(buf)
+  assert(not vim.tbl_contains(actual, "\tLOCAL"),
+    "disjoint edits outside the candidate body must make local recovery decline")
+  assert(actual[1] == "echo changed" and actual[2] == "cat <<-LOCAL",
+    "declining recovery must preserve the user's edits")
 end
 
 do
