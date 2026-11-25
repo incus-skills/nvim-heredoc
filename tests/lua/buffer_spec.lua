@@ -80,6 +80,7 @@ do
     "\t\t",
     "later_function() {",
     "}",
+    "TAB_BODY",
   })
   vim.bo[buf].tabstop = 2
   vim.api.nvim_set_current_buf(buf)
@@ -91,7 +92,9 @@ do
   assert(actual[2] == "\t\t", "the existing TAB-only body prefix should be preserved")
   assert(actual[3] == "\tTAB_BODY", "the closer should be inserted after the TAB-only body line")
   assert(actual[4] == "later_function() {"
-    and actual[5] == "}", "following structure should remain unchanged")
+    and actual[5] == "}"
+    and actual[6] == "TAB_BODY",
+    "following structure and the later matching terminator should remain unchanged")
 end
 
 do
