@@ -39,18 +39,21 @@ local expected = {
   "",
   original[2],
 }
-assert(vim.wait(1000, function()
+local delivered = vim.wait(1000, function()
   local actual = api.nvim_buf_get_lines(buf, 0, -1, false)
   return #actual == #expected
     and actual[1] == expected[1]
     and actual[2] == expected[2]
     and actual[3] == expected[3]
     and actual[4] == expected[4]
-end, 10),
-  "Return inside an unterminated double-quoted string must not create a heredoc scope; lines="
-    .. vim.inspect(api.nvim_buf_get_lines(buf, 0, -1, false)))
-
+end, 10)
 local actual = api.nvim_buf_get_lines(buf, 0, -1, false)
+assert(delivered,
+  "post-Return state not established; mode=" .. vim.inspect(api.nvim_get_mode())
+  .. "; current_buf=" .. api.nvim_get_current_buf()
+  .. "; window_buf=" .. api.nvim_win_get_buf(0)
+  .. "; lines=" .. vim.inspect(actual))
+
 assert(actual[1] == expected[1] and actual[2] == expected[2]
   and actual[3] == expected[3] and actual[4] == expected[4],
   "Return should be delegated as ordinary Insert-mode Return inside quoted text; lines="
