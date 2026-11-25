@@ -13,3 +13,4 @@ nvim --headless -u NONE -c 'lua local ok, err = pcall(dofile, "tests/lua/live_au
 bash tests/expect-failure.sh "buffer integration negative control" \
   "NEGATIVE_CONTROL: ordinary heredoc was unexpectedly left unchanged" \
   nvim --headless -u NONE -c 'lua local ok, err = pcall(dofile, "tests/negative/buffer.lua"); if ok then vim.cmd("qa!") else print(err); vim.cmd("cquit 1") end'
+nvim --headless -u NONE -c 'lua local ok, err = pcall(dofile, "tests/lua/live_return_quoted_context_spec.lua"); if not ok then print(err); vim.cmd("cquit 1") end'
