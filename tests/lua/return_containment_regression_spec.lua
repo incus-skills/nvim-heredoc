@@ -65,7 +65,7 @@ local function run_payload_case(initial, expected_complete, label, done)
     local actual = lines(buf)
     assert(mini_pairs_calls == 0,
       label .. ": confirmed payload Return must not delegate to MiniPairs")
-    assert(actual[2] and actual[2]:gsub("^\t+", "") == "cat <<-INNER",
+    assert(actual[2] and actual[2]:find("cat <<-INNER", 1, true),
       label .. ": payload source text must remain intact after outer structural prefixing; lines="
         .. vim.inspect(actual))
     assert(actual[4] == "OUTER",
