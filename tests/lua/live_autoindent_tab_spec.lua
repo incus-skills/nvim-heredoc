@@ -43,7 +43,7 @@ vim.api.nvim_set_current_buf(buf)
 plugin.setup()
 
 vim.api.nvim_win_set_cursor(0, { 2, #"\tcat <<-'LIVE" })
-vim.api.nvim_input("A\n")
+vim.api.nvim_input("A\r")
 
 defer(function()
   wait_for(function()
@@ -57,7 +57,7 @@ defer(function()
     assert(lines()[3] == "\t\thello1",
       "first payload must have exactly one additional TAB; lines=" .. vim.inspect(lines()))
 
-    vim.api.nvim_input("\n")
+    vim.api.nvim_input("\r")
     defer(function()
       wait_for(function()
         return lines()[4] == "\t\t"
@@ -67,7 +67,7 @@ defer(function()
         assert(lines()[4] == "\t\thello2",
           "second payload must have exactly one additional TAB; lines=" .. vim.inspect(lines()))
 
-        vim.api.nvim_input("\n")
+        vim.api.nvim_input("\r")
         defer(function()
           wait_for(function()
             return lines()[5] == "\t\t"

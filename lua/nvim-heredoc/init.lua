@@ -40,10 +40,13 @@ local function cursor_in_heredoc_payload(buf, row)
   for _, heredoc in ipairs(result.heredocs) do
     if line >= heredoc.body_start_line
       and (not heredoc.terminator_line or line < heredoc.terminator_line) then
-      return true
+      -- A region established before a later scan failure remains authoritative
+      -- for its own body; the later failure cannot erase that containment fact.
+      return "inside"
     end
   end
-  return false
+  -- Absence is conclusive only when the scanner completed the whole document.
+  return result.complete and "outside" or "uncertain"
 end
 
 -- Split payload literally. Do not delegate to shell indentexpr, autoindent,
@@ -172,9 +175,14 @@ local function insert_return_local_closers(buf, changed_range)
   end
 
   -- The line before the cursor is the candidate opener for this Return
-  -- transition. If it is already inside another heredoc body, it is payload.
-  if cursor_in_heredoc_payload(buf, cursor_row - 1) then
+  -- transition. Only confirmed outside-context permits a new commitment.
+  local containment = cursor_in_heredoc_payload(buf, cursor_row - 1)
+  if containment == "inside" then
     return nil
+  elseif containment ~= "outside" then
+    -- Uncertainty is a negative authorization. Return false (rather than nil)
+    -- so M.process_buffer() cannot fall through to whole-buffer recovery.
+    return false
   end
 
   local lines = get_lines(buf)
@@ -825,7 +833,8 @@ local function return_key(buf)
   local row, col = cursor[1] - 1, cursor[2]
   local line = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1] or ""
 
-  if cursor_in_heredoc_payload(buf, row) then
+  local containment = cursor_in_heredoc_payload(buf, row)
+  if containment == "inside" then
     -- Keep Blink's explicit completion acceptance, but do not pass payload
     -- Return through shell indentation or MiniPairs.
     local blink = package.loaded["blink.cmp"]
@@ -838,7 +847,9 @@ local function return_key(buf)
     return
   end
 
-  if col == #line then
+  -- Only a complete scan can authorise opener recognition. Uncertain and
+  -- unknown future states use the existing ordinary-Return delegation below.
+  if containment == "outside" and col == #line then
     local openers = scanner.parse_openers(line, { tabstop = vim.bo[buf].tabstop })
     if openers and #openers == 1 then
       local opener = openers[1]
