@@ -31,7 +31,7 @@ end, 10), "nvim-heredoc did not attach to the quoted shell buffer")
 -- The initial "o" is the mode-entry keycode; explicit CR is the tested key.
 -- <lt> encodes literal "<" bytes for Neovim's input parser.
 api.nvim_win_set_cursor(0, { 1, #original[1] })
-api.nvim_input("ocat <lt><lt>-EOF\\r")
+api.nvim_input("ocat <lt><lt>-EOF\r")
 
 local expected = {
   original[1],
