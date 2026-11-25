@@ -65,7 +65,7 @@ local function run_payload_case(initial, expected_complete, label, done)
     local actual = lines(buf)
     assert(mini_pairs_calls == 0,
       label .. ": confirmed payload Return must not delegate to MiniPairs")
-    assert(actual[2] == "\\tcat <<-INNER",
+    assert(actual[2] == "\tcat <<-INNER",
       label .. ": payload text must remain intact with its outer structural TAB; lines="
         .. vim.inspect(actual))
     assert(actual[4] == "OUTER",
