@@ -66,7 +66,8 @@ local function run_payload_case(initial, expected_complete, label, done)
     assert(mini_pairs_calls == 0,
       label .. ": confirmed payload Return must not delegate to MiniPairs")
     assert(actual[2] == "cat <<-INNER",
-      label .. ": the opener-looking payload text must remain unchanged")
+      label .. ": the opener-looking payload text must remain unchanged; lines="
+        .. vim.inspect(actual))
     assert(actual[4] == "OUTER",
       label .. ": the original outer terminator must remain in place")
     local inner_closers = 0
