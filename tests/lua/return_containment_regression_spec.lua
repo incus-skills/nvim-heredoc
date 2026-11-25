@@ -139,26 +139,29 @@ run_payload_case({
     -- The preceding payload test deliberately leaves Insert mode active.
     -- Return to Normal mode before using "o" as the fresh test's mode-entry key.
     api.nvim_input("\27")
-    assert(vim.wait(1000, function()
-      return api.nvim_get_mode().mode == "n"
-    end, 10), "could not leave Insert mode before fresh-opener test")
-
-    local fresh_buf = attach({ "anchor" })
-    api.nvim_win_set_cursor(0, { 1, #"anchor" })
-    api.nvim_input("ocat <lt><lt>-FRESH\r")
+    -- Let the queued Escape reach Neovim's input loop before checking mode.
     defer(function()
-      assert(vim.wait(1000, function()
-        local actual = lines(fresh_buf)
-        return api.nvim_get_mode().mode == "i"
-          and #actual == 4
-          and actual[1] == "anchor"
-          and actual[2] == "cat <<-FRESH"
-          and actual[3] == "\t"
-          and actual[4] == "FRESH"
-      end, 10), "fresh opener Return must create one body TAB and matching closer; mode="
-        .. vim.inspect(api.nvim_get_mode()) .. "; lines=" .. vim.inspect(lines(fresh_buf)))
-      print("Return containment regression tests: PASS")
-      vim.cmd("qa!")
+      assert(api.nvim_get_mode().mode == "n",
+        "could not leave Insert mode before fresh-opener test; mode="
+          .. vim.inspect(api.nvim_get_mode()))
+
+      local fresh_buf = attach({ "anchor" })
+      api.nvim_win_set_cursor(0, { 1, #"anchor" })
+      api.nvim_input("ocat <lt><lt>-FRESH\r")
+      defer(function()
+        assert(vim.wait(1000, function()
+          local actual = lines(fresh_buf)
+          return api.nvim_get_mode().mode == "i"
+            and #actual == 4
+            and actual[1] == "anchor"
+            and actual[2] == "cat <<-FRESH"
+            and actual[3] == "\t"
+            and actual[4] == "FRESH"
+        end, 10), "fresh opener Return must create one body TAB and matching closer; mode="
+          .. vim.inspect(api.nvim_get_mode()) .. "; lines=" .. vim.inspect(lines(fresh_buf)))
+        print("Return containment regression tests: PASS")
+        vim.cmd("qa!")
+      end)
     end)
   end)
 end)
