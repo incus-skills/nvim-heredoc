@@ -39,27 +39,41 @@ local expected = {
   "",
   original[2],
 }
-local delivered = vim.wait(1000, function()
-  local actual = api.nvim_buf_get_lines(buf, 0, -1, false)
-  return #actual == #expected
-    and actual[1] == expected[1]
-    and actual[2] == expected[2]
-    and actual[3] == expected[3]
-    and actual[4] == expected[4]
-end, 10)
-local actual = api.nvim_buf_get_lines(buf, 0, -1, false)
-assert(delivered,
-  "post-Return state not established; mode=" .. vim.inspect(api.nvim_get_mode())
-  .. "; current_buf=" .. api.nvim_get_current_buf()
-  .. "; window_buf=" .. api.nvim_win_get_buf(0)
-  .. "; lines=" .. vim.inspect(actual))
 
-assert(actual[1] == expected[1] and actual[2] == expected[2]
-  and actual[3] == expected[3] and actual[4] == expected[4],
-  "Return should be delegated as ordinary Insert-mode Return inside quoted text; lines="
-    .. vim.inspect(actual))
-assert(api.nvim_get_mode().mode == "i",
-  "ordinary Return inside quoted text should leave the editor in Insert mode")
+-- nvim_input() queues keys for Neovim's normal input loop. This file is
+-- loaded from a synchronous -c Lua command, so do not wait here: return from
+-- the startup command first, then inspect the result after the input loop has
+-- consumed the uninterrupted mode-entry/opener/Return batch.
+vim.defer_fn(function()
+  local ok, err = xpcall(function()
+    local delivered = vim.wait(1000, function()
+      local actual = api.nvim_buf_get_lines(buf, 0, -1, false)
+      return #actual == #expected
+        and actual[1] == expected[1]
+        and actual[2] == expected[2]
+        and actual[3] == expected[3]
+        and actual[4] == expected[4]
+    end, 10)
+    local actual = api.nvim_buf_get_lines(buf, 0, -1, false)
+    assert(delivered,
+      "post-Return state not established; mode=" .. vim.inspect(api.nvim_get_mode())
+      .. "; current_buf=" .. api.nvim_get_current_buf()
+      .. "; window_buf=" .. api.nvim_win_get_buf(0)
+      .. "; lines=" .. vim.inspect(actual))
 
-print("live Return quoted-context diagnostic: PASS")
-vim.cmd("qa!")
+    assert(actual[1] == expected[1] and actual[2] == expected[2]
+      and actual[3] == expected[3] and actual[4] == expected[4],
+      "Return should be delegated as ordinary Insert-mode Return inside quoted text; lines="
+        .. vim.inspect(actual))
+    assert(api.nvim_get_mode().mode == "i",
+      "ordinary Return inside quoted text should leave the editor in Insert mode")
+
+    print("live Return quoted-context diagnostic: PASS")
+  end, debug.traceback)
+  if not ok then
+    print(err)
+    vim.cmd("cquit 1")
+  else
+    vim.cmd("qa!")
+  end
+end, 20)
