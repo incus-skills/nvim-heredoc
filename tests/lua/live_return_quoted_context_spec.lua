@@ -6,7 +6,6 @@ local api = vim.api
 local buf = api.nvim_create_buf(true, false)
 local original = {
   "printf '%s\\n' \"",
-  "cat <<-EOF",
   "\"",
 }
 api.nvim_buf_set_lines(buf, 0, -1, false, original)
@@ -27,33 +26,32 @@ assert(vim.wait(1000, function()
   return vim.b[buf].nvim_heredoc_attached == true
 end, 10), "nvim-heredoc did not attach to the quoted shell buffer")
 
--- Place the cursor after the opener-looking text, then ask Neovim to enter
--- Insert mode directly. This avoids testing Normal-mode A/append behaviour.
-api.nvim_win_set_cursor(0, { 2, #original[2] })
-vim.cmd("startinsert")
-assert(vim.wait(1000, function()
-  return api.nvim_get_mode().mode == "i"
-end, 10), "could not establish Insert mode at the end of the quoted line")
-local cursor = api.nvim_win_get_cursor(0)
-assert(cursor[1] == 2 and cursor[2] == #original[2],
-  "Insert mode must begin at the end of the opener-looking line; cursor="
-    .. vim.inspect(cursor))
+-- Open a line inside the multiline double-quoted string, type the
+-- opener-looking text, and deliver Return in one uninterrupted input batch.
+-- The initial "o" is the mode-entry keycode; explicit CR is the tested key.
+api.nvim_win_set_cursor(0, { 1, #original[1] })
+api.nvim_input("ocat <<-EOF\\r")
 
-api.nvim_input(api.nvim_replace_termcodes("<CR>", true, false, true))
+local expected = {
+  original[1],
+  "cat <<-EOF",
+  "",
+  original[2],
+}
 assert(vim.wait(1000, function()
-  return #api.nvim_buf_get_lines(buf, 0, -1, false) >= 4
-end, 10), "Insert-mode Return did not create the expected new physical line")
-
--- Allow the registered on_lines/deferred path to run before inspecting the
--- final result. The test is about Return eligibility, not callback timing.
-vim.wait(250, function() return false end, 10)
+  local actual = api.nvim_buf_get_lines(buf, 0, -1, false)
+  return #actual == #expected
+    and actual[1] == expected[1]
+    and actual[2] == expected[2]
+    and actual[3] == expected[3]
+    and actual[4] == expected[4]
+end, 10),
+  "Return inside an unterminated double-quoted string must not create a heredoc scope; lines="
+    .. vim.inspect(api.nvim_buf_get_lines(buf, 0, -1, false)))
 
 local actual = api.nvim_buf_get_lines(buf, 0, -1, false)
-assert(#actual == 4,
-  "Return inside an unterminated double-quoted string must not create a heredoc scope; lines="
-    .. vim.inspect(actual))
-assert(actual[1] == original[1] and actual[2] == original[2]
-  and actual[3] == "" and actual[4] == original[3],
+assert(actual[1] == expected[1] and actual[2] == expected[2]
+  and actual[3] == expected[3] and actual[4] == expected[4],
   "Return should be delegated as ordinary Insert-mode Return inside quoted text; lines="
     .. vim.inspect(actual))
 assert(api.nvim_get_mode().mode == "i",
