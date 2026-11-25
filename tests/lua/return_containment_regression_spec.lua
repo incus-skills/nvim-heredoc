@@ -126,7 +126,31 @@ run_payload_case({
       "M.process_buffer() must not insert a closer when containment is uncertain; lines="
         .. vim.inspect(actual))
 
-    print("Return containment regression tests: PASS")
-    vim.cmd("qa!")
+    -- A fresh, positively recognised opener is outside even though the
+    -- scanner marks the missing terminator as incomplete before Return.
+    local fresh_source = "anchor\\ncat <<-FRESH"
+    local fresh_scan = scanner.scan(fresh_source)
+    assert(not fresh_scan.complete
+      and fresh_scan.heredocs[1]
+      and fresh_scan.heredocs[1].opener_line == 2,
+      "fresh opener fixture must be recorded by the incomplete scanner result")
+
+    local fresh_buf = attach({ "anchor" })
+    api.nvim_win_set_cursor(0, { 1, #"anchor" })
+    api.nvim_input("ocat <lt><lt>-FRESH\\r")
+    defer(function()
+      assert(vim.wait(1000, function()
+        local actual = lines(fresh_buf)
+        return api.nvim_get_mode().mode == "i"
+          and #actual == 4
+          and actual[1] == "anchor"
+          and actual[2] == "cat <<-FRESH"
+          and actual[3] == "\\t"
+          and actual[4] == "FRESH"
+      end, 10), "fresh opener Return must create one body TAB and matching closer; mode="
+        .. vim.inspect(api.nvim_get_mode()) .. "; lines=" .. vim.inspect(lines(fresh_buf)))
+      print("Return containment regression tests: PASS")
+      vim.cmd("qa!")
+    end)
   end)
 end)

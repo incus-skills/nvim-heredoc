@@ -45,7 +45,14 @@ local function cursor_in_heredoc_payload(buf, row)
       return "inside"
     end
   end
-  -- Absence is conclusive only when the scanner completed the whole document.
+  -- An opener positively recognised on the cursor line is a valid
+  -- pre-commit state: its terminator does not exist until Return commits it.
+  for _, heredoc in ipairs(result.heredocs) do
+    if heredoc.opener_line == line then
+      return "outside"
+    end
+  end
+  -- Otherwise, absence is conclusive only when the scanner completed.
   return result.complete and "outside" or "uncertain"
 end
 
