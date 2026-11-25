@@ -103,7 +103,7 @@ run_payload_case({
     -- quoted context, its local Return candidate must decline commitment and
     -- must not fall through to the document-wide incomplete-region fallback.
     local uncertain = {
-      "printf '%s\n' \"",
+      "printf '%s\\n' \"",
       "cat <<-EOF",
       "",
     }
