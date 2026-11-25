@@ -136,6 +136,13 @@ run_payload_case({
       and fresh_scan.heredocs[1].opener_line == 2,
       "fresh opener fixture must be recorded by the incomplete scanner result")
 
+    -- The preceding payload test deliberately leaves Insert mode active.
+    -- Return to Normal mode before using "o" as the fresh test's mode-entry key.
+    api.nvim_input("\27")
+    assert(vim.wait(1000, function()
+      return api.nvim_get_mode().mode == "n"
+    end, 10), "could not leave Insert mode before fresh-opener test")
+
     local fresh_buf = attach({ "anchor" })
     api.nvim_win_set_cursor(0, { 1, #"anchor" })
     api.nvim_input("ocat <lt><lt>-FRESH\r")
