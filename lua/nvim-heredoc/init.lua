@@ -1037,13 +1037,20 @@ local function fix_all(buf, dry_run)
   -- Neovim setloclist() accepts either positional items or the `what` table, not both.
   vim.fn.setloclist(0, {}, "r", { title = "HeredocFixAll", items = items })
 
-  local action = dry_run and "would fix" or "fixing"
-  vim.notify(string.format(
-    "nvim-heredoc: %s %d indented closer(s)%s",
-    action,
-    #candidates,
-    skipped > 0 and string.format("; skipped %d unsafe <<- closer(s)", skipped) or ""
-  ), vim.log.levels.INFO)
+  if #candidates == 0 then
+    local message = skipped > 0
+      and string.format("No safe closer repairs found; skipped %d unsafe <<- closer(s)", skipped)
+      or "No closer repairs needed."
+    vim.notify("nvim-heredoc: " .. message, vim.log.levels.INFO)
+  else
+    local action = dry_run and "would fix" or "fixing"
+    vim.notify(string.format(
+      "nvim-heredoc: %s %d closer(s)%s",
+      action,
+      #candidates,
+      skipped > 0 and string.format("; skipped %d unsafe <<- closer(s)", skipped) or ""
+    ), vim.log.levels.INFO)
+  end
 
   if dry_run or #candidates == 0 then
     return #candidates > 0
