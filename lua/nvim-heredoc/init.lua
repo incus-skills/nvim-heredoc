@@ -150,6 +150,42 @@ local function insert_closer(buf, region, row)
   return true
 end
 
+-- Rewrite only scanner-confirmed terminators whose opener or closer line is
+-- owned by the current edit range. A nil range is the explicit whole-buffer
+-- process_buffer() path. Ordinary << records participate only in this
+-- closer-only repair; their payload never enters prefix_region_range().
+local function normalize_heredoc_closers(buf, heredocs, ranges)
+  local changed = false
+  local lines = get_lines(buf)
+
+  local function touches(line)
+    if not ranges then return true end
+    if type(line) ~= "number" then return false end
+    local row = line - 1
+    for _, range in ipairs(ranges) do
+      if row >= range.start_row and row < range.end_row then
+        return true
+      end
+    end
+    return false
+  end
+
+  for _, region in ipairs(heredocs or {}) do
+    if region.terminator_line and region.opener_safe
+      and (not ranges or touches(region.opener_line) or touches(region.terminator_line)) then
+      local row = region.terminator_line - 1
+      local expected = editing.closer_line(region)
+      if expected and lines[row + 1] ~= expected then
+        vim.api.nvim_buf_set_lines(buf, row, row + 1, false, { expected })
+        lines[row + 1] = expected
+        changed = true
+      end
+    end
+  end
+
+  return changed
+end
+
 local function ensure_body_prefix(buf, region, body_row)
   local prefix = region.body_prefix or ((region.structural_prefix or "") .. "\t")
   if prefix == "" then
@@ -418,6 +454,10 @@ function M.process_buffer(buf, changed_range, close_incomplete, edits)
           end
           changed = true
         else
+          if normalize_heredoc_closers(buf, result.heredocs,
+            changed_range and { changed_range } or nil) then
+            changed = true
+          end
           local pass_changed = false
           for _, region in ipairs(result.regions) do
             if region.editable and (region.body_prefix or ((region.structural_prefix or "") .. "\t")) ~= "" then
@@ -633,6 +673,9 @@ local function process_pending_ranges(buf)
     -- Preserve the existing managed << / <<- compatibility transition as
     -- part of this owned batch; it does not create a new scope.
     reconcile_managed_transition(buf, snapshot, result.snapshot, pending.edits)
+    -- The committed edit may have touched either boundary. Repair the closer
+    -- from the current scanner record without widening body-formatting scope.
+    normalize_heredoc_closers(buf, result.snapshot.heredocs, pending.ranges)
     for _, region in ipairs(result.snapshot.heredocs or {}) do
       if region.editable
         and (region.body_prefix or ((region.structural_prefix or "") .. "\t")) ~= "" then
