@@ -466,9 +466,8 @@ do
   end, 10), "restoring <<- should reapply the structural body and closer TABs")
 end
 
--- Existing matching closers are normalised by the buffer-processing path,
--- not merely described by editing.closer_line(). Ordinary << payload is
--- untouched while its closer alone is repaired.
+-- Existing terminators are recognised for lexical boundary recovery, but
+-- generic buffer processing does not lint/fix user-authored closer lines.
 do
   local original = {
     "  cat <<'PLAIN_END'",
@@ -476,40 +475,39 @@ do
     "\t  PLAIN_END",
   }
   local buf = set_buffer(original)
-  assert(plugin.process_buffer(buf), "a recoverable ordinary << closer should be rewritten")
-  local actual = lines(buf)
-  assert(actual[1] == original[1] and actual[2] == original[2],
-    "ordinary << opener and payload bytes must remain unchanged")
-  assert(actual[3] == "PLAIN_END",
-    "ordinary << closer must be rewritten left-justified")
-  assert(#actual == #original, "closer normalisation must not insert or delete lines")
+  assert(not plugin.process_buffer(buf),
+    "ordinary << has no managed body edit and must not trigger a closer fix")
+  assert(vim.deep_equal(lines(buf), original),
+    "ordinary << opener, payload, and pre-existing closer must remain byte-identical")
 end
 
 do
-  local buf = set_buffer({ "  cat <<-TAB_END", "  payload", "  TAB_END" })
+  local original = { "  cat <<-TAB_END", "  payload", "  TAB_END" }
+  local buf = set_buffer(original)
   vim.bo[buf].tabstop = 2
-  assert(plugin.process_buffer(buf), "a recoverable <<- closer should be rewritten")
+  assert(plugin.process_buffer(buf), "managed <<- body formatting should still run")
   local actual = lines(buf)
-  assert(actual[1] == "  cat <<-TAB_END")
-  assert(actual[2] == "\t\t  payload", "managed <<- body formatting remains active and preserves payload spaces")
-  assert(actual[3] == "\tTAB_END",
-    "<<- closer must be rewritten with the opener's structural TAB prefix")
+  assert(actual[1] == original[1])
+  assert(actual[2] == "\t\t  payload",
+    "managed body formatting remains active and preserves payload spaces")
+  assert(actual[3] == original[3],
+    "a pre-existing space-indented closer is recognised but not silently rewritten")
 end
 
 do
-  -- The registered on_lines path repairs a changed closer line without
-  -- broadening body formatting beyond the owned range.
-  local buf = set_buffer({ "  cat <<-LOCAL_END", "\t\tpayload", "  LOCAL_END" })
+  -- Editing a pre-existing closer is user content, not an owned plugin edit.
+  local original = { "  cat <<-LOCAL_END", "\t\tpayload", "  LOCAL_END" }
+  local buf = set_buffer(original)
   vim.bo[buf].tabstop = 2
   vim.api.nvim_set_current_buf(buf)
   plugin.setup()
   vim.api.nvim_buf_set_lines(buf, 2, 3, false, { "    LOCAL_END" })
   assert(vim.wait(1000, function()
-    return lines(buf)[3] == "\tLOCAL_END"
-  end, 10), "editing the closer should normalise it to the opener's structural TAB prefix")
+    return lines(buf)[3] == "    LOCAL_END"
+  end, 10), "buffer processing must leave a user-edited existing closer unchanged")
   local actual = lines(buf)
   assert(actual[2] == "\t\tpayload",
-    "closer-only recovery must not reformat an unchanged body line")
+    "a closer-line edit must not broaden formatting into an unchanged body line")
 end
 
 do
@@ -615,7 +613,7 @@ do
         "    EOF",
         "}",
       },
-      terminator = "\tEOF",
+      terminator = "    EOF",
       terminator_index = 8,
       payload = "\t\t  cat <<'EOF'",
     },
@@ -649,7 +647,7 @@ do
         "  EOF",
         "}",
       },
-      terminator = "\tEOF",
+      terminator = "EOF",
       terminator_index = 8,
       payload = "\t\tcat <<-'EOF'",
     },
