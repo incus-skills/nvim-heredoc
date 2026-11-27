@@ -11,7 +11,7 @@ Provide predictable editing support for shell heredocs, with managed body format
 - Insert a matching closing delimiter automatically for managed `<<-` openers.
 - Keep managed openers and closing delimiters structurally indented within surrounding shell code.
 - Preserve relative indentation and existing bytes when multiline content is pasted.
-- Recognise and normalise a matching closer for either `<<` or `<<-` when its leading indentation is inconsistent with the opener.
+- Recognise matching closers for either `<<` or `<<-` despite leading spaces or TABs; normalise closers created or actively maintained by the plugin.
 - Keep ordinary `<<` heredoc bodies outside managed formatting, and leave here-strings (`<<<`) untouched.
 - Work in Bash, POSIX `sh`, and Zsh buffers.
 - Coexist with the user's existing completion, pair, indentation, and formatting configuration.
@@ -47,9 +47,9 @@ The implementation distinguishes:
 
 Leading TAB bytes in the body are also stripped by the shell. The editor therefore cannot promise to preserve them as payload indentation. No special values for `expandtab`, `tabstop`, `softtabstop`, or `shiftwidth` are required to position the opener: the earlier need to force those options was a workaround for an older column-zero opener implementation, and is obsolete. The plugin does not set these options.
 
-Ordinary `<<` heredocs are outside the managed body-formatting scope. Their matching closer is still eligible for the narrow recognition-and-normalisation rule: leading spaces or TABs do not prevent recognition, and the closer is rewritten left-justified. Their body is never adopted or reformatted. Here-strings (`<<<`) remain entirely outside scope.
+Ordinary `<<` heredocs are outside the managed body-formatting scope. Their matching closer may be recognised despite leading spaces or TABs, but existing terminator lines are not rewritten by generic buffer processing. The body is never adopted or reformatted. Here-strings (`<<<`) remain entirely outside scope.
 
-This closer recovery is an editor repair policy, not a change to shell syntax. Native `<<` terminators are left-justified; native `<<-` terminators may be indented with TABs, not spaces. The editor may recognise an intended matching delimiter despite either kind of leading whitespace and repair it to the opener's form. Trailing whitespace is not ignored, and the delimiter itself must still match exactly.
+For either operator, leading spaces or TABs may be ignored when recovering the delimiter identity; trailing whitespace is not ignored, and the delimiter itself must still match exactly. This editor-side recognition tolerance does not change native shell syntax. Closer normalisation is limited to lines the plugin creates or is actively maintaining as part of an owned editing operation. Automatically fixing pre-existing indented terminators is a separate, deferred opt-in feature.
 
 ## Architecture
 
