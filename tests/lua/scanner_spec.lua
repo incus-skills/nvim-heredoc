@@ -14,8 +14,10 @@ do
   local tab_indented = assert(scanner.parse_openers("\tcat <<-LIVE", { tabstop = 2 }))
   assert(tab_indented[1].structural_prefix == "\t" and tab_indented[1].body_prefix == "\t\t")
   assert(editing.closer_line(tab_indented[1]) == "\tLIVE")
-  local plain = assert(scanner.parse_openers("cat <<'PLAIN'"))
+  local plain = assert(scanner.parse_openers("  cat <<'PLAIN'"))
   assert(#plain == 1 and plain[1].operator == "<<")
+  assert(editing.closer_line(plain[1]) == "PLAIN",
+    "ordinary << closers are normalised to column zero regardless of opener indentation")
   assert(editing.closer_line(plain[1]) == "PLAIN",
     "ordinary << closers are normalised to column zero regardless of opener indentation")
   local unsupported = assert(scanner.parse_openers("   cat <<-EOF", { tabstop = 2 }))
@@ -304,6 +306,15 @@ do
   assert(editing.closer_line(r) == "OE_SKILL_CALIBRATE_V2_EOF")
   assert(source:find("  hermes:", 1, true) and source:find("    tags:", 1, true),
     "front-matter indentation remains body content, not adopted formatting")
+end
+
+-- Ordinary << recovery also tolerates a TAB-indented candidate, then removes
+-- that indentation from the repaired closer.
+do
+  local result = scanner.scan("  cat <<TAB_END\nbody\n\tTAB_END\n")
+  assert(result.complete and #result.heredocs == 1 and #result.regions == 0)
+  assert(result.heredocs[1].terminator_line == 3)
+  assert(editing.closer_line(result.heredocs[1]) == "TAB_END")
 end
 
 -- A closer with a different delimiter or trailing whitespace is not a match.
