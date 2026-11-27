@@ -709,7 +709,7 @@ do
   local original = {
     "  cat <<'PLAIN_END'",
     "  body  ",
-    "\\t  PLAIN_END",
+    "\t  PLAIN_END",
     "  cat <<-TAB_END",
     "  payload  ",
     "  TAB_END",
@@ -730,7 +730,7 @@ do
   local fixed = lines(buf)
   assert(fixed[3] == "PLAIN_END",
     "ordinary << closer repair should remove all leading indentation")
-  assert(fixed[6] == "\\tTAB_END",
+  assert(fixed[6] == "\tTAB_END",
     "<<- closer repair should use the opener's structural TAB prefix")
   assert(fixed[2] == original[2] and fixed[5] == original[5],
     "the explicit closer repair must not change either heredoc body")
