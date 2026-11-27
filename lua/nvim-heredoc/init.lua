@@ -629,20 +629,10 @@ local function process_pending_ranges(buf)
     -- Reconciliation must use a fresh observation of the post-edit buffer.
     -- The transaction's mapped snapshot can retain displaced heredoc line
     -- coordinates while the user's edit inserts a new opener above them.
-    local prior_openers = {}
-    for _, old in ipairs(snapshot.heredocs or {}) do
-      local mapped_line = map_opener_line(old, pending.edits)
-      if mapped_line then prior_openers[mapped_line] = true end
-    end
     local current_scan = scanner.scan(get_source(get_lines(buf)), { tabstop = current_tabstop })
     -- Preserve the existing managed << / <<- compatibility transition as
     -- part of this owned batch; it does not create a new scope.
     reconcile_managed_transition(buf, snapshot, current_scan, pending.edits)
-    -- Re-observe after reconciliation. A changed opener may repair its
-    -- closer only if that opener existed in the prior snapshot; a newly typed
-    -- uncommitted opener must not claim a later same-delimiter heredoc closer.
-    current_scan = scanner.scan(get_source(get_lines(buf)), { tabstop = current_tabstop })
-    normalize_heredoc_closers(buf, current_scan.heredocs, pending.ranges, prior_openers)
     for _, region in ipairs(result.snapshot.heredocs or {}) do
       if region.editable
         and (region.body_prefix or ((region.structural_prefix or "") .. "\t")) ~= "" then
