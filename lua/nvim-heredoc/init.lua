@@ -980,6 +980,110 @@ local function attach(buf)
   })
 end
 
+local function fix_all(buf, dry_run)
+  buf = buf or vim.api.nvim_get_current_buf()
+  if not vim.api.nvim_buf_is_valid(buf) or not vim.api.nvim_buf_is_loaded(buf) then
+    vim.notify("nvim-heredoc: current buffer is not loaded", vim.log.levels.WARN)
+    return false
+  end
+  if processing[buf] or pending_ranges[buf] then
+    vim.notify("nvim-heredoc: refusing whole-buffer fix while buffer edits are pending", vim.log.levels.WARN)
+    return false
+  end
+
+  local lines = get_lines(buf)
+  local result = scanner.scan(get_source(lines), { tabstop = vim.bo[buf].tabstop })
+  if not result.complete then
+    vim.notify("nvim-heredoc: scan is incomplete or uncertain; no terminators were changed", vim.log.levels.WARN)
+    return false
+  end
+
+  local candidates, skipped = {}, 0
+  for _, region in ipairs(result.heredocs or {}) do
+    if region.terminator_line then
+      local current = lines[region.terminator_line]
+      local desired = editing.closer_line(region)
+      if desired and current ~= desired and current:match("^[ \\t]+") then
+        if region.opener_safe then
+          candidates[#candidates + 1] = {
+            line = region.terminator_line,
+            current = current,
+            desired = desired,
+            operator = region.operator,
+            delimiter = region.delimiter,
+          }
+        else
+          skipped = skipped + 1
+        end
+      end
+    end
+  end
+
+  local items = {}
+  for _, candidate in ipairs(candidates) do
+    items[#items + 1] = {
+      bufnr = buf,
+      lnum = candidate.line,
+      col = 1,
+      type = "W",
+      text = string.format("%s closer: %q -> %q", candidate.operator, candidate.current, candidate.desired),
+    }
+  end
+  vim.fn.setloclist(0, items, "r", { title = "HeredocFixAll" })
+
+  local action = dry_run and "would fix" or "fixing"
+  vim.notify(string.format(
+    "nvim-heredoc: %s %d indented closer(s)%s",
+    action,
+    #candidates,
+    skipped > 0 and string.format("; skipped %d unsafe <<- closer(s)", skipped) or ""
+  ), vim.log.levels.INFO)
+
+  if dry_run or #candidates == 0 then
+    return #candidates > 0
+  end
+
+  -- One contiguous API edit groups all selected closer replacements into a
+  -- single undo step. Unchanged lines between candidates are copied verbatim.
+  local first_line = candidates[1].line
+  local last_line = candidates[#candidates].line
+  local replacement = {}
+  for line = first_line, last_line do
+    replacement[#replacement + 1] = lines[line]
+  end
+  for _, candidate in ipairs(candidates) do
+    replacement[candidate.line - first_line + 1] = candidate.desired
+  end
+
+  processing[buf] = true
+  local ok, err = pcall(vim.api.nvim_buf_set_lines, buf, first_line - 1, last_line, false, replacement)
+  processing[buf] = nil
+  if not ok then
+    vim.notify("nvim-heredoc: " .. tostring(err), vim.log.levels.WARN)
+    return false
+  end
+
+  local final = scanner.scan(get_source(get_lines(buf)), { tabstop = vim.bo[buf].tabstop })
+  final.tabstop = vim.bo[buf].tabstop
+  final.generation = ((scan_snapshots[buf] and scan_snapshots[buf].generation) or 0) + 1
+  scan_snapshots[buf] = final
+  return true
+end
+
+local function install_fix_all_command()
+  vim.api.nvim_create_user_command("HeredocFixAll", function(opts)
+    if opts.args ~= "" and opts.args ~= "--dry-run" then
+      vim.notify("nvim-heredoc: usage: :HeredocFixAll [--dry-run]", vim.log.levels.ERROR)
+      return
+    end
+    fix_all(vim.api.nvim_get_current_buf(), opts.args == "--dry-run")
+  end, {
+    nargs = "?",
+    force = true,
+    desc = "Report and normalise recovered heredoc terminators in the current buffer",
+  })
+end
+
 -- Read-only snapshot access for diagnostics and integration tests.
 function M._snapshot_for_test(buf)
   return scan_snapshots[buf or vim.api.nvim_get_current_buf()]
