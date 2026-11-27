@@ -281,15 +281,17 @@ local function opener_was_displaced(old, lines, edits)
   -- An edit strictly before it moves the original line; an edit touching it
   -- means a later identical line cannot establish that it survived.
   local row = old.opener_line - 1
+  local ambiguous = false
   for _, edit in ipairs(edits) do
     if edit.lastline <= row then
       row = row + edit.new_lastline - edit.lastline
     elseif edit.firstline <= row and row < edit.lastline then
-      return false
+      ambiguous = true
+      break
     end
   end
 
-  if row >= 0 and lines[row + 1] == old.opener_text then
+  if not ambiguous and row >= 0 and lines[row + 1] == old.opener_text then
     return true
   end
 
