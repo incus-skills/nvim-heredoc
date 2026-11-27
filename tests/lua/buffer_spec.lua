@@ -715,6 +715,10 @@ do
     "TAB_END",
   }
   local buf = set_buffer(original)
+  -- Clear setup-time buffer construction from the undo history so this
+  -- assertion measures the command's own single buffer edit.
+  vim.bo[buf].undolevels = -1
+  vim.bo[buf].undolevels = 1000
   vim.bo[buf].tabstop = 2
   vim.api.nvim_set_current_buf(buf)
   plugin.setup()
