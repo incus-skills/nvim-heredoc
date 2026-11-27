@@ -1002,11 +1002,14 @@ local function fix_all(buf, dry_run)
   for _, region in ipairs(result.heredocs or {}) do
     if region.terminator_line then
       local current = lines[region.terminator_line]
-      if current:match("^[ \t]+") then
+      if region.operator == "<<-" and not region.opener_safe then
+        skipped = skipped + 1
+      else
         local desired = editing.closer_line(region)
-        if not region.opener_safe then
-          skipped = skipped + 1
-        elseif desired and current ~= desired then
+        local needs_fix = region.operator == "<<-"
+          and current ~= desired
+          or region.operator == "<<" and current:match("^[ \t]+") ~= nil
+        if desired and needs_fix and current ~= desired then
           candidates[#candidates + 1] = {
             line = region.terminator_line,
             current = current,
