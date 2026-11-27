@@ -10,6 +10,9 @@ function M.closer_line(region)
     or region.delimiter_original == "" then
     return nil, "heredoc delimiter is unavailable"
   end
+  if region.operator == "<<" then
+    return region.delimiter
+  end
   return (region.structural_prefix or "") .. region.delimiter
 end
 
