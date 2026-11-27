@@ -6,7 +6,7 @@ The classifications distinguish two kinds of change: **ownership corrections fix
 
 ## 1. Scope
 
-The managed construct is a shell `<<-` heredoc. The implementation must not manage ordinary `<<` heredocs or here-strings (`<<<`).
+The managed body-formatting construct is a shell `<<-` heredoc. Ordinary `<<` heredoc bodies remain unadopted and must not receive managed payload formatting. However, closer recognition and normalisation are shared: an intended matching delimiter with leading spaces or TABs may be recovered for either operator, then rewritten according to the opener (`<<` left-justified; `<<-` using the structural TAB prefix). This is editor recovery, not a change to native shell syntax. Here-strings (`<<<`) remain outside scope.
 
 Initial filetypes: Bash, POSIX `sh`, and Zsh. The same lexical core serves all three. Treesitter parsers may be available and may provide optional structural assistance, but parser availability and parse success are not runtime requirements for heredoc recognition or editing.
 
@@ -91,11 +91,12 @@ Editing responsibilities are correspondingly narrow:
 - **Closer commitment:** create the matching closer on Return, rather than waiting for a later scan to discover a candidate terminator.
 - **Structural placement:** put the closer inside an already-present enclosing boundary when that is the correct local placement; do not invent or recreate a function/compound-command closer.
 - **Body indentation:** add the managed body TAB prefix while preserving payload spaces and relative indentation.
-- **Terminator indentation:** align the closer with the opener using literal TAB bytes that <<- will strip.
+- **Terminator recognition and normalisation:** for either `<<` or `<<-`, recognise the matching delimiter despite leading spaces or TABs, without trimming trailing whitespace or weakening delimiter identity. Rewrite the closer left-justified for `<<`; for `<<-`, align it with the opener using the structural TAB prefix that the shell strips.
+- **Body adoption boundary:** only `<<-` bodies enter the managed formatting region. An ordinary `<<` body remains payload and is never prefixed, normalised, or otherwise adopted; its closer-only recovery does not grant authority over body bytes.
 - **Transitional — managed-opener reconciliation:** the current `reconcile_managed_transition()` mechanism preserves behaviour when an already-managed opener changes between `<<-` and `<<`. It is retained while maintained snapshot knowledge and merge reconciliation acquire the capability to distinguish the managed and ordinary forms at the relevant cursor location, accounting for pending edit history. Its exit condition is that the maintained snapshot can make that distinction correctly without reconstructing it through this compatibility path. The capability replacement, rather than the compatibility mechanism, defines the intended responsibility.
 - **Paste preservation:** operate on the actual changed range and preserve existing bytes. This is a separate buffer-editing concern, not a reason to build a global heredoc identity system.
 
-Ordinary << heredocs and here-strings (<<<) remain unmanaged. They must not be modified by managed editing actions.
+Ordinary `<<` heredoc bodies and here-strings (`<<<`) remain outside managed body formatting. The ordinary `<<` closer-only recognition and left-justification rule above is a deliberately narrow exception; it does not authorise payload edits or automatic body adoption. Here-strings remain untouched.
 
 **Responsibility dependency — not a temporal pipeline:** The scanner observes shell structure and reports uncertainty conservatively. The merge mechanism maintains current region knowledge by reconciling observations with prior state, including invalidation and per-group salvage. The containment query consumes that maintained knowledge, and the synchronous Return path commits only when the query establishes that commitment is safe. These are responsibility dependencies, not a strictly sequential execution pipeline: scanner observation and merge maintenance may be asynchronous relative to containment queries and Return. Return does not wait for the merge to complete; it queries the current snapshot, which may lag the latest edit, and the validity-aware containment query's affected-region rescan catches up when relevant boundaries have been invalidated.
 
