@@ -154,7 +154,7 @@ end
 -- owned by the current edit range. A nil range is the explicit whole-buffer
 -- process_buffer() path. Ordinary << records participate only in this
 -- closer-only repair; their payload never enters prefix_region_range().
-local function normalize_heredoc_closers(buf, heredocs, ranges)
+local function normalize_heredoc_closers(buf, heredocs, ranges, prior_openers)
   local changed = false
   local lines = get_lines(buf)
 
@@ -171,8 +171,10 @@ local function normalize_heredoc_closers(buf, heredocs, ranges)
   end
 
   for _, region in ipairs(heredocs or {}) do
+    local opener_is_preexisting = prior_openers and prior_openers[region.opener_line]
     if region.terminator_line and region.opener_safe
-      and (not ranges or touches(region.opener_line) or touches(region.terminator_line)) then
+      and (not ranges or touches(region.terminator_line)
+        or (opener_is_preexisting and touches(region.opener_line))) then
       local row = region.terminator_line - 1
       local expected = editing.closer_line(region)
       if expected and lines[row + 1] ~= expected then
@@ -298,11 +300,6 @@ local function reconcile_managed_transition(buf, previous, current, edits)
   for _, old in ipairs(previous.heredocs) do
     local target_operator = old.operator == "<<-" and "<<" or old.operator == "<<" and "<<-" or nil
     local mapped_opener_line = map_opener_line(old, edits)
-    if old.delimiter == "EOF" then
-      print("HEREDOC_RECONCILE_DEBUG", old.operator, old.opener_line,
-        vim.inspect(old.opener_text), mapped_opener_line, vim.inspect(edits),
-        vim.inspect(lines))
-    end
     if target_operator and mapped_opener_line then
       local replacement
       for _, new in ipairs(current.heredocs) do
@@ -674,14 +671,20 @@ local function process_pending_ranges(buf)
     -- Reconciliation must use a fresh observation of the post-edit buffer.
     -- The transaction's mapped snapshot can retain displaced heredoc line
     -- coordinates while the user's edit inserts a new opener above them.
+    local prior_openers = {}
+    for _, old in ipairs(snapshot.heredocs or {}) do
+      local mapped_line = map_opener_line(old, pending.edits)
+      if mapped_line then prior_openers[mapped_line] = true end
+    end
     local current_scan = scanner.scan(get_source(get_lines(buf)), { tabstop = current_tabstop })
     -- Preserve the existing managed << / <<- compatibility transition as
     -- part of this owned batch; it does not create a new scope.
     reconcile_managed_transition(buf, snapshot, current_scan, pending.edits)
-    -- Re-observe after reconciliation, then repair only a closer whose opener
-    -- or terminator boundary belongs to this owned edit range.
+    -- Re-observe after reconciliation. A changed opener may repair its
+    -- closer only if that opener existed in the prior snapshot; a newly typed
+    -- uncommitted opener must not claim a later same-delimiter heredoc closer.
     current_scan = scanner.scan(get_source(get_lines(buf)), { tabstop = current_tabstop })
-    normalize_heredoc_closers(buf, current_scan.heredocs, pending.ranges)
+    normalize_heredoc_closers(buf, current_scan.heredocs, pending.ranges, prior_openers)
     for _, region in ipairs(result.snapshot.heredocs or {}) do
       if region.editable
         and (region.body_prefix or ((region.structural_prefix or "") .. "\t")) ~= "" then
