@@ -703,4 +703,70 @@ do
   end, 10), "an opener-looking payload line must not suppress managed-prefix removal")
 end
 
+-- Explicit whole-buffer repair is opt-in, reports candidates, and leaves
+-- ordinary heredoc payload bytes outside the repair operation.
+do
+  local original = {
+    "  cat <<'PLAIN_END'",
+    "  body  ",
+    "\t  PLAIN_END",
+    "  cat <<-TAB_END",
+    "  payload  ",
+    "TAB_END",
+  }
+  local buf = set_buffer(original)
+  -- Clear setup-time buffer construction from the undo history so this
+  -- assertion measures the command's own single buffer edit.
+  vim.bo[buf].undolevels = -1
+  vim.bo[buf].undolevels = 1000
+  vim.bo[buf].tabstop = 2
+  vim.api.nvim_set_current_buf(buf)
+  plugin.setup()
+
+  vim.cmd("HeredocFixAll --dry-run")
+  assert(vim.deep_equal(lines(buf), original),
+    "--dry-run must report candidates without changing any buffer bytes")
+  local items = vim.fn.getloclist(0)
+  assert(#items == 2 and items[1].lnum == 3 and items[2].lnum == 6,
+    "the location list should report both recovered closer candidates")
+
+  vim.cmd("HeredocFixAll")
+  local fixed = lines(buf)
+  assert(fixed[3] == "PLAIN_END",
+    "ordinary << closer repair should remove all leading indentation")
+  assert(fixed[6] == "\tTAB_END",
+    "<<- closer repair should use the opener's structural TAB prefix")
+  assert(fixed[2] == original[2] and fixed[5] == original[5],
+    "the explicit closer repair must not change either heredoc body")
+
+  vim.cmd("undo")
+  assert(vim.deep_equal(lines(buf), original),
+    "all closer replacements from one command should be one undo step")
+end
+
+-- An incomplete or lexically uncertain whole-buffer scan must fail closed;
+-- in particular, trailing whitespace is not accepted as a recovered closer.
+do
+  local original = { "cat <<-EXACT", "payload", "  EXACT " }
+  local buf = set_buffer(original)
+  vim.api.nvim_set_current_buf(buf)
+  plugin.setup()
+  vim.cmd("HeredocFixAll")
+  assert(vim.deep_equal(lines(buf), original),
+    "the fix command must not trim trailing whitespace or repair an incomplete scan")
+end
+
+-- A <<- opener whose indentation cannot be represented by structural TABs
+-- remains visible to the scanner but is not authorised for rewriting.
+do
+  local original = { "   cat <<-UNSAFE", "payload", "  UNSAFE" }
+  local buf = set_buffer(original)
+  vim.bo[buf].tabstop = 2
+  vim.api.nvim_set_current_buf(buf)
+  plugin.setup()
+  vim.cmd("HeredocFixAll")
+  assert(vim.deep_equal(lines(buf), original),
+    "unsupported structural indentation must not be normalised")
+end
+
 print("buffer integration tests: PASS")
