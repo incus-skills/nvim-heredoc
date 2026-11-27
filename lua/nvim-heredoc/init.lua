@@ -1032,6 +1032,7 @@ local function fix_all(buf, dry_run)
       text = string.format("%s closer: %q -> %q", candidate.operator, candidate.current, candidate.desired),
     }
   end
+  -- Neovim setloclist() accepts either positional items or the `what` table, not both.
   vim.fn.setloclist(0, {}, "r", { title = "HeredocFixAll", items = items })
 
   local action = dry_run and "would fix" or "fixing"
