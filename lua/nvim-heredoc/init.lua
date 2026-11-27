@@ -317,7 +317,18 @@ local function reconcile_managed_transition(buf, previous, current, edits)
   for _, old in ipairs(previous.heredocs) do
     local target_operator = old.operator == "<<-" and "<<" or old.operator == "<<" and "<<-" or nil
     local displaced = opener_was_displaced(old, lines, edits)
-    if target_operator and not displaced then
+    local prior_opener_survives = false
+    for _, candidate in ipairs(current.heredocs) do
+      if candidate.operator == old.operator
+        and candidate.opener_line ~= old.opener_line
+        and candidate.delimiter == old.delimiter
+        and candidate.delimiter_original == old.delimiter_original
+        and candidate.opener_text == old.opener_text then
+        prior_opener_survives = true
+        break
+      end
+    end
+    if target_operator and not displaced and not prior_opener_survives then
       local replacement
       for _, new in ipairs(current.heredocs) do
         if new.operator == target_operator
