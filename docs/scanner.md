@@ -147,8 +147,9 @@ compares the existing line with `editing.closer_line(region)`:
 - `<<`: remove leading spaces/TABs so the delimiter begins in column zero.
 - `<<-`: use the opener's structural TAB prefix.
 
-Only lines with leading indentation that differ from the operator-specific
-target are candidates. The command does not trim trailing whitespace, change
+For `<<`, a closer with leading spaces/TABs is a candidate. For `<<-`, any
+recovered closer that differs from the opener's structural TAB prefix is a
+candidate, including a column-zero line when the opener is indented. The command does not trim trailing whitespace, change
 delimiter identity, or format heredoc bodies. Unsafe `<<-` opener indentation
 is skipped. Already-canonical closers are no-ops.
 
