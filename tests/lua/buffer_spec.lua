@@ -491,7 +491,7 @@ do
   assert(plugin.process_buffer(buf), "a recoverable <<- closer should be rewritten")
   local actual = lines(buf)
   assert(actual[1] == "  cat <<-TAB_END")
-  assert(actual[2] == "\t\tpayload", "managed <<- body formatting remains active")
+  assert(actual[2] == "\t\t  payload", "managed <<- body formatting remains active and preserves payload spaces")
   assert(actual[3] == "\tTAB_END",
     "<<- closer must be rewritten with the opener's structural TAB prefix")
 end
