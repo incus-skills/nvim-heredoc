@@ -10,11 +10,17 @@ function M.closer_line(region)
     or region.delimiter_original == "" then
     return nil, "heredoc delimiter is unavailable"
   end
+  if region.operator == "<<" then
+    return region.delimiter
+  end
   return (region.structural_prefix or "") .. region.delimiter
 end
 
 function M.prefix_lines(region, lines, opts)
   opts = opts or {}
+  if region and region.operator == "<<" then
+    return nil, "ordinary heredoc bodies are outside managed formatting"
+  end
   if not region or not region.opener_safe then
     return nil, "heredoc opener is not safe to edit"
   end

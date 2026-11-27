@@ -236,24 +236,20 @@ local function normalize_heredoc_operators(line)
   return (line or ""):gsub("<<%-", "<<"):gsub("<<", "<")
 end
 
-local function opener_was_displaced(old, lines, edits)
-  if not old.opener_line or not old.opener_text or not edits then
-    return false
-  end
-
-  -- Track only the previous opener's line through the edits in this batch.
-  -- An edit strictly before it moves the original line; an edit touching it
-  -- means a later identical line cannot establish that it survived.
+-- Map the prior opener's 1-based line through the ordered on_lines edits.
+-- An edit touching that line replaces its anchor at the edit's first current
+-- row; edits before it shift the row by their line-count delta.
+local function map_opener_line(old, edits)
+  if not old.opener_line then return nil end
   local row = old.opener_line - 1
-  for _, edit in ipairs(edits) do
+  for _, edit in ipairs(edits or {}) do
     if edit.lastline <= row then
       row = row + edit.new_lastline - edit.lastline
     elseif edit.firstline <= row and row < edit.lastline then
-      return false
+      row = edit.firstline
     end
   end
-
-  return row >= 0 and lines[row + 1] == old.opener_text
+  return row + 1
 end
 
 local function reconcile_managed_transition(buf, previous, current, edits)
@@ -265,12 +261,12 @@ local function reconcile_managed_transition(buf, previous, current, edits)
   local changed = false
   for _, old in ipairs(previous.heredocs) do
     local target_operator = old.operator == "<<-" and "<<" or old.operator == "<<" and "<<-" or nil
-    local displaced = opener_was_displaced(old, lines, edits)
-    if target_operator and not displaced then
+    local mapped_opener_line = map_opener_line(old, edits)
+    if target_operator and mapped_opener_line then
       local replacement
       for _, new in ipairs(current.heredocs) do
         if new.operator == target_operator
-          and new.opener_line == old.opener_line
+          and new.opener_line == mapped_opener_line
           and new.queue_position == old.queue_position
           and new.delimiter == old.delimiter
           and new.delimiter_original == old.delimiter_original
@@ -630,9 +626,13 @@ local function process_pending_ranges(buf)
   -- the buffer.
   processing[buf] = true
   local ok, err = pcall(function()
+    -- Reconciliation must use a fresh observation of the post-edit buffer.
+    -- The transaction's mapped snapshot can retain displaced heredoc line
+    -- coordinates while the user's edit inserts a new opener above them.
+    local current_scan = scanner.scan(get_source(get_lines(buf)), { tabstop = current_tabstop })
     -- Preserve the existing managed << / <<- compatibility transition as
     -- part of this owned batch; it does not create a new scope.
-    reconcile_managed_transition(buf, snapshot, result.snapshot, pending.edits)
+    reconcile_managed_transition(buf, snapshot, current_scan, pending.edits)
     for _, region in ipairs(result.snapshot.heredocs or {}) do
       if region.editable
         and (region.body_prefix or ((region.structural_prefix or "") .. "\t")) ~= "" then

@@ -14,8 +14,10 @@ do
   local tab_indented = assert(scanner.parse_openers("\tcat <<-LIVE", { tabstop = 2 }))
   assert(tab_indented[1].structural_prefix == "\t" and tab_indented[1].body_prefix == "\t\t")
   assert(editing.closer_line(tab_indented[1]) == "\tLIVE")
-  local plain = assert(scanner.parse_openers("cat <<'PLAIN'"))
+  local plain = assert(scanner.parse_openers("  cat <<'PLAIN'"))
   assert(#plain == 1 and plain[1].operator == "<<")
+  assert(editing.closer_line(plain[1]) == "PLAIN",
+    "ordinary << closers are normalised to column zero regardless of opener indentation")
   local unsupported = assert(scanner.parse_openers("   cat <<-EOF", { tabstop = 2 }))
   assert(#unsupported == 1 and not unsupported[1].opener_safe)
   local none = assert(scanner.parse_openers("cat <<<VALUE"))
@@ -79,11 +81,26 @@ do
 end
 
 do
-  local result = scanner.scan("cat <<'EOF'\nbody\nEOF\n")
-  assert(#result.regions == 0, "ordinary heredocs remain outside the managed region list")
+  local result = scanner.scan("  cat <<'EOF'\n  body\n    EOF\n")
+  assert(#result.regions == 0, "ordinary heredocs remain outside the managed body-formatting region list")
   assert(#result.heredocs == 1 and result.heredocs[1].operator == "<<",
-    "the scanner should expose ordinary heredoc structure for transition detection")
-  assert(result.heredocs[1].terminator_line == 3)
+    "the scanner should expose ordinary heredoc structure for closer recovery")
+  local r = result.heredocs[1]
+  assert(r.terminator_line == 3)
+  assert(editing.closer_line(r) == "EOF",
+    "a recovered ordinary << closer must be left-justified")
+  local prefixed, reason = editing.prefix_lines(r, { "  payload" })
+  assert(prefixed == nil and reason:find("outside managed formatting", 1, true),
+    "ordinary << body content must be rejected by managed prefix editing")
+end
+
+-- An ordinary << closer can be repaired even when the opener's indentation
+-- cannot be represented as structural TABs: its target is always column zero.
+do
+  local result = scanner.scan("   cat <<ODD_PREFIX\nbody\n  ODD_PREFIX\n")
+  local r = result.heredocs[1]
+  assert(result.complete and #result.regions == 0 and r.opener_safe)
+  assert(not r.editable and editing.closer_line(r) == "ODD_PREFIX")
 end
 
 do
@@ -182,10 +199,9 @@ end
 
 
 -- Regression cases: heredoc-looking payload is opaque, delimiter identity is
--- per opener, and <<- removes leading TABs (never leading spaces) when
--- matching a terminator. Each source is scanned independently: the first
--- case is intentionally unterminated and therefore consumes the rest of
--- its own source as payload.
+-- per opener, and editor-side closer recovery tolerates leading spaces/TABs
+-- for both operators. This recovery rule is distinct from native shell
+-- terminator syntax; body adoption remains limited to <<-.
 do
   local source = table.concat({
     "conf_print_test4() {",
@@ -200,12 +216,16 @@ do
     "}",
   }, "\n") .. "\n"
   local result = scanner.scan(source)
-  assert(not result.complete, "plain << must not accept an indented terminator")
+  assert(result.complete, "an indented matching delimiter is recoverable for ordinary <<")
   assert(#result.heredocs == 1 and #result.regions == 0,
-    "the apparent opener inside an unterminated plain heredoc must remain payload")
-  assert(result.heredocs[1].delimiter == "EOF"
-    and result.heredocs[1].terminator_line == nil,
-    "neither spaces nor TABs may indent a plain << terminator")
+    "ordinary << is recognised for closer recovery but its body is not adopted")
+  local r = result.heredocs[1]
+  assert(r.delimiter == "EOF" and r.terminator_line == 8 and r.body_end_line == 7,
+    "leading spaces are tolerated for recognition, and the first matching delimiter closes the body")
+  assert(editing.closer_line(r) == "EOF",
+    "ordinary << recovery must remove all leading closer indentation")
+  assert(source:find("      hello1", 1, true) and source:find("          hello2", 1, true),
+    "ordinary heredoc body indentation remains present and unchanged")
 end
 
 do
@@ -222,12 +242,14 @@ do
     "}",
   }, "\n") .. "\n"
   local result = scanner.scan(source)
-  assert(result.complete, "the TAB-indented <<- terminator should close the heredoc")
+  assert(result.complete, "a space-indented matching delimiter is recoverable for <<-")
   assert(#result.heredocs == 1 and #result.regions == 1,
     "the heredoc-looking body line must not create a second opener")
   local r = result.regions[1]
-  assert(r.delimiter == "EOF" and r.terminator_line == 9 and r.body_end_line == 8,
-    "spaces must not terminate <<-, but a leading TAB must")
+  assert(r.delimiter == "EOF" and r.terminator_line == 8 and r.body_end_line == 7,
+    "leading spaces are tolerated for editor recognition, independently of shell <<- semantics")
+  assert(editing.closer_line(r) == "\tEOF",
+    "the recovered <<- closer is rewritten with the opener's structural TAB prefix")
 end
 
 do
@@ -267,6 +289,56 @@ do
   assert(result.regions[1].delimiter == "EOF"
     and result.regions[1].terminator_line == 8,
     "the first valid EOF at column zero must terminate the outer <<- heredoc")
+end
+
+-- A realistic ordinary heredoc with a front-matter/Markdown payload. The
+-- closer is misindented, but only that closer is eligible for repair; the
+-- ordinary body remains outside the managed formatting region.
+do
+  local source = table.concat({
+    "skill_calibrate() {",
+    "cat <<'OE_SKILL_CALIBRATE_V2_EOF'",
+    "---",
+    "",
+    "name: calibrate",
+    'description: "Refine calibration thresholds from session evidence."',
+    "metadata:",
+    "  hermes:",
+    "    tags: [oe, calibration, threshold]",
+    "",
+    "      OE_SKILL_CALIBRATE_V2_EOF",
+    "      }",
+  }, "\n") .. "\n"
+  local result = scanner.scan(source)
+  assert(result.complete and #result.heredocs == 1 and #result.regions == 0)
+  local r = result.heredocs[1]
+  assert(r.operator == "<<" and r.terminator_line == 11)
+  assert(editing.closer_line(r) == "OE_SKILL_CALIBRATE_V2_EOF")
+  assert(source:find("  hermes:", 1, true) and source:find("    tags:", 1, true),
+    "front-matter indentation remains body content, not adopted formatting")
+end
+
+-- Ordinary << recovery also tolerates a TAB-indented candidate, then removes
+-- that indentation from the repaired closer.
+do
+  local result = scanner.scan("  cat <<TAB_END\nbody\n\tTAB_END\n")
+  assert(result.complete and #result.heredocs == 1 and #result.regions == 0)
+  assert(result.heredocs[1].terminator_line == 3)
+  assert(editing.closer_line(result.heredocs[1]) == "TAB_END")
+end
+
+-- A closer with a different delimiter or trailing whitespace is not a match.
+do
+  local result = scanner.scan("cat <<-EOF\n  payload\n  EOF \n  EOF-extra\n")
+  assert(not result.complete and result.heredocs[1].terminator_line == nil,
+    "recovery must retain exact delimiter identity and must not trim trailing whitespace")
+end
+
+-- TAB-indented <<- closers remain normalised to the opener's structural prefix.
+do
+  local result = scanner.scan("\tcat <<-TAB_END\n\t\tbody\n  TAB_END\n")
+  assert(result.complete and result.regions[1].terminator_line == 3)
+  assert(editing.closer_line(result.regions[1]) == "\tTAB_END")
 end
 
 -- A non-colliding inner heredoc is cargo within the established outer region.

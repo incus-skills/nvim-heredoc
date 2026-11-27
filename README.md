@@ -6,12 +6,13 @@ The initial integration target is LazyVim, but the editing logic should remain u
 
 ## Project objective
 
-Provide predictable editing support for shell `<<-` (tab-stripping) heredocs:
+Provide predictable editing support for shell heredocs, with managed body formatting limited to `<<-` (tab-stripping) heredocs:
 
-- Insert a matching closing delimiter automatically.
-- Keep the opener and closing delimiter structurally indented within surrounding shell code.
+- Insert a matching closing delimiter automatically for managed `<<-` openers.
+- Keep managed openers and closing delimiters structurally indented within surrounding shell code.
 - Preserve relative indentation and existing bytes when multiline content is pasted.
-- Avoid changing ordinary `<<` heredocs and here-strings (`<<<`).
+- Recognise matching closers for either `<<` or `<<-` despite leading spaces or TABs; normalise closers created or actively maintained by the plugin.
+- Keep ordinary `<<` heredoc bodies outside managed formatting, and leave here-strings (`<<<`) untouched.
 - Work in Bash, POSIX `sh`, and Zsh buffers.
 - Coexist with the user's existing completion, pair, indentation, and formatting configuration.
 
@@ -46,7 +47,9 @@ The implementation distinguishes:
 
 Leading TAB bytes in the body are also stripped by the shell. The editor therefore cannot promise to preserve them as payload indentation. No special values for `expandtab`, `tabstop`, `softtabstop`, or `shiftwidth` are required to position the opener: the earlier need to force those options was a workaround for an older column-zero opener implementation, and is obsolete. The plugin does not set these options.
 
-Ordinary `<<` heredocs and `<<<` here-strings are outside the managed scope and must remain untouched.
+Ordinary `<<` heredocs are outside the managed body-formatting scope. Their matching closer may be recognised despite leading spaces or TABs, but existing terminator lines are not rewritten by generic buffer processing. The body is never adopted or reformatted. Here-strings (`<<<`) remain entirely outside scope.
+
+For either operator, leading spaces or TABs may be ignored when recovering the delimiter identity; trailing whitespace is not ignored, and the delimiter itself must still match exactly. This editor-side recognition tolerance does not change native shell syntax. Closer normalisation is limited to lines the plugin creates or is actively maintaining as part of an owned editing operation. Automatically fixing pre-existing indented terminators is a separate, deferred opt-in feature.
 
 ## Architecture
 

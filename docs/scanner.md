@@ -85,7 +85,7 @@ The merge consumer, not the scanner, decides how observations affect preservatio
 - Quoted and escaped delimiter words, preserving both source spelling and quote-removed match value, including valid empty quoted delimiters.
 - Multiple heredocs on one logical command, consumed in declaration order.
 - Backslash-newline command continuations.
-- `<<-` terminator matching after stripping leading TAB bytes.
+- Terminator recovery for both `<<` and `<<-`: compare the candidate delimiter after ignoring leading spaces and TABs, while retaining exact delimiter identity and not ignoring trailing whitespace. This is an editor recovery rule, not native shell parsing semantics.
 - Basic arithmetic-command and `[[ ... ]]` contexts to avoid treating shift/comparison operators as heredocs.
 - A bounded subset of `$(...)` command substitutions and nested substitutions, sufficient to skip ordinary substitutions that contain no heredoc redirection.
 - Arithmetic expansions inside supported command-substitution contexts.
@@ -115,7 +115,20 @@ The scanner may still recognise ordinary heredoc bodies so their payload is not 
 
 ## Lexical-zone boundary for syntax consumers
 
-The scanner's completed heredoc records expose `body_start_line`, `body_end_line`, and `terminator_line`. These are the current scanner-derived line boundaries for consumers that need to reason about payload regions. The `heredocs` collection includes ordinary `<<` and managed `<<-` regions; `regions` remains the managed `<<-` subset used by editing.
+The scanner's completed heredoc records expose `body_start_line`, `body_end_line`, and `terminator_line`. These are the scanner-derived line boundaries for consumers that need to reason about payload regions. The `heredocs` collection includes ordinary `<<` and managed `<<-` records; `regions` remains the managed `<<-` subset used for body formatting.
+
+### Closer recovery is separate from body adoption
+
+Both operators use the same editor-side recognition tolerance for an intended matching closer: leading spaces and TABs may be ignored when identifying the delimiter, but trailing whitespace is not ignored and the delimiter spelling must match exactly. Recognition is separate from editing authority: a pre-existing terminator is left byte-for-byte unchanged by generic buffer processing. When the plugin creates or actively maintains a closer as part of an owned operation, it uses the operator-appropriate form:
+
+- `<<`: remove all leading indentation; the closer is left-justified.
+- `<<-`: use the opener's `structural_prefix`, represented by literal TAB bytes.
+
+This is an editor recovery rule, not a claim that the indented candidate is valid shell syntax. Native shell semantics remain distinct: ordinary `<<` requires a left-justified terminator, while `<<-` strips leading TABs but not spaces.
+
+The distinction does not expand body adoption. Ordinary `<<` records remain in `heredocs` only; they are not added to `regions`, and their payload bytes are never passed through managed body-prefix formatting. Recognition of an ordinary `<<` closer does not authorise generic buffer processing to rewrite it. Pre-existing closer normalisation is deferred to a separate opt-in operation. Here-strings (`<<<`) remain outside both recognition and editing scope.
+
+A missing or non-matching delimiter remains incomplete. Recognition must not consume a delimiter-like body line with a different spelling, nor should trailing whitespace be silently trimmed to manufacture a match.
 
 The adopted project policy requires future syntax-presentation consumers to respect these established boundaries. They must not infer a competing payload boundary from Tree-sitter Bash nodes or delimiter-looking text inside a body. This scanner interface is line-based and currently recomputes from source; it does not yet provide a Tree-sitter included-range adapter, incremental region lifecycle, or payload-language classification. Those are implementation questions tracked in [Task 002](../tasks/active/002-syntax-presentation-lexical-zone-containment.md).
 

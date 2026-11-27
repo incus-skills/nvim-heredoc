@@ -466,6 +466,50 @@ do
   end, 10), "restoring <<- should reapply the structural body and closer TABs")
 end
 
+-- Existing terminators are recognised for lexical boundary recovery, but
+-- generic buffer processing does not lint/fix user-authored closer lines.
+do
+  local original = {
+    "  cat <<'PLAIN_END'",
+    "  body  ",
+    "\t  PLAIN_END",
+  }
+  local buf = set_buffer(original)
+  assert(not plugin.process_buffer(buf),
+    "ordinary << has no managed body edit and must not trigger a closer fix")
+  assert(vim.deep_equal(lines(buf), original),
+    "ordinary << opener, payload, and pre-existing closer must remain byte-identical")
+end
+
+do
+  local original = { "  cat <<-TAB_END", "  payload", "  TAB_END" }
+  local buf = set_buffer(original)
+  vim.bo[buf].tabstop = 2
+  assert(plugin.process_buffer(buf), "managed <<- body formatting should still run")
+  local actual = lines(buf)
+  assert(actual[1] == original[1])
+  assert(actual[2] == "\t\t  payload",
+    "managed body formatting remains active and preserves payload spaces")
+  assert(actual[3] == original[3],
+    "a pre-existing space-indented closer is recognised but not silently rewritten")
+end
+
+do
+  -- Editing a pre-existing closer is user content, not an owned plugin edit.
+  local original = { "  cat <<-LOCAL_END", "\t\tpayload", "  LOCAL_END" }
+  local buf = set_buffer(original)
+  vim.bo[buf].tabstop = 2
+  vim.api.nvim_set_current_buf(buf)
+  plugin.setup()
+  vim.api.nvim_buf_set_lines(buf, 2, 3, false, { "    LOCAL_END" })
+  assert(vim.wait(1000, function()
+    return lines(buf)[3] == "    LOCAL_END"
+  end, 10), "buffer processing must leave a user-edited existing closer unchanged")
+  local actual = lines(buf)
+  assert(actual[2] == "\t\tpayload",
+    "a closer-line edit must not broaden formatting into an unchanged body line")
+end
+
 do
   local buf = set_buffer({ "cat <<EOF", "body" })
   assert(not plugin.process_buffer(buf))
@@ -557,7 +601,7 @@ end
 do
   local cases = {
     {
-      name = "function-wrapped EOF with spaces rejected and TAB accepted",
+      name = "function-wrapped EOF with space-indented closer recovery",
       source = {
         "conf_print_test4() {",
         "  cat <<-'EOF'",
@@ -567,11 +611,10 @@ do
         "              hello3",
         "                  hello4",
         "    EOF",
-        "\tEOF",
         "}",
       },
-      terminator = "\tEOF",
-      terminator_index = 9,
+      terminator = "    EOF",
+      terminator_index = 8,
       payload = "\t\t  cat <<'EOF'",
     },
     {
