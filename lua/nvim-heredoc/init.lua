@@ -300,7 +300,7 @@ local function opener_was_displaced(old, lines, edits)
   -- transform ambiguous. Do not mistake a newly inserted same-delimiter
   -- heredoc for an operator transition on that older opener.
   for index, line in ipairs(lines) do
-    if index - 1 ~= old.opener_line and line == old.opener_text then
+    if index ~= old.opener_line and line == old.opener_text then
       return true
     end
   end
