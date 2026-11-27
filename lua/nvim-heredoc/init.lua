@@ -1100,6 +1100,7 @@ function M.setup_buffer(buf)
 end
 
 function M.setup()
+  install_fix_all_command()
   local group = vim.api.nvim_create_augroup(group_name, { clear = true })
   vim.api.nvim_create_autocmd("FileType", {
     group = group,
