@@ -18,8 +18,6 @@ do
   assert(#plain == 1 and plain[1].operator == "<<")
   assert(editing.closer_line(plain[1]) == "PLAIN",
     "ordinary << closers are normalised to column zero regardless of opener indentation")
-  assert(editing.closer_line(plain[1]) == "PLAIN",
-    "ordinary << closers are normalised to column zero regardless of opener indentation")
   local unsupported = assert(scanner.parse_openers("   cat <<-EOF", { tabstop = 2 }))
   assert(#unsupported == 1 and not unsupported[1].opener_safe)
   local none = assert(scanner.parse_openers("cat <<<VALUE"))
