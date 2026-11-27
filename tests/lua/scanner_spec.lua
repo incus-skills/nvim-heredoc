@@ -89,6 +89,18 @@ do
   assert(r.terminator_line == 3)
   assert(editing.closer_line(r) == "EOF",
     "a recovered ordinary << closer must be left-justified")
+  local prefixed, reason = editing.prefix_lines(r, { "  payload" })
+  assert(prefixed == nil and reason:find("outside managed formatting", 1, true),
+    "ordinary << body content must be rejected by managed prefix editing")
+end
+
+-- An ordinary << closer can be repaired even when the opener's indentation
+-- cannot be represented as structural TABs: its target is always column zero.
+do
+  local result = scanner.scan("   cat <<ODD_PREFIX\nbody\n  ODD_PREFIX\n")
+  local r = result.heredocs[1]
+  assert(result.complete and #result.regions == 0 and r.opener_safe)
+  assert(not r.editable and editing.closer_line(r) == "ODD_PREFIX")
 end
 
 do
