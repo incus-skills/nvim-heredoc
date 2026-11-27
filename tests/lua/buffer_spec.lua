@@ -497,19 +497,19 @@ do
 end
 
 do
-  -- The registered on_lines path may repair a closer when the opener boundary
-  -- is edited, but it must not broaden the body range to reach that closer.
+  -- The registered on_lines path repairs a changed closer line without
+  -- broadening body formatting beyond the owned range.
   local buf = set_buffer({ "  cat <<-LOCAL_END", "\t\tpayload", "  LOCAL_END" })
   vim.bo[buf].tabstop = 2
   vim.api.nvim_set_current_buf(buf)
   plugin.setup()
-  vim.api.nvim_buf_set_lines(buf, 0, 1, false, { "cat <<-LOCAL_END" })
+  vim.api.nvim_buf_set_lines(buf, 2, 3, false, { "    LOCAL_END" })
   assert(vim.wait(1000, function()
-    return lines(buf)[3] == "LOCAL_END"
-  end, 10), "editing the opener should normalise its matching closer")
+    return lines(buf)[3] == "\tLOCAL_END"
+  end, 10), "editing the closer should normalise it to the opener's structural TAB prefix")
   local actual = lines(buf)
   assert(actual[2] == "\t\tpayload",
-    "opener-boundary recovery must not reformat an unchanged body line")
+    "closer-only recovery must not reformat an unchanged body line")
 end
 
 do
