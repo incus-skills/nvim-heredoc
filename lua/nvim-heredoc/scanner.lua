@@ -364,7 +364,8 @@ function M.parse_openers(source, opts)
     local opener = lines[item.opener_line] or ""
     local prefix = opener:match("^([ \t]*)") or ""
     local structural_prefix, structural_column = structural_tab_prefix(prefix, tabstop)
-    local safe = structural_prefix ~= nil
+    local structural_safe = structural_prefix ~= nil
+    local closer_safe = item.operator == "<<" or structural_safe
     openers[#openers + 1] = {
       operator = item.operator,
       opener_line = item.opener_line,
@@ -376,13 +377,13 @@ function M.parse_openers(source, opts)
       delimiter_quoted = item.delimiter_quoted,
       body_start_line = #lines + 1,
       structural_prefix = structural_prefix or "",
-      body_prefix = safe and (structural_prefix .. "\t") or nil,
+      body_prefix = structural_safe and (structural_prefix .. "\t") or nil,
       opener_prefix = prefix,
       structural_column = structural_column,
       tabstop = tabstop,
-      structural_tabs_only = safe,
-      opener_safe = safe,
-      confidence = safe and "local" or "unsupported-indent",
+      structural_tabs_only = structural_safe,
+      opener_safe = closer_safe,
+      confidence = closer_safe and "local" or "unsupported-indent",
       editable = false,
     }
   end
@@ -442,7 +443,10 @@ function M.scan(source, opts)
       local body_start, terminator = i, nil
       while i <= #lines do
         local candidate = lines[i]
-        local match_line = item.operator == "<<-" and candidate:gsub("^\t+", "") or candidate
+        -- Editor recovery tolerates leading indentation for either operator.
+        -- This is deliberately broader than native shell terminator syntax;
+        -- trailing whitespace and delimiter spelling remain exact.
+        local match_line = candidate:gsub("^[ \t]+", "")
         if match_line == item.delimiter then
           terminator = i
           break
@@ -450,7 +454,8 @@ function M.scan(source, opts)
         i = i + 1
       end
 
-      local safe = item.structural_tabs_only
+      local structural_safe = item.structural_tabs_only
+      local closer_safe = item.operator == "<<" or structural_safe
       local region = {
         operator = item.operator,
         opener_line = item.opener_line,
@@ -470,10 +475,11 @@ function M.scan(source, opts)
         opener_prefix = item.opener_prefix,
         structural_column = item.structural_column,
         tabstop = tabstop,
-        structural_tabs_only = safe,
-        opener_safe = safe,
-        confidence = terminator and (safe and "lexical" or "unsupported-indent") or "incomplete",
-        editable = terminator ~= nil and safe and #diagnostics == 0,
+        structural_tabs_only = structural_safe,
+        opener_safe = closer_safe,
+        confidence = terminator and (closer_safe and "lexical" or "unsupported-indent") or "incomplete",
+        -- Only <<- records are adopted by the managed body-formatting path.
+        editable = item.operator == "<<-" and terminator ~= nil and structural_safe and #diagnostics == 0,
       }
       result.heredocs[#result.heredocs + 1] = region
       if item.operator == "<<-" then
