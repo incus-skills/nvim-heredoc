@@ -712,7 +712,7 @@ do
     "\t  PLAIN_END",
     "  cat <<-TAB_END",
     "  payload  ",
-    "  TAB_END",
+    "TAB_END",
   }
   local buf = set_buffer(original)
   vim.bo[buf].tabstop = 2
