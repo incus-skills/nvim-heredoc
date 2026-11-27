@@ -272,39 +272,20 @@ local function normalize_heredoc_operators(line)
   return (line or ""):gsub("<<%-", "<<"):gsub("<<", "<")
 end
 
-local function opener_was_displaced(old, lines, edits)
-  if not old.opener_line or not old.opener_text or not edits then
-    return false
-  end
-
-  -- Track only the previous opener's line through the edits in this batch.
-  -- An edit strictly before it moves the original line; an edit touching it
-  -- means a later identical line cannot establish that it survived.
+-- Map the prior opener's 1-based line through the ordered on_lines edits.
+-- An edit touching that line replaces its anchor at the edit's first current
+-- row; edits before it shift the row by their line-count delta.
+local function map_opener_line(old, edits)
+  if not old.opener_line then return nil end
   local row = old.opener_line - 1
-  local ambiguous = false
-  for _, edit in ipairs(edits) do
+  for _, edit in ipairs(edits or {}) do
     if edit.lastline <= row then
       row = row + edit.new_lastline - edit.lastline
     elseif edit.firstline <= row and row < edit.lastline then
-      ambiguous = true
-      break
+      row = edit.firstline
     end
   end
-
-  if not ambiguous and row >= 0 and lines[row + 1] == old.opener_text then
-    return true
-  end
-
-  -- If the exact prior opener still exists elsewhere, the old line was
-  -- displaced even when a coalesced/replacement edit made its coordinate
-  -- transform ambiguous. Do not mistake a newly inserted same-delimiter
-  -- heredoc for an operator transition on that older opener.
-  for index, line in ipairs(lines) do
-    if index ~= old.opener_line and line == old.opener_text then
-      return true
-    end
-  end
-  return false
+  return row + 1
 end
 
 local function reconcile_managed_transition(buf, previous, current, edits)
@@ -316,32 +297,12 @@ local function reconcile_managed_transition(buf, previous, current, edits)
   local changed = false
   for _, old in ipairs(previous.heredocs) do
     local target_operator = old.operator == "<<-" and "<<" or old.operator == "<<" and "<<-" or nil
-    local displaced = opener_was_displaced(old, lines, edits)
-    local prior_opener_survives = false
-    for index, line in ipairs(lines) do
-      if index ~= old.opener_line
-        and normalize_heredoc_operators(line) == normalize_heredoc_operators(old.opener_text) then
-        prior_opener_survives = true
-        break
-      end
-    end
-    if not prior_opener_survives then
-      for _, candidate in ipairs(current.heredocs) do
-        if candidate.operator == old.operator
-          and candidate.opener_line ~= old.opener_line
-          and candidate.delimiter == old.delimiter
-          and candidate.delimiter_original == old.delimiter_original
-          and candidate.opener_text == old.opener_text then
-          prior_opener_survives = true
-          break
-        end
-      end
-    end
-    if target_operator and not displaced and not prior_opener_survives then
+    local mapped_opener_line = map_opener_line(old, edits)
+    if target_operator and mapped_opener_line then
       local replacement
       for _, new in ipairs(current.heredocs) do
         if new.operator == target_operator
-          and new.opener_line == old.opener_line
+          and new.opener_line == mapped_opener_line
           and new.queue_position == old.queue_position
           and new.delimiter == old.delimiter
           and new.delimiter_original == old.delimiter_original
