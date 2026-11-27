@@ -134,6 +134,40 @@ The adopted project policy requires future syntax-presentation consumers to resp
 
 This does not make Tree-sitter a dependency for scanning or editing. The scanner remains the structural source of truth, and unknown payloads must not be silently parsed as Bash.
 
+## Explicit repair of pre-existing terminators
+
+`:HeredocFixAll` is the user-controlled whole-buffer repair operation for
+pre-existing indented terminator lines. It is registered by
+`require("nvim-heredoc").setup()` and acts only on the current buffer.
+
+The command performs one complete scanner pass and refuses to edit if the
+scan is incomplete or lexically uncertain. For each recovered terminator it
+compares the existing line with `editing.closer_line(region)`:
+
+- `<<`: remove leading spaces/TABs so the delimiter begins in column zero.
+- `<<-`: use the opener's structural TAB prefix.
+
+Only lines with leading indentation that differ from the operator-specific
+target are candidates. The command does not trim trailing whitespace, change
+delimiter identity, or format heredoc bodies. Unsafe `<<-` opener indentation
+is skipped. Already-canonical closers are no-ops.
+
+Candidates are placed in the current window's location list. The optional
+`--dry-run` argument reports them without editing. A normal invocation
+replaces all candidate lines in one contiguous buffer edit, preserving any
+intervening lines byte-for-byte and making the repair a single undo operation.
+The command declines while a deferred buffer-edit batch is pending, avoiding
+a race with ordinary plugin maintenance.
+
+There is no load-time, text-change, or save-time autocmd for this operation.
+It is not part of default buffer processing. A future opt-in save hook would
+be a separate contract and configuration change.
+
+The current implementation does not maintain a persistent set of plugin-owned
+closer rows. Plugin-created/maintained closers are already in canonical form
+and therefore are not candidates; the command does not add a document-wide
+ownership ledger.
+
 ## Editing integration status
 
 The current production integration has evolved through several approaches, including retained scan snapshots, transition reconciliation, and Return-local insertion. Those mechanisms are implementation history, not all architectural requirements. The governing question for future changes is whether a mechanism is strictly necessary to fulfil the Return-local bounded-scope contract.
