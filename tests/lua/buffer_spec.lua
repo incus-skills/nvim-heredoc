@@ -649,7 +649,7 @@ do
         "  EOF",
         "}",
       },
-      terminator = "EOF",
+      terminator = "\tEOF",
       terminator_index = 8,
       payload = "\t\tcat <<-'EOF'",
     },
