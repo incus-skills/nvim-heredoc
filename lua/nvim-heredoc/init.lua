@@ -1029,7 +1029,9 @@ local function fix_all(buf, dry_run)
       lnum = candidate.line,
       col = 1,
       type = "W",
-      text = string.format("%s closer: %q -> %q", candidate.operator, candidate.current, candidate.desired),
+      text = candidate.operator == "<<"
+        and "remove leading spaces from << closer"
+        or "restore structural TAB for <<- closer",
     }
   end
   -- Neovim setloclist() accepts either positional items or the `what` table, not both.
