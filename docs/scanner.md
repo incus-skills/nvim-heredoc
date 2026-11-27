@@ -119,14 +119,14 @@ The scanner's completed heredoc records expose `body_start_line`, `body_end_line
 
 ### Closer recovery is separate from body adoption
 
-Both operators use the same editor-side recognition tolerance for an intended matching closer: leading spaces and TABs may be ignored when identifying the delimiter, but trailing whitespace is not ignored and the delimiter spelling must match exactly. Once recognised, the closer is normalised according to its opener:
+Both operators use the same editor-side recognition tolerance for an intended matching closer: leading spaces and TABs may be ignored when identifying the delimiter, but trailing whitespace is not ignored and the delimiter spelling must match exactly. Recognition is separate from editing authority: a pre-existing terminator is left byte-for-byte unchanged by generic buffer processing. When the plugin creates or actively maintains a closer as part of an owned operation, it uses the operator-appropriate form:
 
 - `<<`: remove all leading indentation; the closer is left-justified.
 - `<<-`: use the opener's `structural_prefix`, represented by literal TAB bytes.
 
 This is an editor recovery rule, not a claim that the indented candidate is valid shell syntax. Native shell semantics remain distinct: ordinary `<<` requires a left-justified terminator, while `<<-` strips leading TABs but not spaces.
 
-The distinction does not expand body adoption. Ordinary `<<` records remain in `heredocs` only; they are not added to `regions`, and their payload bytes are never passed through managed body-prefix formatting. The closer-only normalisation is the sole exception to leaving ordinary `<<` heredocs untouched. Here-strings (`<<<`) remain outside both recognition and editing scope.
+The distinction does not expand body adoption. Ordinary `<<` records remain in `heredocs` only; they are not added to `regions`, and their payload bytes are never passed through managed body-prefix formatting. Recognition of an ordinary `<<` closer does not authorise generic buffer processing to rewrite it. Pre-existing closer normalisation is deferred to a separate opt-in operation. Here-strings (`<<<`) remain outside both recognition and editing scope.
 
 A missing or non-matching delimiter remains incomplete. Recognition must not consume a delimiter-like body line with a different spelling, nor should trailing whitespace be silently trimmed to manufacture a match.
 
