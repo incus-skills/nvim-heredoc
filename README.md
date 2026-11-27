@@ -49,7 +49,7 @@ Leading TAB bytes in the body are also stripped by the shell. The editor therefo
 
 Ordinary `<<` heredocs are outside the managed body-formatting scope. Their matching closer may be recognised despite leading spaces or TABs, but existing terminator lines are not rewritten by generic buffer processing. The body is never adopted or reformatted. Here-strings (`<<<`) remain entirely outside scope.
 
-For either operator, leading spaces or TABs may be ignored when recovering the delimiter identity; trailing whitespace is not ignored, and the delimiter itself must still match exactly. This editor-side recognition tolerance does not change native shell syntax. Closer normalisation is limited to lines the plugin creates or is actively maintaining as part of an owned editing operation. Automatically fixing pre-existing indented terminators is a separate, deferred opt-in feature.
+For either operator, leading spaces or TABs may be ignored when recovering the delimiter identity; trailing whitespace is not ignored, and the delimiter itself must still match exactly. This editor-side recognition tolerance does not change native shell syntax. Closer normalisation is limited to lines the plugin creates or is actively maintaining as part of an owned editing operation. Pre-existing indented terminators can be repaired explicitly with `:HeredocFixAll`; this command is never run automatically. Use `:HeredocFixAll --dry-run` to populate the location list without changing the buffer. The command refuses an incomplete or uncertain scan and groups its replacements into one undoable edit.
 
 ## Architecture
 
