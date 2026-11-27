@@ -298,6 +298,11 @@ local function reconcile_managed_transition(buf, previous, current, edits)
   for _, old in ipairs(previous.heredocs) do
     local target_operator = old.operator == "<<-" and "<<" or old.operator == "<<" and "<<-" or nil
     local mapped_opener_line = map_opener_line(old, edits)
+    if old.delimiter == "EOF" then
+      print("HEREDOC_RECONCILE_DEBUG", old.operator, old.opener_line,
+        vim.inspect(old.opener_text), mapped_opener_line, vim.inspect(edits),
+        vim.inspect(lines))
+    end
     if target_operator and mapped_opener_line then
       local replacement
       for _, new in ipairs(current.heredocs) do
