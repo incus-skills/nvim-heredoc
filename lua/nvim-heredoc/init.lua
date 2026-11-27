@@ -675,7 +675,8 @@ local function process_pending_ranges(buf)
     reconcile_managed_transition(buf, snapshot, result.snapshot, pending.edits)
     -- The committed edit may have touched either boundary. Repair the closer
     -- from the current scanner record without widening body-formatting scope.
-    normalize_heredoc_closers(buf, result.snapshot.heredocs, pending.ranges)
+    local current_scan = scanner.scan(get_source(get_lines(buf)), { tabstop = current_tabstop })
+    normalize_heredoc_closers(buf, current_scan.heredocs, pending.ranges)
     for _, region in ipairs(result.snapshot.heredocs or {}) do
       if region.editable
         and (region.body_prefix or ((region.structural_prefix or "") .. "\t")) ~= "" then
